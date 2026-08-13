@@ -716,6 +716,19 @@ export default function Home() {
 
   if (!mounted) return null;
 
+  if (isAuthLoading) {
+    return (
+      <div className={`min-h-screen flex items-center justify-center transition-colors duration-200 ${
+        isDarkMode ? 'bg-zinc-950 text-zinc-100' : 'bg-slate-50 text-slate-800'
+      }`}>
+        <div className="flex flex-col items-center space-y-4">
+          <RefreshCw className="h-10 w-10 text-slate-500 dark:text-zinc-400 animate-spin" />
+          <p className="text-sm font-medium text-slate-500 dark:text-zinc-400">စနစ်အား စတင်ပြင်ဆင်နေပါသည်...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`min-h-screen flex flex-col transition-colors duration-200 font-sans selection:bg-slate-500/20 antialiased ${
       isDarkMode ? 'bg-zinc-950 text-zinc-100' : 'bg-slate-50 text-slate-800'
@@ -1020,11 +1033,98 @@ export default function Home() {
             </div>
           </div>
         ) : isConnectingDrive ? (
-          /* Connecting to Drive spinner */
-          <div className="flex flex-col items-center justify-center space-y-4 py-20 bg-white rounded-2xl border border-slate-200/80 shadow-sm">
-            <RefreshCw className="h-12 w-12 text-slate-800 animate-spin" />
-            <h3 className="text-lg font-bold text-slate-900">Google Drive နှင့် ချိတ်ဆက်နေပါသည်...</h3>
-            <p className="text-sm text-slate-500 max-w-xs text-center">သင့် account ရှိ Trading Journal Sheets နှင့် Notes Docs များကို ရှာဖွေပြင်ဆင်နေပါသည်။</p>
+          /* Connecting to Drive spinner - Redesigned as Premium Modern UI */
+          <div className="max-w-md mx-auto my-12 relative">
+            <style>{`
+              @keyframes driveProgress {
+                0% { transform: translateX(-100%); }
+                100% { transform: translateX(250%); }
+              }
+              .animate-drive-progress {
+                animation: driveProgress 2s infinite cubic-bezier(0.4, 0, 0.2, 1);
+              }
+            `}</style>
+            
+            <div className={`relative overflow-hidden p-8 sm:p-10 rounded-2xl border text-center transition-all shadow-xl ${
+              isDarkMode 
+                ? 'bg-zinc-900 border-zinc-800/80 text-zinc-100 shadow-black/40' 
+                : 'bg-white border-slate-200/80 text-slate-800 shadow-slate-200/50'
+            }`}>
+              {/* Premium Ambient Background Glow */}
+              <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-48 h-48 rounded-full blur-3xl opacity-20 pointer-events-none transition-colors ${
+                isDarkMode ? 'bg-indigo-500/20' : 'bg-blue-500/15'
+              }`}></div>
+
+              <div className="relative z-10 flex flex-col items-center">
+                {/* Visual Icon Header */}
+                <div className="relative mb-6">
+                  <div className={`absolute inset-0 rounded-full animate-ping opacity-15 scale-125 ${
+                    isDarkMode ? 'bg-indigo-400' : 'bg-blue-400'
+                  }`}></div>
+                  <div className={`relative p-4 rounded-2xl shadow-md border ${
+                    isDarkMode 
+                      ? 'bg-zinc-800/80 border-zinc-700/80 text-indigo-400' 
+                      : 'bg-slate-50 border-slate-100 text-blue-600'
+                  }`}>
+                    {/* Cloud Drive Sync icon */}
+                    <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
+                    </svg>
+                  </div>
+                </div>
+
+                <h3 className="text-lg font-bold tracking-tight mb-2">
+                  Google Drive နှင့် ချိတ်ဆက်နေပါသည်
+                </h3>
+                <p className={`text-xs max-w-xs mx-auto mb-6 leading-relaxed ${
+                  isDarkMode ? 'text-zinc-400' : 'text-slate-500'
+                }`}>
+                  သင့် account ရှိ Trading Journal Sheets နှင့် Notes Docs များကို ရှာဖွေပြင်ဆင်နေပါသည်။
+                </p>
+
+                {/* Highly Responsive Custom Progress Bar */}
+                <div className={`w-full max-w-xs h-1 rounded-full overflow-hidden relative mb-8 ${
+                  isDarkMode ? 'bg-zinc-800' : 'bg-slate-100'
+                }`}>
+                  <div className={`absolute top-0 bottom-0 left-0 bg-gradient-to-r ${
+                    isDarkMode ? 'from-indigo-500 to-purple-500' : 'from-blue-500 to-indigo-500'
+                  } animate-drive-progress rounded-full`} style={{ width: '40%' }}></div>
+                </div>
+
+                {/* Process Step Indicators */}
+                <div className={`w-full max-w-xs space-y-3 text-left border-t pt-5 ${
+                  isDarkMode ? 'border-zinc-800/80' : 'border-slate-100'
+                }`}>
+                  <div className="flex items-center space-x-2.5 text-xs font-medium">
+                    <span className="flex h-2 w-2 relative">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    <span className={isDarkMode ? 'text-zinc-300' : 'text-slate-600'}>
+                      Google Services Authenticated
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-2.5 text-xs font-medium">
+                    <span className="flex h-2 w-2 relative">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                    </span>
+                    <span className={isDarkMode ? 'text-zinc-400' : 'text-slate-500'}>
+                      Syncing Trading Journal Sheets...
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-2.5 text-xs font-medium">
+                    <span className="flex h-2 w-2 relative">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-500"></span>
+                    </span>
+                    <span className={isDarkMode ? 'text-zinc-400' : 'text-slate-500'}>
+                      Syncing Strategy Notes & Docs...
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         ) : (
           /* Main Dashboard UI */
