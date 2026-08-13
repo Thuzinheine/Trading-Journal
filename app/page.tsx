@@ -1130,88 +1130,45 @@ export default function Home() {
           /* Main Dashboard UI */
           <div className="space-y-8">
             {/* Top Toolbar / Tab Switcher (Redesigned as Page Header with Sync Status) */}
-            <div className={`flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-5 rounded-2xl border transition-all ${
-              isDarkMode 
-                ? 'bg-zinc-900/50 border-zinc-800/80 text-zinc-100' 
-                : 'bg-white border-slate-200/80 text-slate-800'
-            }`}>
-              <div>
-                <h2 className="text-xl font-bold tracking-tight">
-                  {activeTab === 'overview' && 'Dashboard'}
-                  {activeTab === 'journal' && 'Trading Journal (အရောင်းအဝယ်မှတ်တမ်း)'}
-                  {activeTab === 'notes' && 'Strategy Notes (ကိုယ်ပိုင်မဟာဗျူဟာများ)'}
-                  {activeTab === 'keep' && 'Local Notes (အမြန်မှတ်စုများ)'}
-                </h2>
-                <p className="text-xs text-zinc-500 mt-0.5">
-                  {activeTab === 'overview' && 'အရောင်းအဝယ်များနှင့် ရလဒ်များ၏ ခြုံငုံသုံးသပ်ချက် ဇယားများ'}
-                  {activeTab === 'journal' && 'Google Sheets နှင့် ချိတ်ဆက်ထားသော trade data မှတ်တမ်းဇယား'}
-                  {activeTab === 'notes' && 'Google Doc နှင့် တိုက်ရိုက်ချိတ်ဆက်ထားသော strategy မှတ်စုစာမျက်နှာ'}
-                  {activeTab === 'keep' && 'သင်၏ Trading Note မှတ်စုစာစုများ နှင့် backup notes စနစ်'}
-                </p>
-              </div>
+            {activeTab !== 'overview' && (
+              <div className={`flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-5 rounded-2xl border transition-all ${
+                isDarkMode 
+                  ? 'bg-zinc-900/50 border-zinc-800/80 text-zinc-100' 
+                  : 'bg-white border-slate-200/80 text-slate-800'
+              }`}>
+                <div>
+                  <h2 className="text-xl font-bold tracking-tight">
+                    {activeTab === 'journal' && 'Trading Journal (အရောင်းအဝယ်မှတ်တမ်း)'}
+                    {activeTab === 'notes' && 'Strategy Notes (ကိုယ်ပိုင်မဟာဗျူဟာများ)'}
+                    {activeTab === 'keep' && 'Local Notes (အမြန်မှတ်စုများ)'}
+                  </h2>
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    {activeTab === 'journal' && 'Google Sheets နှင့် ချိတ်ဆက်ထားသော trade data မှတ်တမ်းဇယား'}
+                    {activeTab === 'notes' && 'Google Doc နှင့် တိုက်ရိုက်ချိတ်ဆက်ထားသော strategy မှတ်စုစာမျက်နှာ'}
+                    {activeTab === 'keep' && 'သင်၏ Trading Note မှတ်စုစာစုများ နှင့် backup notes စနစ်'}
+                  </p>
+                </div>
 
-              {/* Sync Indicators & Google Direct Links */}
-              <div className="flex items-center flex-wrap gap-2.5 text-xs">
-                <button
-                  onClick={triggerRefresh}
-                  className={`flex items-center space-x-1.5 px-3.5 py-2 border rounded-xl font-semibold transition-all duration-150 cursor-pointer ${
-                    isDarkMode 
-                      ? 'bg-zinc-800/50 hover:bg-zinc-800 border-zinc-700/50 text-zinc-300 hover:text-white' 
-                      : 'bg-slate-50 border-slate-200 hover:bg-slate-100 hover:text-slate-900 text-slate-600'
-                  }`}
-                  title="Google Workspace မှ Data များ တစ်ပြိုင်နက် Sync ပြန်လုပ်ပါ"
-                >
-                  <RefreshCw className={`h-3.5 w-3.5 ${isLoadingTrades || isDocLoading || isKeepLoading ? 'animate-spin' : ''}`} />
-                  <span>Sync Refresh</span>
-                </button>
-                
-                {spreadsheetId && (
-                  <a
-                    href={`https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl font-semibold border transition-all duration-150 ${
-                      isDarkMode 
-                        ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700/85 border-zinc-750' 
-                        : 'bg-slate-100 text-slate-800 hover:bg-slate-200 border-slate-200/80'
-                    }`}
-                  >
-                    <span>Sheets ဖွင့်ရန်</span>
-                    <ExternalLink className="h-3.5 w-3.5" />
-                  </a>
-                )}
-                {documentId && (
-                  <a
-                    href={`https://docs.google.com/document/d/${documentId}/edit`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl font-semibold border transition-all duration-150 ${
-                      isDarkMode 
-                        ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700/85 border-zinc-750' 
-                        : 'bg-slate-100 text-slate-800 hover:bg-slate-200 border-slate-200/80'
-                    }`}
-                  >
-                    <span>Docs ဖွင့်ရန်</span>
-                    <ExternalLink className="h-3.5 w-3.5" />
-                  </a>
-                )}
+                {/* Keep ဖွင့်ရန် button if on keep tab */}
                 {activeTab === 'keep' && (
-                  <a
-                    href="https://keep.google.com"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl font-semibold border transition-all duration-150 ${
-                      isDarkMode 
-                        ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700/85 border-zinc-750' 
-                        : 'bg-slate-100 text-slate-800 hover:bg-slate-200 border-slate-200/80'
-                    }`}
-                  >
-                    <span>Keep ဖွင့်ရန်</span>
-                    <ExternalLink className="h-3.5 w-3.5" />
-                  </a>
+                  <div className="flex items-center flex-wrap gap-2.5 text-xs">
+                    <a
+                      href="https://keep.google.com"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl font-semibold border transition-all duration-150 ${
+                        isDarkMode 
+                          ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700/85 border-zinc-750' 
+                          : 'bg-slate-100 text-slate-800 hover:bg-slate-200 border-slate-200/80'
+                      }`}
+                    >
+                      <span>Keep ဖွင့်ရန်</span>
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                  </div>
                 )}
               </div>
-            </div>
+            )}
 
             {/* OVERVIEW DASHBOARD VIEW */}
             {activeTab === 'overview' && (
@@ -2127,278 +2084,276 @@ export default function Home() {
       </div>
     </footer>
 
-      {/* ADD / EDIT TRADE MODAL */}
+    {/* ADD / EDIT TRADE MODAL */}
       <AnimatePresence>
         {showFormModal && (
-          <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
             {/* Overlay */}
             <div 
               className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity" 
               onClick={() => setShowFormModal(false)}
             />
 
-            <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                transition={{ duration: 0.2 }}
-                className={`relative transform overflow-hidden rounded-2xl text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg ${
-                  isDarkMode ? 'bg-zinc-900 border border-zinc-800 text-zinc-100' : 'bg-white text-slate-800'
-                }`}
-              >
-                {/* Header */}
-                <div className="bg-slate-900 dark:bg-zinc-950 px-6 py-4 flex justify-between items-center text-white">
-                  <h3 className="text-base font-bold leading-6">
-                    {editingTrade ? 'Trading Record ပြင်ဆင်ရန်' : 'Trading Record အသစ်ထည့်ရန်'}
-                  </h3>
-                  <button 
-                    onClick={() => setShowFormModal(false)}
-                    className="text-white/80 hover:text-white text-sm font-semibold transition-all cursor-pointer"
-                  >
-                    ပိတ်ရန်
-                  </button>
-                </div>
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ duration: 0.2 }}
+              className={`relative z-10 w-full max-w-lg max-h-[90vh] flex flex-col rounded-2xl text-left shadow-xl overflow-hidden transition-all ${
+                isDarkMode ? 'bg-zinc-900 border border-zinc-800 text-zinc-100 shadow-black/40' : 'bg-white text-slate-800 shadow-slate-200/50'
+              }`}
+            >
+              {/* Header - Sticky */}
+              <div className="bg-slate-900 dark:bg-zinc-950 px-4 sm:px-6 py-4 flex justify-between items-center text-white shrink-0">
+                <h3 className="text-sm sm:text-base font-bold leading-6">
+                  {editingTrade ? 'Trading Record ပြင်ဆင်ရန်' : 'Trading Record အသစ်ထည့်ရန်'}
+                </h3>
+                <button 
+                  onClick={() => setShowFormModal(false)}
+                  className="text-white/80 hover:text-white text-sm font-semibold transition-all cursor-pointer"
+                >
+                  ပိတ်ရန်
+                </button>
+              </div>
 
-                <form onSubmit={handleFormSubmit}>
-                  {/* Form fields */}
-                  <div className={`px-6 py-6 space-y-4 ${isDarkMode ? 'bg-zinc-900' : 'bg-white'}`}>
-                    {formError && (
-                      <div className="p-3 bg-rose-50 dark:bg-rose-950/20 text-rose-800 dark:text-rose-400 border border-rose-200 dark:border-rose-800 rounded-xl text-xs font-semibold">
-                        {formError}
-                      </div>
-                    )}
-
-                    <div className="grid grid-cols-2 gap-4">
-                      {/* Date */}
-                      <div>
-                        <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Date</label>
-                        <input
-                          type="date"
-                          required
-                          value={formData.date}
-                          onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                          className={`w-full px-3 py-2 border rounded-xl text-sm focus:outline-hidden focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 ${
-                            isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-800'
-                          }`}
-                        />
-                      </div>
-
-                      {/* Pair */}
-                      <div>
-                        <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Pair / Asset</label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="e.g. BTCUSD, EURUSD"
-                          value={formData.pair}
-                          onChange={(e) => setFormData({ ...formData, pair: e.target.value })}
-                          className={`w-full px-3 py-2 border rounded-xl text-sm focus:outline-hidden focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 ${
-                            isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-800'
-                          }`}
-                        />
-                      </div>
+              <form onSubmit={handleFormSubmit} className="flex-1 flex flex-col overflow-hidden">
+                {/* Form fields - Scrollable body */}
+                <div className={`flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-6 space-y-3.5 ${isDarkMode ? 'bg-zinc-900' : 'bg-white'}`}>
+                  {formError && (
+                    <div className="p-3 bg-rose-50 dark:bg-rose-950/20 text-rose-800 dark:text-rose-400 border border-rose-200 dark:border-rose-800 rounded-xl text-xs font-semibold">
+                      {formError}
                     </div>
+                  )}
 
-                    <div className="grid grid-cols-2 gap-4">
-                      {/* Buy/Sell Type */}
-                      <div>
-                        <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Buy/Sell</label>
-                        <div className="relative flex items-center">
-                          <select
-                            value={formData.type}
-                            onChange={(e: any) => setFormData({ ...formData, type: e.target.value })}
-                            className={`appearance-none w-full pl-3 pr-10 py-2 border rounded-xl text-sm focus:outline-hidden focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 cursor-pointer ${
-                              isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-200' : 'bg-slate-50 border-slate-200 text-slate-700'
-                            }`}
-                          >
-                            <option value="Buy">Buy</option>
-                            <option value="Sell">Sell</option>
-                          </select>
-                          <ChevronDown className="h-4 w-4 absolute right-3 pointer-events-none text-slate-400 dark:text-zinc-500" />
-                        </div>
-                      </div>
-
-                      {/* Win/Loss */}
-                      <div>
-                        <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Win/Loss</label>
-                        <div className="relative flex items-center">
-                          <select
-                            value={formData.winLoss}
-                            onChange={(e: any) => setFormData({ ...formData, winLoss: e.target.value })}
-                            className={`appearance-none w-full pl-3 pr-10 py-2 border rounded-xl text-sm focus:outline-hidden focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 cursor-pointer ${
-                              isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-200' : 'bg-slate-50 border-slate-200 text-slate-700'
-                            }`}
-                          >
-                            <option value="Pending">Pending</option>
-                            <option value="Win">Win</option>
-                            <option value="Loss">Loss</option>
-                          </select>
-                          <ChevronDown className="h-4 w-4 absolute right-3 pointer-events-none text-slate-400 dark:text-zinc-500" />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-3">
-                      {/* Entry Price */}
-                      <div>
-                        <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Entry Price</label>
-                        <input
-                          type="number"
-                          step="any"
-                          required
-                          placeholder="60000"
-                          value={formData.entryPrice}
-                          onChange={(e) => setFormData({ ...formData, entryPrice: e.target.value })}
-                          className={`w-full px-3 py-2 border rounded-xl text-sm focus:outline-hidden focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 ${
-                            isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-800'
-                          }`}
-                        />
-                      </div>
-
-                      {/* SL */}
-                      <div>
-                        <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>SL</label>
-                        <input
-                          type="number"
-                          step="any"
-                          placeholder="59500"
-                          value={formData.sl}
-                          onChange={(e) => setFormData({ ...formData, sl: e.target.value })}
-                          className={`w-full px-3 py-2 border rounded-xl text-sm focus:outline-hidden focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 ${
-                            isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-800'
-                          }`}
-                        />
-                      </div>
-
-                      {/* TP */}
-                      <div>
-                        <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>TP</label>
-                        <input
-                          type="number"
-                          step="any"
-                          placeholder="61500"
-                          value={formData.tp}
-                          onChange={(e) => setFormData({ ...formData, tp: e.target.value })}
-                          className={`w-full px-3 py-2 border rounded-xl text-sm focus:outline-hidden focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 ${
-                            isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-800'
-                          }`}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      {/* R:R (Risk/Reward) */}
-                      <div>
-                        <div className="flex justify-between items-center mb-1">
-                          <label className={`block text-xs font-bold uppercase tracking-wider ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>R:R Ratio</label>
-                          {calculatedSuggestions.rr && (
-                            <span className="text-[10px] text-emerald-500 font-semibold">Suggested: {calculatedSuggestions.rr}</span>
-                          )}
-                        </div>
-                        <input
-                          type="text"
-                          placeholder={calculatedSuggestions.rr || "e.g. 1:3"}
-                          value={formData.rr}
-                          onChange={(e) => setFormData({ ...formData, rr: e.target.value })}
-                          className={`w-full px-3 py-2 border rounded-xl text-sm focus:outline-hidden focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 ${
-                            isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-800'
-                          }`}
-                        />
-                      </div>
-
-                      {/* PnL ($ / R) */}
-                      <div>
-                        <div className="flex justify-between items-center mb-1">
-                          <label className={`block text-xs font-bold uppercase tracking-wider ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>PnL ($/R)</label>
-                          {formData.winLoss !== 'Pending' && (
-                            <button
-                              type="button"
-                              onClick={() => setFormData({ ...formData, pnl: formData.winLoss === 'Win' ? (calculatedSuggestions.suggestedPnlWin || '+3R') : '-1R' })}
-                              className="text-[9px] bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 px-1.5 py-0.5 rounded text-slate-500 dark:text-zinc-300 font-bold cursor-pointer"
-                            >
-                              Auto-Fill
-                            </button>
-                          )}
-                        </div>
-                        <input
-                          type="text"
-                          placeholder="e.g. +$300, +3R or -1R"
-                          value={formData.pnl}
-                          onChange={(e) => setFormData({ ...formData, pnl: e.target.value })}
-                          className={`w-full px-3 py-2 border rounded-xl text-sm focus:outline-hidden focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 ${
-                            isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-800'
-                          }`}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Strategy */}
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                    {/* Date */}
                     <div>
-                      <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Strategy / Setup</label>
+                      <label className={`block text-[11px] sm:text-xs font-bold uppercase tracking-wider mb-1 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Date</label>
+                      <input
+                        type="date"
+                        required
+                        value={formData.date}
+                        onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                        className={`w-full px-3 py-1.5 sm:py-2 border rounded-xl text-sm focus:outline-hidden focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 ${
+                          isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-800'
+                        }`}
+                      />
+                    </div>
+
+                    {/* Pair */}
+                    <div>
+                      <label className={`block text-[11px] sm:text-xs font-bold uppercase tracking-wider mb-1 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Pair / Asset</label>
                       <input
                         type="text"
-                        placeholder="e.g. Liquidity Sweep, Order Block"
-                        value={formData.strategy}
-                        onChange={(e) => setFormData({ ...formData, strategy: e.target.value })}
-                        className={`w-full px-3 py-2 border rounded-xl text-sm focus:outline-hidden focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 ${
+                        required
+                        placeholder="e.g. BTCUSD"
+                        value={formData.pair}
+                        onChange={(e) => setFormData({ ...formData, pair: e.target.value })}
+                        className={`w-full px-3 py-1.5 sm:py-2 border rounded-xl text-sm focus:outline-hidden focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 ${
                           isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-800'
                         }`}
                       />
                     </div>
+                  </div>
 
-                    {/* Notes */}
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                    {/* Buy/Sell Type */}
                     <div>
-                      <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Notes / မှတ်စု (Lessons Learned)</label>
-                      <textarea
-                        placeholder="Setup အတိုင်း စိတ်ရှည်လက်ရှည် စောင့်ဝင်ခဲ့၍ အဆင်ပြေခဲ့သည်။"
-                        value={formData.notes}
-                        onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                        rows={2}
-                        className={`w-full px-3 py-2 border rounded-xl text-sm focus:outline-hidden focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 ${
+                      <label className={`block text-[11px] sm:text-xs font-bold uppercase tracking-wider mb-1 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Buy/Sell</label>
+                      <div className="relative flex items-center">
+                        <select
+                          value={formData.type}
+                          onChange={(e: any) => setFormData({ ...formData, type: e.target.value })}
+                          className={`appearance-none w-full pl-3 pr-10 py-1.5 sm:py-2 border rounded-xl text-sm focus:outline-hidden focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 cursor-pointer ${
+                            isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-200' : 'bg-slate-50 border-slate-200 text-slate-700'
+                          }`}
+                        >
+                          <option value="Buy">Buy</option>
+                          <option value="Sell">Sell</option>
+                        </select>
+                        <ChevronDown className="h-4 w-4 absolute right-3 pointer-events-none text-slate-400 dark:text-zinc-500" />
+                      </div>
+                    </div>
+
+                    {/* Win/Loss */}
+                    <div>
+                      <label className={`block text-[11px] sm:text-xs font-bold uppercase tracking-wider mb-1 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Win/Loss</label>
+                      <div className="relative flex items-center">
+                        <select
+                          value={formData.winLoss}
+                          onChange={(e: any) => setFormData({ ...formData, winLoss: e.target.value })}
+                          className={`appearance-none w-full pl-3 pr-10 py-1.5 sm:py-2 border rounded-xl text-sm focus:outline-hidden focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 cursor-pointer ${
+                            isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-200' : 'bg-slate-50 border-slate-200 text-slate-700'
+                          }`}
+                        >
+                          <option value="Pending">Pending</option>
+                          <option value="Win">Win</option>
+                          <option value="Loss">Loss</option>
+                        </select>
+                        <ChevronDown className="h-4 w-4 absolute right-3 pointer-events-none text-slate-400 dark:text-zinc-500" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                    {/* Entry Price */}
+                    <div>
+                      <label className={`block text-[11px] sm:text-xs font-bold uppercase tracking-wider mb-1 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Entry Price</label>
+                      <input
+                        type="number"
+                        step="any"
+                        required
+                        placeholder="60000"
+                        value={formData.entryPrice}
+                        onChange={(e) => setFormData({ ...formData, entryPrice: e.target.value })}
+                        className={`w-full px-2 sm:px-3 py-1.5 sm:py-2 border rounded-xl text-sm focus:outline-hidden focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 ${
+                          isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-800'
+                        }`}
+                      />
+                    </div>
+
+                    {/* SL */}
+                    <div>
+                      <label className={`block text-[11px] sm:text-xs font-bold uppercase tracking-wider mb-1 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>SL</label>
+                      <input
+                        type="number"
+                        step="any"
+                        placeholder="59500"
+                        value={formData.sl}
+                        onChange={(e) => setFormData({ ...formData, sl: e.target.value })}
+                        className={`w-full px-2 sm:px-3 py-1.5 sm:py-2 border rounded-xl text-sm focus:outline-hidden focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 ${
+                          isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-800'
+                        }`}
+                      />
+                    </div>
+
+                    {/* TP */}
+                    <div>
+                      <label className={`block text-[11px] sm:text-xs font-bold uppercase tracking-wider mb-1 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>TP</label>
+                      <input
+                        type="number"
+                        step="any"
+                        placeholder="61500"
+                        value={formData.tp}
+                        onChange={(e) => setFormData({ ...formData, tp: e.target.value })}
+                        className={`w-full px-2 sm:px-3 py-1.5 sm:py-2 border rounded-xl text-sm focus:outline-hidden focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 ${
                           isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-800'
                         }`}
                       />
                     </div>
                   </div>
 
-                  {/* Actions */}
-                  <div className={`px-6 py-4 flex justify-end space-x-3 border-t ${
-                    isDarkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-slate-50 border-slate-100'
-                  }`}>
-                    <button
-                      type="button"
-                      onClick={() => setShowFormModal(false)}
-                      className={`px-4 py-2 border rounded-xl text-sm font-semibold transition-colors duration-150 cursor-pointer ${
-                        isDarkMode 
-                          ? 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700' 
-                          : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
-                      }`}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isFormSubmitting}
-                      className={`inline-flex justify-center items-center px-4 py-2 text-sm font-semibold rounded-xl shadow-sm transition-colors duration-150 cursor-pointer ${
-                        isDarkMode
-                          ? 'bg-zinc-100 text-zinc-950 hover:bg-zinc-200 disabled:bg-zinc-800 disabled:text-zinc-600'
-                          : 'bg-slate-900 text-white hover:bg-slate-800 disabled:bg-slate-100 disabled:text-slate-400'
-                      }`}
-                    >
-                      {isFormSubmitting ? (
-                        <>
-                          <RefreshCw className="h-4 w-4 animate-spin mr-1.5" />
-                          <span>Saving...</span>
-                        </>
-                      ) : (
-                        <span>သိမ်းဆည်းမည်</span>
-                      )}
-                    </button>
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                    {/* R:R (Risk/Reward) */}
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className={`block text-[11px] sm:text-xs font-bold uppercase tracking-wider ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>R:R Ratio</label>
+                        {calculatedSuggestions.rr && (
+                          <span className="text-[9px] text-emerald-500 font-semibold truncate max-w-[55px] sm:max-w-none">Sg: {calculatedSuggestions.rr}</span>
+                        )}
+                      </div>
+                      <input
+                        type="text"
+                        placeholder={calculatedSuggestions.rr || "e.g. 1:3"}
+                        value={formData.rr}
+                        onChange={(e) => setFormData({ ...formData, rr: e.target.value })}
+                        className={`w-full px-3 py-1.5 sm:py-2 border rounded-xl text-sm focus:outline-hidden focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 ${
+                          isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-800'
+                        }`}
+                      />
+                    </div>
+
+                    {/* PnL ($ / R) */}
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className={`block text-[11px] sm:text-xs font-bold uppercase tracking-wider ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>PnL ($/R)</label>
+                        {formData.winLoss !== 'Pending' && (
+                          <button
+                            type="button"
+                            onClick={() => setFormData({ ...formData, pnl: formData.winLoss === 'Win' ? (calculatedSuggestions.suggestedPnlWin || '+3R') : '-1R' })}
+                            className="text-[9px] bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 px-1.5 py-0.5 rounded text-slate-500 dark:text-zinc-300 font-bold cursor-pointer"
+                          >
+                            Auto-Fill
+                          </button>
+                        )}
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="e.g. +$300, +3R"
+                        value={formData.pnl}
+                        onChange={(e) => setFormData({ ...formData, pnl: e.target.value })}
+                        className={`w-full px-3 py-1.5 sm:py-2 border rounded-xl text-sm focus:outline-hidden focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 ${
+                          isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-800'
+                        }`}
+                      />
+                    </div>
                   </div>
-                </form>
-              </motion.div>
-            </div>
+
+                  {/* Strategy */}
+                  <div>
+                    <label className={`block text-[11px] sm:text-xs font-bold uppercase tracking-wider mb-1 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Strategy / Setup</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Liquidity Sweep, Order Block"
+                      value={formData.strategy}
+                      onChange={(e) => setFormData({ ...formData, strategy: e.target.value })}
+                      className={`w-full px-3 py-1.5 sm:py-2 border rounded-xl text-sm focus:outline-hidden focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 ${
+                        isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-800'
+                      }`}
+                    />
+                  </div>
+
+                  {/* Notes */}
+                  <div>
+                    <label className={`block text-[11px] sm:text-xs font-bold uppercase tracking-wider mb-1 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Notes / Lessons Learned</label>
+                    <textarea
+                      placeholder="Setup အတိုင်း စိတ်ရှည်လက်ရှည် စောင့်ဝင်ခဲ့၍ အဆင်ပြေခဲ့သည်။"
+                      value={formData.notes}
+                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                      rows={2}
+                      className={`w-full px-3 py-1.5 sm:py-2 border rounded-xl text-sm focus:outline-hidden focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 resize-none ${
+                        isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-800'
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                {/* Actions - Sticky footer */}
+                <div className={`px-4 sm:px-6 py-4 flex justify-end space-x-3 border-t shrink-0 ${
+                  isDarkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-slate-50 border-slate-100'
+                }`}>
+                  <button
+                    type="button"
+                    onClick={() => setShowFormModal(false)}
+                    className={`px-4 py-2 border rounded-xl text-sm font-semibold transition-colors duration-150 cursor-pointer ${
+                      isDarkMode 
+                        ? 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700' 
+                        : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isFormSubmitting}
+                    className={`inline-flex justify-center items-center px-4 py-2 text-sm font-semibold rounded-xl shadow-sm transition-colors duration-150 cursor-pointer ${
+                      isDarkMode
+                        ? 'bg-zinc-100 text-zinc-950 hover:bg-zinc-200 disabled:bg-zinc-800 disabled:text-zinc-600'
+                        : 'bg-slate-900 text-white hover:bg-slate-800 disabled:bg-slate-100 disabled:text-slate-400'
+                    }`}
+                  >
+                    {isFormSubmitting ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 animate-spin mr-1.5" />
+                        <span>Saving...</span>
+                      </>
+                    ) : (
+                      <span>သိမ်းဆည်းမည်</span>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
           </div>
         )}
       </AnimatePresence>
