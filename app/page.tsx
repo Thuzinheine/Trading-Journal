@@ -372,12 +372,14 @@ export default function Home() {
         setToken(cachedToken);
         setNeedsAuth(false);
         setIsAuthLoading(false);
+        setIsMobileMenuOpen(false);
       },
       () => {
         setUser(null);
         setToken(null);
         setNeedsAuth(true);
         setIsAuthLoading(false);
+        setIsMobileMenuOpen(false);
       }
     );
 
@@ -402,6 +404,7 @@ export default function Home() {
         setToken(result.accessToken);
         setUser(result.user);
         setNeedsAuth(false);
+        setIsMobileMenuOpen(false);
       }
     } catch (err) {
       console.error('Login failed:', err);
@@ -418,6 +421,7 @@ export default function Home() {
       setTrades([]);
       setDocText('');
       setNeedsAuth(true);
+      setIsMobileMenuOpen(false);
     } catch (err) {
       console.error('Logout failed:', err);
     }
@@ -878,7 +882,6 @@ export default function Home() {
             </div>
           </div>
           
-          {/* Mobile Menu Drawer */}
           <AnimatePresence>
             {isMobileMenuOpen && (
               <motion.div
@@ -890,50 +893,50 @@ export default function Home() {
                 <div className="px-4 py-3 space-y-1">
                   <button
                     onClick={() => { setActiveTab('overview'); setIsMobileMenuOpen(false); }}
-                    className={`flex items-center space-x-3 w-full px-3 py-2.5 rounded-xl text-xs font-semibold cursor-pointer ${
+                    className={`flex items-center space-x-3 w-full px-3 py-3 rounded-xl text-xs sm:text-sm font-semibold cursor-pointer ${
                       activeTab === 'overview' ? 'bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-950' : isDarkMode ? 'text-zinc-400 hover:bg-zinc-800' : 'text-slate-600 hover:bg-slate-100'
                     }`}
                   >
-                    <Activity className="h-4 w-4" />
+                    <Activity className="h-4.5 w-4.5" />
                     <span>Dashboard</span>
                   </button>
                   
                   <button
                     onClick={() => { setActiveTab('journal'); setIsMobileMenuOpen(false); }}
-                    className={`flex items-center space-x-3 w-full px-3 py-2.5 rounded-xl text-xs font-semibold cursor-pointer ${
+                    className={`flex items-center space-x-3 w-full px-3 py-3 rounded-xl text-xs sm:text-sm font-semibold cursor-pointer ${
                       activeTab === 'journal' ? 'bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-950' : isDarkMode ? 'text-zinc-400 hover:bg-zinc-800' : 'text-slate-600 hover:bg-slate-100'
                     }`}
                   >
-                    <BookOpen className="h-4 w-4" />
+                    <BookOpen className="h-4.5 w-4.5" />
                     <span>Trading Journal ({trades.length})</span>
                   </button>
                   
                   <button
                     onClick={() => { setActiveTab('notes'); setIsMobileMenuOpen(false); }}
-                    className={`flex items-center space-x-3 w-full px-3 py-2.5 rounded-xl text-xs font-semibold cursor-pointer ${
+                    className={`flex items-center space-x-3 w-full px-3 py-3 rounded-xl text-xs sm:text-sm font-semibold cursor-pointer ${
                       activeTab === 'notes' ? 'bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-950' : isDarkMode ? 'text-zinc-400 hover:bg-zinc-800' : 'text-slate-600 hover:bg-slate-100'
                     }`}
                   >
-                    <FileText className="h-4 w-4" />
+                    <FileText className="h-4.5 w-4.5" />
                     <span>Trading Notes (Docs)</span>
                   </button>
                   
                   <button
                     onClick={() => { setActiveTab('keep'); setIsMobileMenuOpen(false); }}
-                    className={`flex items-center space-x-3 w-full px-3 py-2.5 rounded-xl text-xs font-semibold cursor-pointer ${
+                    className={`flex items-center space-x-3 w-full px-3 py-3 rounded-xl text-xs sm:text-sm font-semibold cursor-pointer ${
                       activeTab === 'keep' ? 'bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-950' : isDarkMode ? 'text-zinc-400 hover:bg-zinc-800' : 'text-slate-600 hover:bg-slate-100'
                     }`}
                   >
-                    <StickyNote className="h-4 w-4" />
+                    <StickyNote className="h-4.5 w-4.5" />
                     <span>Local Notes (မှတ်စုများ)</span>
                   </button>
 
                   {user && (
                     <button
                       onClick={handleLogout}
-                      className="flex items-center space-x-3 w-full px-3 py-2.5 rounded-xl text-xs font-semibold text-rose-500 hover:bg-rose-500/10 cursor-pointer"
+                      className="flex items-center space-x-3 w-full px-3 py-3 rounded-xl text-xs sm:text-sm font-semibold text-rose-500 hover:bg-rose-500/10 cursor-pointer"
                     >
-                      <LogOut className="h-4 w-4" />
+                      <LogOut className="h-4.5 w-4.5" />
                       <span>Sign Out</span>
                     </button>
                   )}
@@ -946,7 +949,7 @@ export default function Home() {
 
       {/* Main Body content area */}
       <div className={`flex-1 flex flex-col ${needsAuth ? '' : 'md:pl-64'}`}>
-        <main className="flex-1 w-full px-6 sm:px-8 lg:px-10 py-8">
+        <main className="flex-1 w-full px-4 sm:px-8 lg:px-10 py-6 sm:py-8">
         
         {/* If user needs authentication, display gorgeous onboarding page */}
         {needsAuth ? (
@@ -1114,17 +1117,17 @@ export default function Home() {
             {activeTab === 'overview' && (
               <div className="space-y-8">
                 {/* Metrics Panels */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {/* Metric 1: Net PnL */}
-                  <div className={`relative overflow-hidden p-6 rounded-2xl border flex flex-col justify-between transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 ${
+                  <div className={`relative overflow-hidden p-4 sm:p-6 rounded-2xl border flex flex-col justify-between transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 ${
                     isDarkMode ? 'bg-zinc-900/50 border-zinc-800/80 text-zinc-100 shadow-zinc-950/20 shadow-md' : 'bg-white border-slate-200/80 shadow-xs text-slate-800 hover:border-slate-300'
                   }`}>
                     {/* Decorative Background Icon */}
-                    <DollarSign className="absolute -right-3 -top-3 h-20 w-20 opacity-10 dark:opacity-5 text-slate-400 dark:text-zinc-600 pointer-events-none stroke-[1.25]" />
+                    <DollarSign className="absolute -right-3 -top-3 h-16 w-16 sm:h-20 sm:w-20 opacity-10 dark:opacity-5 text-slate-400 dark:text-zinc-600 pointer-events-none stroke-[1.25]" />
                     
                     <div className="relative z-10">
-                      <p className="text-xs font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">Net Profit / Loss</p>
-                      <h3 className={`text-3xl font-extrabold mt-2 tracking-tight ${metrics.netPnL >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                      <p className="text-[10px] sm:text-xs font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">Net Profit / Loss</p>
+                      <h3 className={`text-2xl sm:text-3xl font-extrabold mt-2 tracking-tight ${metrics.netPnL >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
                         {metrics.netPnL >= 0 ? '+$' : '-$'}{Math.abs(metrics.netPnL).toFixed(2)}
                       </h3>
                     </div>
@@ -1144,16 +1147,16 @@ export default function Home() {
                   </div>
 
                   {/* Metric 2: Win Rate */}
-                  <div className={`relative overflow-hidden p-6 rounded-2xl border flex flex-col justify-between transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 ${
+                  <div className={`relative overflow-hidden p-4 sm:p-6 rounded-2xl border flex flex-col justify-between transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 ${
                     isDarkMode ? 'bg-zinc-900/50 border-zinc-800/80 text-zinc-100 shadow-zinc-950/20 shadow-md' : 'bg-white border-slate-200/80 shadow-xs text-slate-800 hover:border-slate-300'
                   }`}>
                     {/* Decorative Background Icon */}
-                    <Award className="absolute -right-3 -top-3 h-20 w-20 opacity-10 dark:opacity-5 text-slate-400 dark:text-zinc-600 pointer-events-none stroke-[1.25]" />
+                    <Award className="absolute -right-3 -top-3 h-16 w-16 sm:h-20 sm:w-20 opacity-10 dark:opacity-5 text-slate-400 dark:text-zinc-600 pointer-events-none stroke-[1.25]" />
 
                     <div className="relative z-10">
-                      <p className="text-xs font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">Win Rate (Closed)</p>
+                      <p className="text-[10px] sm:text-xs font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">Win Rate (Closed)</p>
                       <div className="flex items-baseline space-x-1.5 mt-2">
-                        <h3 className={`text-3xl font-extrabold tracking-tight ${isDarkMode ? 'text-zinc-100' : 'text-slate-900'}`}>
+                        <h3 className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${isDarkMode ? 'text-zinc-100' : 'text-slate-900'}`}>
                           {metrics.winRate.toFixed(1)}%
                         </h3>
                       </div>
@@ -1174,16 +1177,16 @@ export default function Home() {
                   </div>
 
                   {/* Metric 3: Total Trades */}
-                  <div className={`relative overflow-hidden p-6 rounded-2xl border flex flex-col justify-between transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 ${
+                  <div className={`relative overflow-hidden p-4 sm:p-6 rounded-2xl border flex flex-col justify-between transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 ${
                     isDarkMode ? 'bg-zinc-900/50 border-zinc-800/80 text-zinc-100 shadow-zinc-950/20 shadow-md' : 'bg-white border-slate-200/80 shadow-xs text-slate-800 hover:border-slate-300'
                   }`}>
                     {/* Decorative Background Icon */}
-                    <Layers className="absolute -right-3 -top-3 h-20 w-20 opacity-10 dark:opacity-5 text-slate-400 dark:text-zinc-600 pointer-events-none stroke-[1.25]" />
+                    <Layers className="absolute -right-3 -top-3 h-16 w-16 sm:h-20 sm:w-20 opacity-10 dark:opacity-5 text-slate-400 dark:text-zinc-600 pointer-events-none stroke-[1.25]" />
 
                     <div className="relative z-10">
-                      <p className="text-xs font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">Total / Open Trades</p>
-                      <h3 className={`text-3xl font-extrabold mt-2 tracking-tight ${isDarkMode ? 'text-zinc-100' : 'text-slate-900'}`}>
-                        {metrics.totalTrades} <span className="text-sm font-medium text-slate-400">/ {metrics.openTrades} Open</span>
+                      <p className="text-[10px] sm:text-xs font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">Total / Open Trades</p>
+                      <h3 className={`text-2xl sm:text-3xl font-extrabold mt-2 tracking-tight ${isDarkMode ? 'text-zinc-100' : 'text-slate-900'}`}>
+                        {metrics.totalTrades} <span className="text-xs sm:text-sm font-medium text-slate-400">/ {metrics.openTrades} Open</span>
                       </h3>
                     </div>
                     <div className="relative z-10 mt-5">
@@ -1210,18 +1213,18 @@ export default function Home() {
                   </div>
 
                   {/* Metric 4: Avg Win vs Loss */}
-                  <div className={`relative overflow-hidden p-6 rounded-2xl border flex flex-col justify-between transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 ${
+                  <div className={`relative overflow-hidden p-4 sm:p-6 rounded-2xl border flex flex-col justify-between transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 ${
                     isDarkMode ? 'bg-zinc-900/50 border-zinc-800/80 text-zinc-100 shadow-zinc-950/20 shadow-md' : 'bg-white border-slate-200/80 shadow-xs text-slate-800 hover:border-slate-300'
                   }`}>
                     {/* Decorative Background Icon */}
-                    <Activity className="absolute -right-3 -top-3 h-20 w-20 opacity-10 dark:opacity-5 text-slate-400 dark:text-zinc-600 pointer-events-none stroke-[1.25]" />
+                    <Activity className="absolute -right-3 -top-3 h-16 w-16 sm:h-20 sm:w-20 opacity-10 dark:opacity-5 text-slate-400 dark:text-zinc-600 pointer-events-none stroke-[1.25]" />
 
                     <div className="relative z-10">
-                      <p className="text-xs font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">Average Win / Loss</p>
+                      <p className="text-[10px] sm:text-xs font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">Average Win / Loss</p>
                       <div className="mt-2 flex items-baseline space-x-1.5">
-                        <span className="text-xl font-extrabold text-emerald-500">+${metrics.avgWin.toFixed(0)}</span>
+                        <span className="text-lg sm:text-xl font-extrabold text-emerald-500">+${metrics.avgWin.toFixed(0)}</span>
                         <span className="text-zinc-400 dark:text-zinc-600 text-sm">/</span>
-                        <span className="text-xl font-extrabold text-rose-500">-${Math.abs(metrics.avgLoss).toFixed(0)}</span>
+                        <span className="text-lg sm:text-xl font-extrabold text-rose-500">-${Math.abs(metrics.avgLoss).toFixed(0)}</span>
                       </div>
                     </div>
                     <div className="relative z-10 mt-5">
@@ -1250,42 +1253,42 @@ export default function Home() {
 
                 {/* Best / Worst Trades row */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className={`relative overflow-hidden p-5 rounded-2xl border flex items-center justify-between transition-all duration-200 hover:shadow-md ${
+                  <div className={`relative overflow-hidden p-4 sm:p-5 rounded-2xl border flex items-center justify-between transition-all duration-200 hover:shadow-md ${
                     isDarkMode ? 'bg-zinc-900/50 border-zinc-800/80 text-zinc-100 shadow-zinc-950/10 shadow-sm' : 'bg-white border-emerald-100 shadow-xs'
                   }`}>
                     {/* Decorative Background Icon */}
-                    <Zap className="absolute right-4 top-1/2 -translate-y-1/2 h-20 w-20 opacity-10 dark:opacity-5 text-emerald-500 pointer-events-none stroke-[1.25]" />
+                    <Zap className="absolute right-4 top-1/2 -translate-y-1/2 h-16 w-16 sm:h-20 sm:w-20 opacity-10 dark:opacity-5 text-emerald-500 pointer-events-none stroke-[1.25]" />
 
                     <div className="relative z-10 flex items-center space-x-4">
-                      <div className={`p-3 rounded-2xl ${isDarkMode ? 'bg-emerald-500/10 text-emerald-400' : 'bg-emerald-50 text-emerald-600'}`}>
-                        <TrendingUp className="h-6 w-6" />
+                      <div className={`p-2.5 sm:p-3 rounded-2xl ${isDarkMode ? 'bg-emerald-500/10 text-emerald-400' : 'bg-emerald-50 text-emerald-600'}`}>
+                        <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6" />
                       </div>
                       <div>
-                        <p className="text-xs font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider">Best Profit Trade</p>
-                        <p className={`text-sm font-semibold mt-0.5 ${isDarkMode ? 'text-zinc-200' : 'text-slate-800'}`}>အမြတ်အများဆုံး အရောင်းအဝယ်</p>
+                        <p className="text-[10px] sm:text-xs font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider">Best Profit Trade</p>
+                        <p className={`text-xs sm:text-sm font-semibold mt-0.5 ${isDarkMode ? 'text-zinc-200' : 'text-slate-800'}`}>အမြတ်အများဆုံး အရောင်းအဝယ်</p>
                       </div>
                     </div>
-                    <span className="relative z-10 text-xl font-extrabold text-emerald-500">
+                    <span className="relative z-10 text-lg sm:text-xl font-extrabold text-emerald-500">
                       {metrics.bestTrade >= 0 ? '+' : ''}${metrics.bestTrade.toFixed(2)}
                     </span>
                   </div>
 
-                  <div className={`relative overflow-hidden p-5 rounded-2xl border flex items-center justify-between transition-all duration-200 hover:shadow-md ${
+                  <div className={`relative overflow-hidden p-4 sm:p-5 rounded-2xl border flex items-center justify-between transition-all duration-200 hover:shadow-md ${
                     isDarkMode ? 'bg-zinc-900/50 border-zinc-800/80 text-zinc-100 shadow-zinc-950/10 shadow-sm' : 'bg-white border-rose-100 shadow-xs'
                   }`}>
                     {/* Decorative Background Icon */}
-                    <AlertTriangle className="absolute right-4 top-1/2 -translate-y-1/2 h-20 w-20 opacity-10 dark:opacity-5 text-rose-500 pointer-events-none stroke-[1.25]" />
+                    <AlertTriangle className="absolute right-4 top-1/2 -translate-y-1/2 h-16 w-16 sm:h-20 sm:w-20 opacity-10 dark:opacity-5 text-rose-500 pointer-events-none stroke-[1.25]" />
 
                     <div className="relative z-10 flex items-center space-x-4">
-                      <div className={`p-3 rounded-2xl ${isDarkMode ? 'bg-rose-500/10 text-rose-400' : 'bg-rose-50 text-rose-600'}`}>
-                        <TrendingDown className="h-6 w-6" />
+                      <div className={`p-2.5 sm:p-3 rounded-2xl ${isDarkMode ? 'bg-rose-500/10 text-rose-400' : 'bg-rose-50 text-rose-600'}`}>
+                        <TrendingDown className="h-5 w-5 sm:h-6 sm:w-6" />
                       </div>
                       <div>
-                        <p className="text-xs font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider">Worst Loss Trade</p>
-                        <p className={`text-sm font-semibold mt-0.5 ${isDarkMode ? 'text-zinc-200' : 'text-slate-800'}`}>အရှုံးအများဆုံး အရောင်းအဝယ်</p>
+                        <p className="text-[10px] sm:text-xs font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider">Worst Loss Trade</p>
+                        <p className={`text-xs sm:text-sm font-semibold mt-0.5 ${isDarkMode ? 'text-zinc-200' : 'text-slate-800'}`}>အရှုံးအများဆုံး အရောင်းအဝယ်</p>
                       </div>
                     </div>
-                    <span className="relative z-10 text-xl font-extrabold text-rose-500">
+                    <span className="relative z-10 text-lg sm:text-xl font-extrabold text-rose-500">
                       ${metrics.worstTrade.toFixed(2)}
                     </span>
                   </div>
@@ -1468,7 +1471,7 @@ export default function Home() {
                 <div className={`rounded-2xl border transition-all overflow-hidden ${
                   isDarkMode ? 'bg-zinc-900/40 border-zinc-800/80' : 'bg-white border-slate-200 shadow-xs'
                 }`}>
-                  <div className="overflow-x-auto">
+                  <div className="hidden md:block overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                       <thead>
                         <tr className={`border-b text-xs font-bold tracking-wider transition-colors ${
@@ -1593,6 +1596,120 @@ export default function Home() {
                         )}
                       </tbody>
                     </table>
+                  </div>
+
+                  {/* Mobile view (Hidden on desktop) */}
+                  <div className="block md:hidden divide-y divide-zinc-200/40 dark:divide-zinc-800/80">
+                    {isLoadingTrades ? (
+                      <div className="text-center py-12 flex flex-col items-center justify-center space-y-2">
+                        <RefreshCw className="h-8 w-8 text-slate-500 animate-spin" />
+                        <span className={`text-xs font-semibold ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Google Sheet မှ Trade Data များ ဆွဲယူနေပါသည်...</span>
+                      </div>
+                    ) : filteredTrades.length > 0 ? (
+                      filteredTrades.map((trade) => {
+                        const isWin = trade.winLoss === 'Win';
+                        const isLoss = trade.winLoss === 'Loss';
+                        const isPending = trade.winLoss === 'Pending';
+                        
+                        return (
+                          <div 
+                            key={trade.id} 
+                            className={`p-4 space-y-3 transition-colors duration-150 ${
+                              isDarkMode ? 'hover:bg-zinc-800/10' : 'hover:bg-slate-50/30'
+                            }`}
+                          >
+                            <div className="flex justify-between items-center">
+                              <span className={`text-[10px] font-semibold ${isDarkMode ? 'text-zinc-500' : 'text-slate-400'}`}>
+                                {trade.date}
+                              </span>
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                isWin ? (isDarkMode ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-emerald-50 text-emerald-700 border border-emerald-100') :
+                                isLoss ? (isDarkMode ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' : 'bg-rose-50 text-rose-700 border border-rose-100') :
+                                (isDarkMode ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-amber-50 text-amber-700 border border-amber-100')
+                              }`}>
+                                {trade.winLoss}
+                              </span>
+                            </div>
+
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <h4 className={`font-bold text-sm ${isDarkMode ? 'text-zinc-200' : 'text-slate-900'}`}>
+                                  {trade.pair}
+                                </h4>
+                                <p className={`text-xs mt-0.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                                  <span className={`font-bold ${trade.type === 'Buy' ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                    {trade.type}
+                                  </span>
+                                  {' '}@ {trade.entryPrice ? trade.entryPrice.toLocaleString() : '-'}
+                                </p>
+                              </div>
+
+                              <div className="text-right">
+                                <span className={`font-extrabold text-sm ${
+                                  isWin ? 'text-emerald-500' : isLoss ? 'text-rose-500' : 'text-slate-400'
+                                }`}>
+                                  {trade.pnl || '-'}
+                                </span>
+                                <div className={`text-[10px] font-medium mt-0.5 ${isDarkMode ? 'text-zinc-500' : 'text-slate-400'}`}>
+                                  R:R: {trade.rr || '-'}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Additional info for mobile card */}
+                            <div className={`text-xs p-2.5 rounded-xl space-y-1 ${
+                              isDarkMode ? 'bg-zinc-950/40 text-zinc-400' : 'bg-slate-50 text-slate-600'
+                            }`}>
+                              <div className="grid grid-cols-2 gap-1 text-[10px]">
+                                <div><span className="opacity-60">SL:</span> <span className="font-semibold">{trade.sl ? trade.sl.toLocaleString() : '-'}</span></div>
+                                <div><span className="opacity-60">TP:</span> <span className="font-semibold">{trade.tp ? trade.tp.toLocaleString() : '-'}</span></div>
+                              </div>
+                              {trade.strategy && (
+                                <div className="text-[10px] mt-1">
+                                  <span className="font-bold opacity-60">Strategy:</span> {trade.strategy}
+                                </div>
+                              )}
+                              {trade.notes && (
+                                <div className="text-[11px] italic mt-1 font-sans border-t border-zinc-200/20 dark:border-zinc-800/40 pt-1">
+                                  &quot;{trade.notes}&quot;
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="flex justify-end items-center space-x-3 pt-1">
+                              <button
+                                onClick={() => handleEditClick(trade)}
+                                className={`inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all duration-150 cursor-pointer ${
+                                  isDarkMode 
+                                    ? 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-700' 
+                                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                                }`}
+                              >
+                                <Edit2 className="h-3 w-3 text-emerald-500" />
+                                <span>Edit</span>
+                              </button>
+                              <button
+                                onClick={() => handleDeleteClick(trade)}
+                                className={`inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all duration-150 cursor-pointer ${
+                                  isDarkMode 
+                                    ? 'bg-zinc-800 text-rose-400 border-zinc-700 hover:bg-zinc-700' 
+                                    : 'bg-white text-rose-600 border-slate-200 hover:bg-rose-50'
+                                }`}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                                <span>Delete</span>
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="text-center py-16 px-4">
+                        <BookOpen className="h-10 w-10 mx-auto mb-3 stroke-1 text-zinc-400 dark:text-zinc-700" />
+                        <p className={`font-bold text-sm ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>အရောင်းအဝယ်မှတ်တမ်းများ ရှာမတွေ့ပါ။</p>
+                        <p className="text-xs text-slate-400 mt-1">ရှာဖွေမှုစကားလုံး ပြောင်းကြည့်ပါ သို့မဟုတ် Trade အသစ်တစ်ခု ထည့်သွင်းကြည့်ပါ။</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
