@@ -1,0 +1,181 @@
+// Google Workspace API Proxy Clients (sends requests to local API server to avoid client CORS / sandbox fetch blocks)
+
+export interface Trade {
+  row: number; // 1-based index corresponding to sheet row (row 1 is headers, trades start at 2)
+  id: string;
+  date: string;
+  pair: string;
+  type: 'Buy' | 'Sell';
+  entryPrice: number;
+  sl: number;
+  tp: number;
+  rr: string;
+  strategy: string;
+  winLoss: 'Win' | 'Loss' | 'Pending';
+  pnl: string;
+  notes: string;
+}
+
+// Global helper for calling the local API proxy
+async function callProxy(accessToken: string, action: string, payload: any = {}) {
+  const res = await fetch('/api/google', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({
+      action,
+      ...payload,
+    }),
+  });
+
+  if (!res.ok) {
+    let errMsg = `Google Proxy API failed with status ${res.status}`;
+    try {
+      const errText = await res.text();
+      try {
+        const errJson = JSON.parse(errText);
+        if (errJson && errJson.error) {
+          errMsg = errJson.error;
+        }
+      } catch (jsonErr) {
+        if (errText) {
+          if (errText.includes('<html>') || errText.includes('<html')) {
+            errMsg = `Access restricted or denied (Status ${res.status}). Google Workspace permissions or credentials might be restricted for this service.`;
+          } else {
+            errMsg = errText;
+          }
+        }
+      }
+    } catch (e) {}
+    throw new Error(errMsg);
+  }
+
+  return await res.json();
+}
+
+// Find or Create a file in Google Drive
+export async function findOrCreateFile(
+  accessToken: string,
+  name: string,
+  mimeType: string
+): Promise<string> {
+  // We can just rely on the server's 'bootstrap' action to do both findOrCreate and formatting,
+  // but to keep signature compatibility:
+  const data = await callProxy(accessToken, 'bootstrap');
+  if (mimeType.includes('spreadsheet')) {
+    return data.spreadsheetId;
+  } else {
+    return data.documentId;
+  }
+}
+
+// Ensure Trading Journal Sheet is properly formatted with headers
+export async function initializeJournalSheet(
+  accessToken: string,
+  spreadsheetId: string
+): Promise<void> {
+  // Done inside 'bootstrap' action on server
+}
+
+// Fetch all trades from Sheet
+export async function fetchTrades(
+  accessToken: string,
+  spreadsheetId: string
+): Promise<Trade[]> {
+  const data = await callProxy(accessToken, 'fetchTrades', { spreadsheetId });
+  return data.trades || [];
+}
+
+// Append a new trade
+export async function addTrade(
+  accessToken: string,
+  spreadsheetId: string,
+  trade: Omit<Trade, 'row'>
+): Promise<void> {
+  await callProxy(accessToken, 'addTrade', { spreadsheetId, trade });
+}
+
+// Update an existing trade
+export async function updateTradeRow(
+  accessToken: string,
+  spreadsheetId: string,
+  trade: Trade
+): Promise<void> {
+  await callProxy(accessToken, 'updateTrade', { spreadsheetId, trade });
+}
+
+// Delete a trade (by removing its sheet row)
+export async function deleteTradeRow(
+  accessToken: string,
+  spreadsheetId: string,
+  rowIndex: number // 1-based sheet row index (e.g. 2, 3...)
+): Promise<void> {
+  await callProxy(accessToken, 'deleteTrade', { spreadsheetId, rowIndex });
+}
+
+// Fetch Google Doc content (extracted plain text)
+export async function fetchDocContent(
+  accessToken: string,
+  documentId: string
+): Promise<{ text: string; length: number }> {
+  return await callProxy(accessToken, 'fetchDoc', { documentId });
+}
+
+// Save Google Doc content (overwrites everything)
+export async function saveDocContent(
+  accessToken: string,
+  documentId: string,
+  content: string
+): Promise<void> {
+  await callProxy(accessToken, 'saveDoc', { documentId, content });
+}
+
+export interface KeepNote {
+  name: string;
+  title?: string;
+  body?: {
+    textContent?: {
+      text?: string;
+    };
+  };
+}
+
+// Fetch Keep Notes
+export async function fetchKeepNotes(accessToken: string): Promise<KeepNote[]> {
+  const data = await callProxy(accessToken, 'fetchKeepNotes');
+  return data.notes || [];
+}
+
+// Create Keep Note
+export async function createKeepNote(
+  accessToken: string,
+  title: string,
+  bodyText: string
+): Promise<KeepNote> {
+  const note = {
+    title,
+    body: {
+      textContent: {
+        text: bodyText,
+      },
+    },
+  };
+  return await callProxy(accessToken, 'createKeepNote', { note });
+}
+
+// List all trading-related Google Docs
+export async function listDocs(accessToken: string): Promise<{ id: string; name: string }[]> {
+  const data = await callProxy(accessToken, 'listDocs');
+  return data.files || [];
+}
+
+// Create a new custom trading-related Google Doc
+export async function createDoc(
+  accessToken: string,
+  title: string
+): Promise<{ documentId: string; name: string }> {
+  return await callProxy(accessToken, 'createDoc', { title });
+}
+
