@@ -1,10 +1,12 @@
 import { initializeApp, getApp, getApps } from 'firebase/app';
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, User } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
 // Initialize Firebase
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
+export const db = getFirestore(app);
 
 export const provider = new GoogleAuthProvider();
 // Request Sheets, Docs, and Drive scopes
@@ -114,3 +116,141 @@ export const logout = async () => {
     localStorage.removeItem('google_oauth_token_expiry');
   }
 };
+
+import { 
+  collection, 
+  doc, 
+  getDocs, 
+  setDoc, 
+  deleteDoc, 
+  query, 
+  where, 
+  orderBy, 
+  serverTimestamp 
+} from 'firebase/firestore';
+
+export interface LearningNote {
+  id: string;
+  title: string;
+  content: string;
+  imageUrl?: string;
+  createdAt: any; 
+  userId: string;
+  userEmail: string;
+  tags?: string[];
+}
+
+export enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+export interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+    isAnonymous?: boolean | null;
+    tenantId?: string | null;
+    providerInfo?: {
+      providerId?: string | null;
+      email?: string | null;
+    }[];
+  }
+}
+
+export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData?.map(provider => ({
+        providerId: provider.providerId,
+        email: provider.email,
+      })) || []
+    },
+    operationType,
+    path
+  };
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
+
+export async function fetchLearningNotes(userId: string): Promise<LearningNote[]> {
+  const path = 'learning_notes';
+  try {
+    const q = query(
+      collection(db, path),
+      where('userId', '==', userId)
+    );
+    const snapshot = await getDocs(q);
+    const notes = snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        title: data.title || '',
+        content: data.content || '',
+        imageUrl: data.imageUrl || '',
+        createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt || '',
+        userId: data.userId || '',
+        userEmail: data.userEmail || '',
+        tags: data.tags || []
+      } as LearningNote;
+    });
+    // Client-side sort by createdAt descending to bypass composite index requirement and speed up the query instantly
+    return notes.sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateB - dateA;
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.LIST, path);
+    return [];
+  }
+}
+
+export async function saveLearningNote(note: Omit<LearningNote, 'createdAt'>, isNew: boolean): Promise<void> {
+  const path = `learning_notes/${note.id}`;
+  try {
+    const docRef = doc(db, 'learning_notes', note.id);
+    const dataToSave: any = {
+      id: note.id,
+      title: note.title,
+      content: note.content,
+      userId: note.userId,
+      userEmail: note.userEmail,
+      tags: note.tags || [],
+      updatedAt: serverTimestamp()
+    };
+    if (note.imageUrl !== undefined) {
+      dataToSave.imageUrl = note.imageUrl;
+    }
+    if (isNew) {
+      dataToSave.createdAt = serverTimestamp();
+    }
+    await setDoc(docRef, dataToSave, { merge: true });
+  } catch (error) {
+    handleFirestoreError(error, isNew ? OperationType.CREATE : OperationType.UPDATE, path);
+  }
+}
+
+export async function deleteLearningNote(noteId: string): Promise<void> {
+  const path = `learning_notes/${noteId}`;
+  try {
+    const docRef = doc(db, 'learning_notes', noteId);
+    await deleteDoc(docRef);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+  }
+}

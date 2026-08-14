@@ -1,0 +1,26 @@
+{
+  "entities": {
+    "TradingLearningNote": {
+      "title": "TradingLearningNote",
+      "description": "Private trading learning blog notes with images",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string", "maxLength": 100 },
+        "content": { "type": "string", "maxLength": 50000 },
+        "imageUrl": { "type": "string", "maxLength": 2000000 },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string" },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" }
+      },
+      "required": ["id", "title", "content", "createdAt", "userId", "userEmail"]
+    }
+  },
+  "firestore": {
+    "/learning_notes/{noteId}": {
+      "schema": "TradingLearningNote",
+      "description": "Private trading learning notes collection"
+    }
+  }
+}

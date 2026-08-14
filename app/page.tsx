@@ -7,7 +7,11 @@ import {
   logout, 
   getAccessToken,
   setAccessToken,
-  auth
+  auth,
+  fetchLearningNotes,
+  saveLearningNote,
+  deleteLearningNote,
+  LearningNote
 } from '@/lib/firebase';
 import { 
   findOrCreateFile, 
@@ -69,7 +73,10 @@ import {
   Download,
   Award,
   Zap,
-  Percent
+  Percent,
+  Image as ImageIcon,
+  ZoomIn,
+  Maximize2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -116,7 +123,95 @@ export default function Home() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Active view
-  const [activeTab, setActiveTab] = useState<'overview' | 'journal' | 'notes' | 'keep'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'journal' | 'notes' | 'keep' | 'alignment' | 'learning'>('overview');
+
+  // Learning Notes States
+  const [learningNotes, setLearningNotes] = useState<LearningNote[]>([]);
+  const [isLearningNotesLoading, setIsLearningNotesLoading] = useState(false);
+  const [learningNoteTitle, setLearningNoteTitle] = useState('');
+  const [learningNoteContent, setLearningNoteContent] = useState('');
+  const [learningNoteImage, setLearningNoteImage] = useState<string>('');
+  const [selectedLearningNote, setSelectedLearningNote] = useState<LearningNote | null>(null);
+  const [isSavingLearningNote, setIsSavingLearningNote] = useState(false);
+  const [showLearningModal, setShowLearningModal] = useState(false);
+  const [editingLearningNote, setEditingLearningNote] = useState<LearningNote | null>(null);
+  const [learningNoteTags, setLearningNoteTags] = useState<string[]>([]);
+  const [selectedFilterTag, setSelectedFilterTag] = useState<string | null>(null);
+  const [customTagInput, setCustomTagInput] = useState('');
+  const [learningError, setLearningError] = useState<string | null>(null);
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+
+  const allUniqueTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    learningNotes.forEach(note => {
+      note.tags?.forEach(tag => {
+        if (tag.trim()) {
+          tagSet.add(tag.trim());
+        }
+      });
+    });
+    return Array.from(tagSet);
+  }, [learningNotes]);
+
+  // Alignment Calculator states
+  const [alignDirection, setAlignDirection] = useState<'LONG' | 'SHORT'>('SHORT');
+  const [alignEntry, setAlignEntry] = useState('');
+  const [alignSl, setAlignSl] = useState('');
+  const [alignTp, setAlignTp] = useState('');
+  const [alignRisk, setAlignRisk] = useState('10');
+  const [alignChecks, setAlignChecks] = useState<boolean[]>([false, false, false, false]);
+  const [alignResult, setAlignResult] = useState<{
+    costOfRisk: string;
+    positionSize: string;
+    positionValue: string;
+    leverage: number;
+    margin: string;
+    rMultiple: string | null;
+    liqApprox: string;
+    slPrice: string;
+    liqMatchesSL: boolean;
+    risk: string;
+  } | null>(null);
+
+  const calculateAlignment = () => {
+    const entryVal = parseFloat(alignEntry);
+    const slVal = parseFloat(alignSl);
+    const tpVal = parseFloat(alignTp);
+    const riskVal = parseFloat(alignRisk || '10');
+
+    if (!entryVal || !slVal || !riskVal) {
+      alert('Entry Price, Stop Loss နှင့် Risk Amount တို့ကို ထည့်သွင်းရန် လိုအပ်ပါသည်!');
+      return;
+    }
+
+    const costOfRisk = Math.abs(slVal - entryVal);
+    if (costOfRisk === 0) {
+      alert('Entry Price နှင့် Stop Loss Price တူညီ၍မရပါ!');
+      return;
+    }
+
+    const positionSize = riskVal / costOfRisk;
+    const positionValue = positionSize * entryVal;
+    const leverage = Math.round(positionValue / riskVal);
+    const margin = positionValue / (leverage || 1);
+    const rMultiple = !isNaN(tpVal) && tpVal ? Math.abs((entryVal - tpVal) / (slVal - entryVal)) : null;
+    const liqApprox = alignDirection === 'SHORT' ? entryVal + (riskVal / positionSize) : entryVal - (riskVal / positionSize);
+    const liqMatchesSL = Math.abs(liqApprox - slVal) < 1;
+
+    setAlignResult({
+      costOfRisk: costOfRisk.toFixed(4),
+      positionSize: positionSize.toFixed(4),
+      positionValue: positionValue.toFixed(2),
+      leverage,
+      margin: margin.toFixed(2),
+      rMultiple: rMultiple ? rMultiple.toFixed(1) : null,
+      liqApprox: liqApprox.toFixed(2),
+      slPrice: slVal.toFixed(2),
+      liqMatchesSL,
+      risk: riskVal.toFixed(2)
+    });
+    setAlignChecks([false, false, false, false]);
+  };
 
   const isKeepRestricted = !!(keepError && (keepError.includes('403') || keepError.includes('restricted') || keepError.includes('denied')));
 
@@ -149,6 +244,17 @@ export default function Home() {
   useEffect(() => {
     const timer = setTimeout(() => setMounted(true), 0);
     return () => clearTimeout(timer);
+  }, []);
+
+  // Escape key to close image lightbox preview
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setLightboxImage(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   const loadTrades = async (accessToken: string, sheetId: string) => {
@@ -439,11 +545,177 @@ export default function Home() {
     }
   };
 
+  const loadLearningNotes = async (userId: string) => {
+    setIsLearningNotesLoading(true);
+    setLearningError(null);
+    try {
+      const notes = await fetchLearningNotes(userId);
+      setLearningNotes(notes);
+    } catch (error: any) {
+      console.error('Error fetching learning notes:', error);
+      setLearningError('သင်ခန်းစာများဆွဲယူရာတွင် အမှားအယွင်းရှိနေပါသည်။');
+    } finally {
+      setIsLearningNotesLoading(false);
+    }
+  };
+
+  // Load learning notes auto-hook
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (user?.uid) {
+        loadLearningNotes(user.uid);
+      } else {
+        setLearningNotes([]);
+      }
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [user]);
+
+  const handleSaveLearningNote = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    if (!learningNoteTitle.trim()) {
+      setLearningError('ခေါင်းစဉ်ထည့်သွင်းရန်လိုအပ်ပါသည်!');
+      return;
+    }
+    if (!learningNoteContent.trim()) {
+      setLearningError('မှတ်စုစာသားထည့်သွင်းရန်လိုအပ်ပါသည်!');
+      return;
+    }
+
+    setIsSavingLearningNote(true);
+    setLearningError(null);
+    try {
+      const noteId = editingLearningNote ? editingLearningNote.id : `note-${Date.now()}`;
+      const noteToSave: Omit<LearningNote, 'createdAt'> = {
+        id: noteId,
+        title: learningNoteTitle.trim(),
+        content: learningNoteContent.trim(),
+        imageUrl: learningNoteImage,
+        userId: user.uid,
+        userEmail: user.email || '',
+        tags: learningNoteTags
+      };
+
+      // 1. Optimistic local update so the note is added or edited instantly in the UI
+      const localNote: LearningNote = {
+        id: noteId,
+        title: noteToSave.title,
+        content: noteToSave.content,
+        imageUrl: noteToSave.imageUrl || '',
+        createdAt: editingLearningNote ? editingLearningNote.createdAt : new Date().toISOString(),
+        userId: noteToSave.userId,
+        userEmail: noteToSave.userEmail,
+        tags: noteToSave.tags || []
+      };
+
+      setLearningNotes(prev => {
+        const index = prev.findIndex(n => n.id === noteId);
+        if (index > -1) {
+          const updated = [...prev];
+          updated[index] = localNote;
+          return updated;
+        } else {
+          return [localNote, ...prev];
+        }
+      });
+
+      // 2. Instantly reset inputs and close the modal so there's no visible "Saving..." delay for the user
+      setLearningNoteTitle('');
+      setLearningNoteContent('');
+      setLearningNoteImage('');
+      setLearningNoteTags([]);
+      setCustomTagInput('');
+      setEditingLearningNote(null);
+      setShowLearningModal(false);
+      setIsSavingLearningNote(false);
+
+      // If viewing the note that is being edited, update its details instantly too
+      if (selectedLearningNote?.id === noteId) {
+        setSelectedLearningNote(localNote);
+      }
+
+      // 3. Save to remote Firestore in the background
+      saveLearningNote(noteToSave, !editingLearningNote)
+        .then(() => {
+          // Re-fetch in the background to sync server timestamps/fields
+          loadLearningNotes(user.uid);
+        })
+        .catch(err => {
+          console.error('Background Firestore save failed:', err);
+        });
+
+    } catch (error: any) {
+      console.error('Error saving learning note:', error);
+      setLearningError('သင်ခန်းစာမှတ်စု သိမ်းဆည်းစဉ် အမှားအယွင်းရှိခဲ့ပါသည်။');
+      setIsSavingLearningNote(false);
+    }
+  };
+
+  const handleDeleteLearningNote = async (noteId: string) => {
+    if (!user) return;
+    if (!confirm('ဤသင်ခန်းစာမှတ်စုကို ဖျက်ရန် သေချာပါသလား?')) return;
+    
+    try {
+      await deleteLearningNote(noteId);
+      if (selectedLearningNote?.id === noteId) {
+        setSelectedLearningNote(null);
+      }
+      await loadLearningNotes(user.uid);
+    } catch (error: any) {
+      console.error('Error deleting note:', error);
+      alert('ဖျက်ရာတွင် အမှားအယွင်းရှိခဲ့ပါသည်');
+    }
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new window.Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        // Increase maximum bounds substantially to preserve original desktop chart resolution and readable text labels
+        const MAX_WIDTH = 1600;
+        const MAX_HEIGHT = 1200;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          // Set JPEG quality to 88% (near indistinguishable from raw file) so text, lines, and candles remain pixel-perfect
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+          setLearningNoteImage(dataUrl);
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
   const triggerRefresh = async () => {
     if (!token) return;
     if (spreadsheetId) await loadTrades(token, spreadsheetId);
     if (documentId) await loadDocContent(token, documentId);
     await loadKeepNotes(token);
+    if (user?.uid) await loadLearningNotes(user.uid);
   };
 
   // Auto calculated suggested Risk/Reward and PnL
@@ -767,6 +1039,18 @@ export default function Home() {
               </button>
 
               <button
+                onClick={() => { setActiveTab('alignment'); setIsMobileMenuOpen(false); }}
+                className={`flex items-center space-x-3 w-full px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150 cursor-pointer ${
+                  activeTab === 'alignment'
+                    ? 'bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-950 shadow-sm'
+                    : isDarkMode ? 'hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200' : 'hover:bg-slate-50 text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Percent className="h-4 w-4" />
+                <span>Alignment Calculator</span>
+              </button>
+
+              <button
                 onClick={() => { setActiveTab('journal'); setIsMobileMenuOpen(false); }}
                 className={`flex items-center justify-between w-full px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150 cursor-pointer ${
                   activeTab === 'journal'
@@ -809,6 +1093,18 @@ export default function Home() {
               >
                 <StickyNote className="h-4 w-4" />
                 <span>Local Notes (မှတ်စုများ)</span>
+              </button>
+
+              <button
+                onClick={() => { setActiveTab('learning'); setIsMobileMenuOpen(false); }}
+                className={`flex items-center space-x-3 w-full px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150 cursor-pointer ${
+                  activeTab === 'learning'
+                    ? 'bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-950 shadow-sm'
+                    : isDarkMode ? 'hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200' : 'hover:bg-slate-50 text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <ImageIcon className="h-4 w-4" />
+                <span>Learning Notes</span>
               </button>
             </nav>
 
@@ -915,6 +1211,16 @@ export default function Home() {
                   </button>
                   
                   <button
+                    onClick={() => { setActiveTab('alignment'); setIsMobileMenuOpen(false); }}
+                    className={`flex items-center space-x-3 w-full px-3 py-3 rounded-xl text-xs sm:text-sm font-semibold cursor-pointer ${
+                      activeTab === 'alignment' ? 'bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-950' : isDarkMode ? 'text-zinc-400 hover:bg-zinc-800' : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <Percent className="h-4.5 w-4.5" />
+                    <span>Alignment Calculator</span>
+                  </button>
+
+                  <button
                     onClick={() => { setActiveTab('journal'); setIsMobileMenuOpen(false); }}
                     className={`flex items-center space-x-3 w-full px-3 py-3 rounded-xl text-xs sm:text-sm font-semibold cursor-pointer ${
                       activeTab === 'journal' ? 'bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-950' : isDarkMode ? 'text-zinc-400 hover:bg-zinc-800' : 'text-slate-600 hover:bg-slate-100'
@@ -942,6 +1248,16 @@ export default function Home() {
                   >
                     <StickyNote className="h-4.5 w-4.5" />
                     <span>Local Notes (မှတ်စုများ)</span>
+                  </button>
+
+                  <button
+                    onClick={() => { setActiveTab('learning'); setIsMobileMenuOpen(false); }}
+                    className={`flex items-center space-x-3 w-full px-3 py-3 rounded-xl text-xs sm:text-sm font-semibold cursor-pointer ${
+                      activeTab === 'learning' ? 'bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-950' : isDarkMode ? 'text-zinc-400 hover:bg-zinc-800' : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <ImageIcon className="h-4.5 w-4.5" />
+                    <span>Learning Notes</span>
                   </button>
 
                   {user && (
@@ -1149,9 +1465,52 @@ export default function Home() {
                   </p>
                 </div>
 
-                {/* Keep ဖွင့်ရန် button if on keep tab */}
-                {activeTab === 'keep' && (
-                  <div className="flex items-center flex-wrap gap-2.5 text-xs">
+                {/* Sync Indicators & Google Direct Links */}
+                <div className="flex items-center flex-wrap gap-2.5 text-xs">
+                  <button
+                    onClick={triggerRefresh}
+                    className={`flex items-center space-x-1.5 px-3.5 py-2 border rounded-xl font-semibold transition-all duration-150 cursor-pointer ${
+                      isDarkMode 
+                        ? 'bg-zinc-800/50 hover:bg-zinc-800 border-zinc-700/50 text-zinc-300 hover:text-white' 
+                        : 'bg-slate-50 border-slate-200 hover:bg-slate-100 hover:text-slate-900 text-slate-600'
+                    }`}
+                    title="Google Workspace မှ Data များ တစ်ပြိုင်နက် Sync ပြန်လုပ်ပါ"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${isLoadingTrades || isDocLoading || isKeepLoading ? 'animate-spin' : ''}`} />
+                    <span>Sync Refresh</span>
+                  </button>
+                  
+                  {spreadsheetId && (
+                    <a
+                      href={`https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl font-semibold border transition-all duration-150 ${
+                        isDarkMode 
+                          ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700/85 border-zinc-750' 
+                          : 'bg-slate-100 text-slate-800 hover:bg-slate-200 border-slate-200/80'
+                      }`}
+                    >
+                      <span>Sheets ဖွင့်ရန်</span>
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                  )}
+                  {documentId && (
+                    <a
+                      href={`https://docs.google.com/document/d/${documentId}/edit`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl font-semibold border transition-all duration-150 ${
+                        isDarkMode 
+                          ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700/85 border-zinc-750' 
+                          : 'bg-slate-100 text-slate-800 hover:bg-slate-200 border-slate-200/80'
+                      }`}
+                    >
+                      <span>Docs ဖွင့်ရန်</span>
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                  )}
+                  {activeTab === 'keep' && (
                     <a
                       href="https://keep.google.com"
                       target="_blank"
@@ -1165,8 +1524,8 @@ export default function Home() {
                       <span>Keep ဖွင့်ရန်</span>
                       <ExternalLink className="h-3.5 w-3.5" />
                     </a>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             )}
 
@@ -2070,6 +2429,658 @@ export default function Home() {
                 </div>
               </div>
             )}
+
+            {/* TRADING LEARNING NOTES / BLOG TAB VIEW */}
+            {activeTab === 'learning' && (
+              <div className="space-y-6">
+                <div className={`p-6 rounded-2xl border transition-all ${
+                  isDarkMode ? 'bg-zinc-900/40 border-zinc-800/80 text-zinc-100' : 'bg-white border-slate-200 shadow-xs'
+                }`}>
+                  {/* Tab Header */}
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-5 border-b border-zinc-200/30 dark:border-zinc-800/80">
+                    <div>
+                      <h4 className={`text-xl font-bold flex items-center gap-2.5 ${isDarkMode ? 'text-zinc-100' : 'text-slate-900'}`}>
+                        <ImageIcon className="h-5.5 w-5.5 text-indigo-500" />
+                        Trading Learning Notes & Blog
+                      </h4>
+                      <p className="text-xs text-slate-400 mt-1">
+                        စာများနှင့် ပုံများကို အသုံးပြု၍ သင်ယူမှုမှတ်စုများကို အော့ဖ်လိုင်းနှင့် ကလောက်ဗားရှင်းအဖြစ် အခမဲ့လုံခြုံစွာသိမ်းဆည်းပါ။
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-3 shrink-0">
+                      <button
+                        onClick={() => {
+                          setEditingLearningNote(null);
+                          setLearningNoteTitle('');
+                          setLearningNoteContent('');
+                          setLearningNoteImage('');
+                          setLearningNoteTags([]);
+                          setCustomTagInput('');
+                          setLearningError(null);
+                          setShowLearningModal(true);
+                        }}
+                        className="inline-flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-md hover:shadow-lg transition-all duration-150 cursor-pointer animate-fade-in"
+                      >
+                        <Plus className="h-4 w-4" />
+                        <span>သင်ခန်းစာသစ်ရေးရန်</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Privacy Guard Notice banner */}
+                  <div className={`mt-4 px-4 py-3 rounded-xl border flex items-center gap-3 text-xs font-medium leading-relaxed ${
+                    isDarkMode 
+                      ? 'bg-indigo-950/10 border-indigo-900/40 text-indigo-300' 
+                      : 'bg-indigo-50/50 border-indigo-100 text-indigo-700'
+                  }`}>
+                    <span className="flex h-2 w-2 relative shrink-0">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                    </span>
+                    <span>
+                      🔒 <strong>လုံခြုံရေးအပြည့်ရှိပါသည် -</strong> ဤမှတ်စုများသည် သင်၏ Google Account ({user?.email}) ဖြင့်သာ တိုက်ရိုက်ချိတ်ဆက်ထားပြီး အခြားမည်သူမျှ လုံးဝကြည့်ရှု၍မရပါ။ Account ထွက်လိုက်ပါက အလိုအလျောက် ပိတ်သွားမည်ဖြစ်ပါသည်။
+                    </span>
+                  </div>
+
+                  {/* Search and status overview bar */}
+                  <div className="mt-6 flex flex-col gap-4">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div className="relative flex-1 max-w-md">
+                        <input
+                          type="text"
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          placeholder="သင်ခန်းစာ ခေါင်းစဉ် သို့မဟုတ် အကြောင်းအရာ ရှာဖွေရန်..."
+                          className={`w-full pl-9 pr-4 py-2 border rounded-xl text-xs focus:outline-hidden focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 ${
+                            isDarkMode ? 'bg-zinc-900 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 text-slate-700'
+                          }`}
+                        />
+                        <Search className="h-4 w-4 absolute left-3 top-2.5 text-slate-400 dark:text-zinc-500" />
+                      </div>
+                      
+                      <div className="text-xs text-slate-400">
+                        သင်ခန်းစာစုစုပေါင်း: <strong className="text-slate-700 dark:text-zinc-200">{learningNotes.length} ခု</strong>
+                      </div>
+                    </div>
+
+                    {/* Horizontal Tags Filter Bar */}
+                    <div className="flex flex-wrap items-center gap-1.5 py-1 text-xs">
+                      <span className={`font-semibold mr-1.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Tags ဖြင့် စစ်ထုတ်ရန်:</span>
+                      <button
+                        onClick={() => setSelectedFilterTag(null)}
+                        className={`px-3 py-1.5 rounded-xl font-semibold cursor-pointer transition-all duration-150 ${
+                          selectedFilterTag === null
+                            ? 'bg-indigo-600 text-white shadow-xs'
+                            : isDarkMode 
+                              ? 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-850' 
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                      >
+                        အားလုံး (All)
+                      </button>
+
+                      {/* Only show the tags created by the user across their notes */}
+                      {allUniqueTags.length > 0 ? (
+                        allUniqueTags.map((tag) => (
+                          <button
+                            key={tag}
+                            onClick={() => setSelectedFilterTag(tag)}
+                            className={`px-3 py-1.5 rounded-xl font-semibold cursor-pointer transition-all duration-150 ${
+                              selectedFilterTag === tag
+                                ? 'bg-indigo-600 text-white shadow-xs'
+                                : isDarkMode 
+                                  ? 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-850' 
+                                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                          >
+                            #{tag}
+                          </button>
+                        ))
+                      ) : (
+                        <span className="text-[10px] text-zinc-500 italic">ထည့်သွင်းထားသော tag မရှိသေးပါ</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Learning Notes Content Grid */}
+                  {isLearningNotesLoading ? (
+                    <div className="py-24 text-center">
+                      <RefreshCw className="h-8 w-8 text-indigo-600 animate-spin mx-auto mb-3" />
+                      <p className="text-sm font-semibold text-slate-500">သင်ခန်းစာအချက်အလက်များ ဆွဲယူနေပါသည်...</p>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Filter logic */}
+                      {(() => {
+                        const filtered = learningNotes.filter(note => {
+                          const query = searchQuery.toLowerCase().trim();
+                          const matchesSearch = note.title.toLowerCase().includes(query) || note.content.toLowerCase().includes(query);
+                          const matchesTag = selectedFilterTag 
+                            ? note.tags?.some(t => t.toLowerCase() === selectedFilterTag.toLowerCase()) 
+                            : true;
+                          return matchesSearch && matchesTag;
+                        });
+
+                        if (filtered.length === 0) {
+                          return (
+                            <div className="py-20 text-center border border-dashed rounded-xl border-zinc-200/50 dark:border-zinc-800/80 mt-6 bg-slate-50/10 dark:bg-zinc-950/5">
+                              <ImageIcon className="h-12 w-12 text-zinc-400 dark:text-zinc-700 mx-auto mb-3 stroke-1" />
+                              <h5 className="font-bold text-sm mb-1 text-slate-700 dark:text-zinc-300">
+                                {searchQuery ? 'ရှာဖွေမှုနှင့်ကိုက်ညီသော မှတ်စုမရှိပါ' : 'သင်ခန်းစာမှတ်စု မရှိသေးပါ'}
+                              </h5>
+                              <p className="text-xs text-slate-400 max-w-xs mx-auto mb-6">
+                                {searchQuery ? 'အခြားစာလုံးများဖြင့် ထပ်မံရှာဖွေကြည့်ပါ။' : 'စာသားနှင့် ပုံများကို အသုံးပြုပြီး သင်၏ပထမဆုံး trading သင်ခန်းစာကို စတင်ရေးသားလိုက်ပါ။'}
+                              </p>
+                              {!searchQuery && (
+                                <button
+                                  onClick={() => {
+                                    setEditingLearningNote(null);
+                                    setLearningNoteTitle('');
+                                    setLearningNoteContent('');
+                                    setLearningNoteImage('');
+                                    setLearningNoteTags([]);
+                                    setCustomTagInput('');
+                                    setLearningError(null);
+                                    setShowLearningModal(true);
+                                  }}
+                                  className="inline-flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 py-2.5 rounded-xl cursor-pointer"
+                                >
+                                  <Plus className="h-3.5 w-3.5" />
+                                  <span>သင်ခန်းစာမှတ်စုအသစ် စရေးရန်</span>
+                                </button>
+                              )}
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6 mt-6">
+                            {filtered.map((note) => (
+                              <div
+                                key={note.id}
+                                className={`rounded-2xl border overflow-hidden flex flex-col justify-between transition-all duration-250 hover:shadow-md group ${
+                                  isDarkMode 
+                                    ? 'bg-zinc-900/30 border-zinc-800/70 hover:border-zinc-750/80 text-zinc-100' 
+                                    : 'bg-slate-50 border-slate-200/60 hover:bg-white text-slate-800'
+                                }`}
+                              >
+                                <div>
+                                  {/* Blog Image */}
+                                  {note.imageUrl ? (
+                                    <div 
+                                      className="relative h-44 w-full overflow-hidden bg-slate-900/5 cursor-pointer border-b border-zinc-200/10"
+                                      onClick={() => setSelectedLearningNote(note)}
+                                    >
+                                      <img 
+                                        src={note.imageUrl} 
+                                        alt={note.title} 
+                                        className="h-full w-full object-cover transition-transform duration-350 group-hover:scale-102"
+                                      />
+                                    </div>
+                                  ) : (
+                                    <div 
+                                      className={`h-24 w-full flex items-center justify-center cursor-pointer border-b border-zinc-200/5 ${
+                                        isDarkMode ? 'bg-zinc-850/30 text-zinc-600' : 'bg-slate-100 text-slate-300'
+                                      }`}
+                                      onClick={() => setSelectedLearningNote(note)}
+                                    >
+                                      <ImageIcon className="h-8 w-8 stroke-1 animate-pulse" />
+                                    </div>
+                                  )}
+
+                                  {/* Blog Info */}
+                                  <div className="p-4">
+                                    <span className="text-[10px] text-zinc-400 font-semibold uppercase tracking-wider block mb-1">
+                                      {note.createdAt ? new Date(note.createdAt).toLocaleDateString('my-MM', { year: 'numeric', month: 'short', day: 'numeric' }) : 'မှတ်တမ်းမရှိ'}
+                                    </span>
+                                    <h5 
+                                      className="font-bold text-sm tracking-tight hover:text-indigo-500 dark:hover:text-indigo-400 cursor-pointer line-clamp-1 mb-1.5"
+                                      onClick={() => setSelectedLearningNote(note)}
+                                    >
+                                      {note.title}
+                                    </h5>
+                                    
+                                    {/* Note Tags */}
+                                    <div className="flex flex-wrap gap-1.5 mb-2.5">
+                                      {note.tags && note.tags.length > 0 ? (
+                                        note.tags.map((tag, idx) => (
+                                          <span 
+                                            key={idx} 
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setSelectedFilterTag(tag);
+                                            }}
+                                            className={`text-[10px] px-2 py-0.5 rounded-md font-semibold cursor-pointer transition-all hover:scale-105 duration-100 ${
+                                              isDarkMode 
+                                                ? 'bg-indigo-950/40 text-indigo-300 border border-indigo-900/40 hover:bg-indigo-900/30' 
+                                                : 'bg-indigo-50 text-indigo-700 border border-indigo-100 hover:bg-indigo-100'
+                                            }`}
+                                          >
+                                            #{tag}
+                                          </span>
+                                        ))
+                                      ) : (
+                                        <span className="text-[10px] text-zinc-500 italic">No tags</span>
+                                      )}
+                                    </div>
+
+                                    <p 
+                                      className="text-xs leading-relaxed text-zinc-500 dark:text-zinc-300 line-clamp-3 whitespace-pre-wrap cursor-pointer"
+                                      onClick={() => setSelectedLearningNote(note)}
+                                    >
+                                      {note.content}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                {/* Footer actions */}
+                                <div className={`px-4 py-3 border-t flex justify-between items-center bg-slate-50/20 dark:bg-zinc-900/10 ${
+                                  isDarkMode ? 'border-zinc-800/40' : 'border-slate-200/40'
+                                }`}>
+                                  <button
+                                    onClick={() => setSelectedLearningNote(note)}
+                                    className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                                  >
+                                    အပြည့်အစုံဖတ်ရန် (View Details)
+                                  </button>
+                                  <div className="flex items-center space-x-1 shrink-0">
+                                    <button
+                                      onClick={() => {
+                                        setEditingLearningNote(note);
+                                        setLearningNoteTitle(note.title);
+                                        setLearningNoteContent(note.content);
+                                        setLearningNoteImage(note.imageUrl || '');
+                                        setLearningNoteTags(note.tags || []);
+                                        setCustomTagInput('');
+                                        setLearningError(null);
+                                        setShowLearningModal(true);
+                                      }}
+                                      className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                                        isDarkMode ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200'
+                                      }`}
+                                      title="Edit note"
+                                    >
+                                      <Edit2 className="h-3.5 w-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteLearningNote(note.id)}
+                                      className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                                        isDarkMode ? 'text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10' : 'text-slate-400 hover:text-rose-500 hover:bg-rose-50'
+                                      }`}
+                                      title="Delete note"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ALIGNMENT CALCULATOR TAB VIEW */}
+            {activeTab === 'alignment' && (
+              <div className="space-y-6">
+                <div className={`p-6 rounded-2xl border transition-all ${
+                  isDarkMode ? 'bg-zinc-900/40 border-zinc-800/80 text-zinc-100' : 'bg-white border-slate-200 shadow-xs'
+                }`}>
+                  <div className="mb-6 pb-4 border-b border-zinc-200/30 dark:border-zinc-800/80">
+                    <h4 className={`text-lg font-bold flex items-center gap-2 ${isDarkMode ? 'text-zinc-100' : 'text-slate-900'}`}>
+                      <Percent className="h-5 w-5 text-amber-500" />
+                      Alignment Calculator (အရောင်းအဝယ်မဝင်မီ ချိန်ညှိတွက်ချက်စနစ်)
+                    </h4>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Binance / Exchange Settings များကို မိမိတွက်ချက်မှုနှင့် ကိုက်ညီစေရန် တစ်ဆင့်ချင်း ချိန်ညှိပေးသော စနစ်ကျလှသည့် Position Engine ဖြစ်သည်။
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    {/* INPUTS COLUMN */}
+                    <div className="lg:col-span-1 space-y-4">
+                      <div className={`p-5 rounded-xl border ${
+                        isDarkMode ? 'bg-zinc-950/40 border-zinc-850' : 'bg-slate-50 border-slate-200/60'
+                      }`}>
+                        <label className={`block text-[11px] font-bold uppercase tracking-wider mb-2.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                          ① TRADE DIRECTION (အရောင်းအဝယ်လားရာ)
+                        </label>
+                        <div className="flex rounded-xl overflow-hidden border border-zinc-200/50 dark:border-zinc-850 p-1 bg-zinc-100/50 dark:bg-zinc-900/60">
+                          <button
+                            type="button"
+                            onClick={() => setAlignDirection('LONG')}
+                            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                              alignDirection === 'LONG'
+                                ? 'bg-emerald-500 text-white shadow-sm'
+                                : isDarkMode ? 'text-zinc-400 hover:text-zinc-200' : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                          >
+                            📈 LONG (Buy)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setAlignDirection('SHORT')}
+                            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                              alignDirection === 'SHORT'
+                                ? 'bg-rose-500 text-white shadow-sm'
+                                : isDarkMode ? 'text-zinc-400 hover:text-zinc-200' : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                          >
+                            📉 SHORT (Sell)
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div>
+                          <label className={`block text-[11px] font-bold uppercase tracking-wider mb-1.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                            ENTRY PRICE (ဝင်မည့်ဈေး) *
+                          </label>
+                          <div className="relative flex items-center">
+                            <span className="absolute left-3 text-xs font-bold text-slate-400 dark:text-zinc-500">$</span>
+                            <input
+                              type="number"
+                              step="any"
+                              required
+                              placeholder="e.g. 50000"
+                              value={alignEntry}
+                              onChange={(e) => setAlignEntry(e.target.value)}
+                              className={`w-full pl-7 pr-3 py-2.5 border rounded-xl text-sm font-semibold focus:outline-hidden transition-all ${
+                                isDarkMode 
+                                  ? 'bg-zinc-950 border-zinc-800 focus:border-amber-500/50 focus:ring-4 focus:ring-amber-500/10 text-zinc-100' 
+                                  : 'bg-slate-50 border-slate-200 focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 text-slate-800'
+                              }`}
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className={`block text-[11px] font-bold uppercase tracking-wider mb-1.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                            STOP LOSS PRICE (အရှုံးသတ်မှတ်ဈေး) *
+                          </label>
+                          <div className="relative flex items-center">
+                            <span className="absolute left-3 text-xs font-bold text-slate-400 dark:text-zinc-500">$</span>
+                            <input
+                              type="number"
+                              step="any"
+                              required
+                              placeholder="e.g. 49000"
+                              value={alignSl}
+                              onChange={(e) => setAlignSl(e.target.value)}
+                              className={`w-full pl-7 pr-3 py-2.5 border rounded-xl text-sm font-semibold focus:outline-hidden transition-all ${
+                                isDarkMode 
+                                  ? 'bg-zinc-950 border-zinc-800 focus:border-amber-500/50 focus:ring-4 focus:ring-amber-500/10 text-zinc-100' 
+                                  : 'bg-slate-50 border-slate-200 focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 text-slate-800'
+                              }`}
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className={`block text-[11px] font-bold uppercase tracking-wider mb-1.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                            TAKE PROFIT PRICE (အမြတ်သတ်မှတ်ဈေး - Optional)
+                          </label>
+                          <div className="relative flex items-center">
+                            <span className="absolute left-3 text-xs font-bold text-slate-400 dark:text-zinc-500">$</span>
+                            <input
+                              type="number"
+                              step="any"
+                              placeholder="e.g. 53000"
+                              value={alignTp}
+                              onChange={(e) => setAlignTp(e.target.value)}
+                              className={`w-full pl-7 pr-3 py-2.5 border rounded-xl text-sm font-semibold focus:outline-hidden transition-all ${
+                                isDarkMode 
+                                  ? 'bg-zinc-950 border-zinc-800 focus:border-amber-500/50 focus:ring-4 focus:ring-amber-500/10 text-zinc-100' 
+                                  : 'bg-slate-50 border-slate-200 focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 text-slate-800'
+                              }`}
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className={`block text-[11px] font-bold uppercase tracking-wider mb-1.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                            RISK AMOUNT (အရှုံးခံမည့် ပမာဏ) *
+                          </label>
+                          <div className="relative flex items-center">
+                            <span className="absolute left-3 text-xs font-bold text-slate-400 dark:text-zinc-500">$</span>
+                            <input
+                              type="number"
+                              step="any"
+                              required
+                              placeholder="10"
+                              value={alignRisk}
+                              onChange={(e) => setAlignRisk(e.target.value)}
+                              className={`w-full pl-7 pr-3 py-2.5 border rounded-xl text-sm font-semibold focus:outline-hidden transition-all ${
+                                isDarkMode 
+                                  ? 'bg-zinc-950 border-zinc-800 focus:border-amber-500/50 focus:ring-4 focus:ring-amber-500/10 text-zinc-100' 
+                                  : 'bg-slate-50 border-slate-200 focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 text-slate-800'
+                              }`}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={calculateAlignment}
+                        className="w-full inline-flex items-center justify-center space-x-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-sm px-4 py-3 rounded-xl transition-all cursor-pointer shadow-xs active:scale-[0.99] mt-2 text-center animate-none"
+                      >
+                        <span>▶ ချိန်ညှိတွက်ချက်ရန် (Calculate)</span>
+                      </button>
+                    </div>
+
+                    {/* RESULTS & CHECKLIST COLUMN */}
+                    <div className="lg:col-span-2 space-y-6">
+                      {!alignResult ? (
+                        <div className={`h-full flex flex-col items-center justify-center border border-dashed rounded-2xl py-16 px-4 ${
+                          isDarkMode ? 'border-zinc-800 bg-zinc-950/10' : 'border-slate-200 bg-slate-50/40'
+                        }`}>
+                          <Percent className="h-12 w-12 text-zinc-400 dark:text-zinc-700 mb-3 stroke-1" />
+                          <p className="text-sm font-bold text-zinc-500 dark:text-zinc-400">ချိန်ညှိတွက်ချက်မှု ရလဒ်များ မရှိသေးပါ။</p>
+                          <p className="text-xs text-zinc-400 mt-1 text-center max-w-sm">
+                            အထက်ပါ Trade Direction၊ Entry/SL ဈေးနှုန်းများနှင့် Risk ပမာဏများကို ဖြည့်သွင်းပြီး &quot;ချိန်ညှိတွက်ချက်ရန်&quot; ခလုတ်ကို နှိပ်ပါ။
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-6">
+                          {/* Calculation results card */}
+                          <div className={`p-6 rounded-2xl border ${
+                            isDarkMode ? 'bg-zinc-950/40 border-zinc-800/80' : 'bg-slate-50/50 border-slate-200'
+                          }`}>
+                            <h5 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500 mb-4 border-b pb-2 border-zinc-200/20 dark:border-zinc-800/80">
+                              တွက်ချက်မှုရလဒ်များ (Calculation Results)
+                            </h5>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div className="space-y-3">
+                                <div className="flex justify-between items-center py-1.5 border-b border-zinc-200/10 dark:border-zinc-800/40">
+                                  <span className="text-xs text-slate-500 dark:text-zinc-400 font-medium">Direction (လားရာ)</span>
+                                  <span className={`text-xs px-2.5 py-0.5 rounded-md font-bold ${
+                                    alignDirection === 'SHORT' 
+                                      ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20' 
+                                      : 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
+                                  }`}>
+                                    {alignDirection}
+                                  </span>
+                                </div>
+
+                                <div className="flex justify-between items-center py-1.5 border-b border-zinc-200/10 dark:border-zinc-800/40">
+                                  <span className="text-xs text-slate-500 dark:text-zinc-400 font-medium">Cost of Risk (SL Distance)</span>
+                                  <span className="text-sm font-bold">${alignResult.costOfRisk}</span>
+                                </div>
+
+                                <div className="flex justify-between items-center py-1.5 border-b border-zinc-200/10 dark:border-zinc-800/40">
+                                  <span className="text-xs text-slate-500 dark:text-zinc-400 font-medium">Position Size (အရေအတွက်)</span>
+                                  <span className="text-sm font-extrabold text-amber-500 dark:text-amber-400">{alignResult.positionSize}</span>
+                                </div>
+
+                                <div className="flex justify-between items-center py-1.5 border-b border-zinc-200/10 dark:border-zinc-800/40">
+                                  <span className="text-xs text-slate-500 dark:text-zinc-400 font-medium">Position Value (တန်ဖိုးစုစုပေါင်း)</span>
+                                  <span className="text-sm font-bold">${alignResult.positionValue}</span>
+                                </div>
+
+                                {alignResult.rMultiple && (
+                                  <div className="flex justify-between items-center py-1.5 border-b border-zinc-200/10 dark:border-zinc-800/40">
+                                    <span className="text-xs text-slate-500 dark:text-zinc-400 font-medium">R Multiple (Risk/Reward)</span>
+                                    <span className="text-sm font-extrabold text-emerald-500">{alignResult.rMultiple}R</span>
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="space-y-3">
+                                <div className={`p-4 rounded-xl border flex flex-col justify-between ${
+                                  isDarkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-200'
+                                }`}>
+                                  <div>
+                                    <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-zinc-500 tracking-wider">Required Leverage (လိုအပ်သော မြှောက်ဖော်)</span>
+                                    <span className="block text-[10px] text-zinc-500 mt-0.5">Formula: Position Value ÷ Risk Amount</span>
+                                  </div>
+                                  <span className="text-3xl font-extrabold text-amber-500 tracking-tight mt-2">{alignResult.leverage}x</span>
+                                </div>
+
+                                <div className="flex justify-between items-center py-1.5 border-b border-zinc-200/10 dark:border-zinc-800/40 mt-1">
+                                  <span className="text-xs text-slate-500 dark:text-zinc-400 font-medium">Margin (Isolated - အာမခံငွေ)</span>
+                                  <span className="text-sm font-bold text-emerald-500">${alignResult.margin}</span>
+                                </div>
+
+                                <div className="flex justify-between items-center py-1.5 border-b border-zinc-200/10 dark:border-zinc-800/40">
+                                  <span className="text-xs text-slate-500 dark:text-zinc-400 font-medium">Est. Liquidation Price</span>
+                                  <span className={`text-sm font-bold ${alignResult.liqMatchesSL ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                    ${alignResult.liqApprox}
+                                  </span>
+                                </div>
+
+                                <div className="flex justify-between items-center py-1.5 border-b border-zinc-200/10 dark:border-zinc-800/40">
+                                  <span className="text-xs text-slate-500 dark:text-zinc-400 font-medium">Your Stop Loss (ရွေးထားသော SL)</span>
+                                  <span className="text-sm font-bold">${alignResult.slPrice}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Liquidation gap notice */}
+                            <div className={`mt-4 p-3 rounded-xl border text-xs font-semibold ${
+                              alignResult.liqMatchesSL 
+                                ? (isDarkMode ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-emerald-50 border-emerald-100 text-emerald-700')
+                                : (isDarkMode ? 'bg-rose-500/10 border-rose-500/20 text-rose-400' : 'bg-rose-50 border-rose-100 text-rose-700')
+                            }`}>
+                              {alignResult.liqMatchesSL ? (
+                                <span>✅ Liquidation ≈ SL — Setting ကိုက်ညီမှုရှိပြီး အန္တရာယ်ကင်းပါသည်။</span>
+                              ) : (
+                                <span>⚠ Liquidation ≠ SL — Binance Calculator တွင် ပြန်လည်စစ်ဆေးရန် လိုအပ်ပါသည်။</span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Pre-Entry Checklist */}
+                          <div className={`p-6 rounded-2xl border ${
+                            isDarkMode ? 'bg-zinc-950/40 border-zinc-800/80' : 'bg-slate-50/50 border-slate-200'
+                          }`}>
+                            <h5 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500 mb-4 border-b pb-2 border-zinc-200/20 dark:border-zinc-800/80">
+                              ② Pre-Entry Checklist (မဝင်မီ လုပ်ဆောင်ရမည့်အဆင့်များ)
+                            </h5>
+
+                            <div className="space-y-2.5">
+                              {[
+                                { text: 'Isolated Margin Mode ပြောင်းထားလား စစ်ပါ', detail: 'Cross → Isolated သို့ ပြောင်းလဲရန်' },
+                                { text: `Leverage ကို ${alignResult.leverage}x ပြောင်းလဲပေးပါ`, detail: `Required Leverage: ${alignResult.leverage}x ဖြစ်ရမည်` },
+                                { text: `${alignResult.positionSize} ${alignDirection} ကို ဖွင့်ပါ`, detail: `Isolated Margin: $${alignResult.margin} အသုံးပြုမည်` },
+                                { text: `Liquidation ≈ $${alignResult.liqApprox} ဖြစ်မဖြစ် Binance တွင် စစ်ပါ`, detail: `Target Liquidation Price: ~$${alignResult.slPrice}` }
+                              ].map((item, idx) => {
+                                const isChecked = alignChecks[idx];
+                                return (
+                                  <div
+                                    key={idx}
+                                    onClick={() => {
+                                      const next = [...alignChecks];
+                                      next[idx] = !next[idx];
+                                      setAlignChecks(next);
+                                    }}
+                                    className={`p-3 border rounded-xl flex items-start gap-3 cursor-pointer transition-all ${
+                                      isChecked 
+                                        ? 'bg-emerald-500/10 border-emerald-500/40' 
+                                        : isDarkMode ? 'bg-zinc-900/40 border-zinc-800 hover:border-zinc-700' : 'bg-white border-slate-200 hover:border-slate-300'
+                                    }`}
+                                  >
+                                    <div className={`h-4.5 w-4.5 rounded-md flex items-center justify-center border shrink-0 mt-0.5 transition-all ${
+                                      isChecked 
+                                        ? 'bg-emerald-500 border-emerald-500 text-white' 
+                                        : isDarkMode ? 'border-zinc-700 bg-zinc-950' : 'border-slate-300 bg-slate-50'
+                                    }`}>
+                                      {isChecked && <Check className="h-3 w-3 stroke-[3]" />}
+                                    </div>
+                                    <div>
+                                      <p className={`text-xs font-bold ${isChecked ? 'text-emerald-500' : isDarkMode ? 'text-zinc-200' : 'text-slate-800'}`}>
+                                        {item.text}
+                                      </p>
+                                      <p className="text-[10px] text-zinc-500 mt-0.5">{item.detail}</p>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+
+                            {alignChecks.every(Boolean) && (
+                              <div className="mt-5 p-3.5 bg-emerald-500/10 border border-emerald-500 text-emerald-500 rounded-xl text-center font-bold text-xs tracking-wider">
+                                ✅ ALL CHECKS PASSED — READY TO ENTER THE TRADE
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* INFO & EDUCATION FOOTERS */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8 pt-6 border-t border-zinc-200/20 dark:border-zinc-800/80">
+                    <div className={`p-5 rounded-xl border ${
+                      isDarkMode ? 'bg-zinc-950/20 border-zinc-800/60' : 'bg-slate-50/30 border-slate-200/80'
+                    }`}>
+                      <h6 className="text-xs font-bold uppercase tracking-wider text-amber-500 mb-2">
+                        ③ Isolated vs Cross Margin (စနစ် နှိုင်းယှဉ်ချက်)
+                      </h6>
+                      <div className="text-xs leading-relaxed space-y-2 text-slate-500 dark:text-zinc-400">
+                        <p>
+                          <strong>Cross Margin</strong> — အကောင့်အတွင်းရှိ Balance အားလုံးကို အာမခံ (Collateral) သုံးစွဲသည့်အတွက် လုံခြုံမှုအားနည်းပြီး Exchange မှ Position size ကို Balance အပေါ်မူတည်၍ ကန့်သတ်တတ်သည်။
+                        </p>
+                        <p>
+                          <strong>Isolated Margin</strong> — လက်ရှိ Trade အတွက်သာ သီးသန့်ခွဲဝေအာမခံခြင်း ဖြစ်သည်။ ဥပမာ- $10 သာ Allocate လုပ်ထားပါက Stop Loss ထိခိုက်ခဲ့လျှင်လည်း <strong>$10 သာ အတိအကျ ဆုံးရှုံးမည်ဖြစ်သည်</strong>။
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className={`p-4 rounded-xl border-l-4 border-amber-500 ${
+                        isDarkMode ? 'bg-zinc-950/20 border-zinc-800/60' : 'bg-amber-50/30 border-amber-200/80'
+                      }`}>
+                        <h6 className="text-xs font-bold uppercase tracking-wider text-amber-500 mb-1">
+                          ⚠ Important Rule (ရွှေရောင်ဥပဒေသ)
+                        </h6>
+                        <ul className="text-xs space-y-1 text-slate-500 dark:text-zinc-400 list-disc pl-4 leading-relaxed">
+                          <li>ကိုယ့် Calculation ကို Exchange အတွက် <strong>ပြောင်းမပေးပါနဲ့</strong></li>
+                          <li>Exchange Setting ကို ကိုယ့် Calculation နဲ့ <strong>ကိုက်အောင် ပြန်ချိန်ပါ</strong></li>
+                        </ul>
+                      </div>
+
+                      <div className={`p-4 rounded-xl text-center italic border ${
+                        isDarkMode ? 'bg-zinc-900/60 border-zinc-850' : 'bg-slate-100/50 border-slate-200/60'
+                      }`}>
+                        <p className={`text-xs font-serif ${isDarkMode ? 'text-zinc-300' : 'text-slate-700'}`}>
+                          &quot;The system obeys the one who commands themselves first.&quot;
+                        </p>
+                        <span className="block text-[10px] text-zinc-500 dark:text-zinc-500 mt-1 font-semibold">
+                          Formula: Leverage = Position Value ÷ Risk Amount
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </main>
@@ -2353,6 +3364,465 @@ export default function Home() {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+
+        {/* CREATE / EDIT LEARNING NOTE MODAL */}
+        {showLearningModal && (
+          <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 animate-fade-in">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowLearningModal(false)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs"
+            />
+
+            {/* Modal Box */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className={`relative w-full max-w-2xl rounded-2xl border shadow-2xl flex flex-col max-h-[90vh] overflow-hidden ${
+                isDarkMode ? 'bg-zinc-900 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 text-slate-800'
+              }`}
+            >
+              {/* Header */}
+              <div className={`px-6 py-4 border-b flex justify-between items-center shrink-0 ${
+                isDarkMode ? 'border-zinc-800' : 'border-slate-100'
+              }`}>
+                <h3 className="font-bold text-base flex items-center gap-2">
+                  <ImageIcon className="h-5 w-5 text-indigo-500" />
+                  {editingLearningNote ? 'သင်ခန်းစာမှတ်စုအား ပြင်ဆင်ရန်' : 'သင်ခန်းစာမှတ်စုအသစ် ရေးသားရန်'}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setShowLearningModal(false)}
+                  className={`p-1 rounded-lg transition-colors cursor-pointer ${
+                    isDarkMode ? 'hover:bg-zinc-800 text-zinc-400' : 'hover:bg-slate-100 text-slate-500'
+                  }`}
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Form Content */}
+              <form onSubmit={handleSaveLearningNote} className="flex flex-col flex-1 overflow-y-auto">
+                <div className="p-6 space-y-5">
+                  {learningError && (
+                    <div className="p-3.5 rounded-xl text-xs bg-rose-500/10 border border-rose-500/20 text-rose-500 flex items-center gap-2 font-medium">
+                      <AlertTriangle className="h-4 w-4 shrink-0" />
+                      <span>{learningError}</span>
+                    </div>
+                  )}
+
+                  {/* Title */}
+                  <div>
+                    <label className={`block text-xs font-bold uppercase tracking-wider mb-1.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                      သင်ခန်းစာ ခေါင်းစဉ် (Title) <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Break of Structure (BOS) နှင့် Liquidity ကောက်ပုံ"
+                      value={learningNoteTitle}
+                      onChange={(e) => setLearningNoteTitle(e.target.value)}
+                      className={`w-full px-3 py-2 border rounded-xl text-sm focus:outline-hidden focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 ${
+                        isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-800'
+                      }`}
+                    />
+                  </div>
+
+                  {/* Image Uploader */}
+                  <div>
+                    <label className={`block text-xs font-bold uppercase tracking-wider mb-1.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                      ပုံတင်ရန် (Upload Image) - <span className="text-[10px] text-zinc-400 font-normal">စာနှင့်အတူ တွဲသိမ်းချင်သော ပုံရှိလျှင်</span>
+                    </label>
+                    
+                    <div className="space-y-3">
+                      {learningNoteImage ? (
+                        <div className="relative rounded-xl overflow-hidden border border-zinc-700/50 max-h-56 bg-zinc-950">
+                          <img 
+                            src={learningNoteImage} 
+                            alt="Preview" 
+                            className="h-full w-full object-contain max-h-56 mx-auto"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setLearningNoteImage('')}
+                            className="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white p-1.5 rounded-lg shadow-md transition-colors cursor-pointer"
+                            title="ပုံကို ဖယ်ရှားရန်"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className={`border-2 border-dashed rounded-xl p-6 text-center transition-colors relative group ${
+                          isDarkMode 
+                            ? 'border-zinc-800 hover:border-zinc-700 bg-zinc-950/20' 
+                            : 'border-slate-200 hover:border-slate-300 bg-slate-50/50'
+                        }`}>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleImageChange}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                          />
+                          <ImageIcon className="h-8 w-8 text-zinc-400 dark:text-zinc-600 mx-auto mb-2" />
+                          <p className="text-xs font-bold text-zinc-500 dark:text-zinc-400">ပုံရွေးချယ်ရန် ကလစ်နှိပ်ပါ သို့မဟုတ် Drag ဆွဲထည့်ပါ</p>
+                          <p className="text-[10px] text-zinc-400 mt-1">ပုံအရွယ်အစားကို client-side တွင် အလိုအလျောက် သင့်လျော်စွာ ချုံ့ပေးမည်ဖြစ်သည်။</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Tags Selector */}
+                  <div>
+                    <label className={`block text-xs font-bold uppercase tracking-wider mb-1.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                      Tags ရွေးချယ်ရန် / ထည့်သွင်းရန် (Tags)
+                    </label>
+                    <div className="space-y-2.5">
+                      {/* Previously used tags for quick toggle */}
+                      {allUniqueTags.length > 0 && (
+                        <div className="space-y-1">
+                          <span className={`text-[10px] font-semibold block ${isDarkMode ? 'text-zinc-500' : 'text-slate-400'}`}>ယခင်အသုံးပြုခဲ့သော Tags များမှ အမြန်ရွေးချယ်ရန်:</span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {allUniqueTags.map((tag) => {
+                              const isSelected = learningNoteTags.includes(tag);
+                              return (
+                                <button
+                                  type="button"
+                                  key={tag}
+                                  onClick={() => {
+                                    if (isSelected) {
+                                      setLearningNoteTags(learningNoteTags.filter(t => t !== tag));
+                                    } else {
+                                      setLearningNoteTags([...learningNoteTags, tag]);
+                                    }
+                                  }}
+                                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors duration-100 ${
+                                    isSelected 
+                                      ? 'bg-indigo-600 text-white shadow-xs font-bold' 
+                                      : isDarkMode ? 'bg-zinc-800 text-zinc-400 hover:bg-zinc-750' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                                  }`}
+                                >
+                                  {isSelected ? '✓ ' : ''}#{tag}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Custom tag input */}
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          placeholder="Custom tag ရိုက်ထည့်ပါ (e.g. MyPattern) ပြီးလျှင် Enter ခေါက်ပါ..."
+                          value={customTagInput}
+                          onChange={(e) => setCustomTagInput(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))} // only allow alphanumeric and underscores
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              const newTag = customTagInput.trim();
+                              if (newTag && !learningNoteTags.includes(newTag)) {
+                                setLearningNoteTags([...learningNoteTags, newTag]);
+                                setCustomTagInput('');
+                              }
+                            }
+                          }}
+                          className={`flex-1 px-3 py-2 border rounded-xl text-xs focus:outline-hidden focus:border-indigo-500 ${
+                            isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-800'
+                          }`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newTag = customTagInput.trim();
+                            if (newTag && !learningNoteTags.includes(newTag)) {
+                              setLearningNoteTags([...learningNoteTags, newTag]);
+                              setCustomTagInput('');
+                            }
+                          }}
+                          className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-xl cursor-pointer"
+                        >
+                          ထည့်ရန်
+                        </button>
+                      </div>
+
+                      {/* Active selected tags list */}
+                      {learningNoteTags.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 p-2.5 rounded-xl border border-zinc-200/10 bg-zinc-950/20 dark:bg-zinc-950/50">
+                          <span className="text-[10px] text-zinc-400 font-semibold block mr-1 self-center">ရွေးချယ်ထားသော Tags:</span>
+                          {learningNoteTags.map((tag, idx) => (
+                            <span
+                              key={idx}
+                              className="inline-flex items-center gap-1 bg-indigo-500/15 text-indigo-400 px-2 py-0.5 rounded-md text-xs font-semibold"
+                            >
+                              #{tag}
+                              <button
+                                type="button"
+                                onClick={() => setLearningNoteTags(learningNoteTags.filter(t => t !== tag))}
+                                className="hover:text-red-400 font-bold ml-1 focus:outline-hidden"
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Content */}
+                  <div>
+                    <label className={`block text-xs font-bold uppercase tracking-wider mb-1.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                      သင်ခန်းစာအကြောင်းအရာ / မှတ်စုစာသား (Content) <span className="text-rose-500">*</span>
+                    </label>
+                    <textarea
+                      required
+                      placeholder="Market Structure Shift ဖြစ်သွားတဲ့အချိန်မှာ Order Block နေရာမှာ Limit တင်ပြီးစောင့်ဝင်ရမယ်..."
+                      value={learningNoteContent}
+                      onChange={(e) => setLearningNoteContent(e.target.value)}
+                      rows={8}
+                      className={`w-full px-3 py-2 border rounded-xl text-sm focus:outline-hidden focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 whitespace-pre-wrap ${
+                        isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-800'
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                {/* Sticky Footer Actions */}
+                <div className={`px-6 py-4 flex justify-end space-x-3 border-t shrink-0 ${
+                  isDarkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-slate-50 border-slate-100'
+                }`}>
+                  <button
+                    type="button"
+                    onClick={() => setShowLearningModal(false)}
+                    className={`px-4 py-2 border rounded-xl text-sm font-semibold transition-colors duration-150 cursor-pointer ${
+                      isDarkMode 
+                        ? 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700' 
+                        : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingLearningNote}
+                    className="inline-flex justify-center items-center bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-semibold text-sm px-5 py-2 rounded-xl transition-all duration-150 cursor-pointer shadow-xs"
+                  >
+                    {isSavingLearningNote ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 animate-spin mr-1.5" />
+                        <span>သိမ်းဆည်းနေပါသည်...</span>
+                      </>
+                    ) : (
+                      <span>သိမ်းဆည်းမည်</span>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+
+        {/* LEARNING NOTE DETAIL MODAL */}
+        {selectedLearningNote && (
+          <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedLearningNote(null)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs"
+            />
+
+            {/* Modal Box */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className={`relative w-full max-w-3xl rounded-2xl border shadow-2xl flex flex-col max-h-[85vh] overflow-hidden ${
+                isDarkMode ? 'bg-zinc-900 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 text-slate-800'
+              }`}
+            >
+              {/* Header */}
+              <div className={`px-6 py-4 border-b flex justify-between items-center shrink-0 ${
+                isDarkMode ? 'border-zinc-800' : 'border-slate-100'
+              }`}>
+                <div>
+                  <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider block mb-0.5">
+                    {selectedLearningNote.createdAt ? new Date(selectedLearningNote.createdAt).toLocaleDateString('my-MM', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'မှတ်တမ်းမရှိ'}
+                  </span>
+                  <h3 className="font-bold text-base sm:text-lg text-slate-900 dark:text-zinc-100 tracking-tight">
+                    {selectedLearningNote.title}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedLearningNote(null)}
+                  className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                    isDarkMode ? 'hover:bg-zinc-800 text-zinc-400' : 'hover:bg-slate-100 text-slate-500'
+                  }`}
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Scrollable Content */}
+              <div className="p-6 space-y-6 overflow-y-auto flex-1">
+                {/* Note Image */}
+                {selectedLearningNote.imageUrl && (
+                  <div 
+                    onClick={() => setLightboxImage(selectedLearningNote.imageUrl || null)}
+                    className="rounded-xl overflow-hidden border border-zinc-200/15 bg-slate-950 max-h-[45vh] flex justify-center shadow-lg cursor-zoom-in group relative"
+                    title="ပုံကို အပြည့်ချဲ့ကြည့်ရန် နှိပ်ပါ (Click to view full screen)"
+                  >
+                    <img 
+                      src={selectedLearningNote.imageUrl} 
+                      alt={selectedLearningNote.title} 
+                      className="max-h-[45vh] w-auto object-contain transition-all duration-300 group-hover:scale-[1.01] group-hover:brightness-105"
+                    />
+                    <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-colors duration-250 flex items-center justify-center opacity-0 group-hover:opacity-100">
+                      <span className="bg-black/75 text-zinc-100 text-xs font-bold px-3 py-2 rounded-xl flex items-center space-x-2 backdrop-blur-xs shadow-lg transform translate-y-2 group-hover:translate-y-0 transition-all duration-250">
+                        <ZoomIn className="h-4 w-4 text-indigo-400" />
+                        <span>အပြည့်ချဲ့ကြည့်ရန် နှိပ်ပါ</span>
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Note Tags */}
+                {selectedLearningNote.tags && selectedLearningNote.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {selectedLearningNote.tags.map((tag, idx) => (
+                      <span 
+                        key={idx} 
+                        className={`text-xs px-2.5 py-1 rounded-lg font-bold border ${
+                          isDarkMode 
+                            ? 'bg-indigo-950/40 text-indigo-300 border-indigo-900/30' 
+                            : 'bg-indigo-50 text-indigo-700 border-indigo-100'
+                        }`}
+                      >
+                        #{tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Note Text content */}
+                <div className={`whitespace-pre-wrap text-sm leading-relaxed ${
+                  isDarkMode ? 'text-zinc-200' : 'text-slate-700'
+                }`}>
+                  {selectedLearningNote.content}
+                </div>
+              </div>
+
+              {/* Footer actions */}
+              <div className={`px-6 py-4 flex justify-between items-center border-t shrink-0 ${
+                isDarkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-slate-50 border-slate-100'
+              }`}>
+                <div className="text-[10px] text-zinc-400 font-semibold">
+                  📧 Owner: {selectedLearningNote.userEmail || user?.email}
+                </div>
+                
+                <div className="flex items-center space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const noteToEdit = selectedLearningNote;
+                      setSelectedLearningNote(null);
+                      setEditingLearningNote(noteToEdit);
+                      setLearningNoteTitle(noteToEdit.title);
+                      setLearningNoteContent(noteToEdit.content);
+                      setLearningNoteImage(noteToEdit.imageUrl || '');
+                      setLearningNoteTags(noteToEdit.tags || []);
+                      setCustomTagInput('');
+                      setLearningError(null);
+                      setShowLearningModal(true);
+                    }}
+                    className={`inline-flex items-center space-x-1 px-4 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer border ${
+                      isDarkMode 
+                        ? 'bg-zinc-800 border-zinc-700 text-zinc-200 hover:bg-zinc-700 hover:text-white' 
+                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    <Edit2 className="h-3.5 w-3.5" />
+                    <span>ပြင်ဆင်ရန် (Edit)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedLearningNote(null);
+                    }}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 py-2 rounded-lg transition-colors cursor-pointer shadow-xs"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* LIGHTBOX IMAGE PREVIEW MODAL */}
+        {lightboxImage && (
+          <div className="fixed inset-0 z-50 overflow-hidden flex items-center justify-center p-4">
+            {/* Dark Blurred Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setLightboxImage(null)}
+              className="fixed inset-0 bg-black/90 backdrop-blur-md cursor-zoom-out"
+            />
+
+            {/* Close button on top-right */}
+            <div className="absolute top-4 right-4 z-50 flex items-center space-x-3">
+              <a 
+                href={lightboxImage} 
+                target="_blank" 
+                rel="noreferrer"
+                className="p-2.5 bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 hover:text-white rounded-full transition-colors cursor-pointer border border-zinc-800/50 shadow-lg flex items-center justify-center"
+                title="မူရင်းပုံကို ယူရန် (Download Original)"
+              >
+                <Download className="h-4 w-4" />
+              </a>
+              <button
+                type="button"
+                onClick={() => setLightboxImage(null)}
+                className="p-2.5 bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 hover:text-white rounded-full transition-colors cursor-pointer border border-zinc-800/50 shadow-lg flex items-center justify-center"
+                title="ပိတ်ရန် (Close)"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Centered Image Container */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.94 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.94 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+              className="relative max-w-full max-h-[92vh] z-10 flex flex-col items-center justify-center pointer-events-none"
+            >
+              <img 
+                src={lightboxImage} 
+                alt="Enlarged Note Asset" 
+                className="max-w-[98vw] sm:max-w-[92vw] max-h-[88vh] object-contain rounded-lg shadow-2xl border border-zinc-800/40 select-none pointer-events-auto cursor-zoom-out"
+                onClick={() => setLightboxImage(null)}
+              />
+              {/* Optional Caption */}
+              <div className="mt-4 px-4 py-1.5 bg-zinc-950/85 backdrop-blur-xs border border-zinc-800/40 rounded-full flex items-center space-x-2 shadow-lg">
+                <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-ping" />
+                <span className="text-[10px] sm:text-xs text-zinc-300 font-bold tracking-wider">
+                  အပြည့်ချဲ့၍ ကြည့်ရှုနေသည် (Fullscreen View)
+                </span>
+              </div>
             </motion.div>
           </div>
         )}
