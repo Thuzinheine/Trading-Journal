@@ -753,9 +753,6 @@ export default function Home() {
         tags: learningNoteTags
       };
 
-      // 1. Save to remote Firestore and await completion to verify size/permissions
-      await saveLearningNote(noteToSave, !editingLearningNote);
-
       const localNote: LearningNote = {
         id: noteId,
         title: noteToSave.title,
@@ -767,7 +764,7 @@ export default function Home() {
         tags: noteToSave.tags || []
       };
 
-      // 2. Update local state
+      // 1. UPDATE LOCAL STATE INSTANTLY (Optimistic UI Update)
       setLearningNotes(prev => {
         const index = prev.findIndex(n => n.id === noteId);
         if (index > -1) {
@@ -779,7 +776,7 @@ export default function Home() {
         }
       });
 
-      // Update cached notes in localStorage instantly
+      // 2. UPDATE LOCAL STORAGE CACHE INSTANTLY
       const cachedKey = `trading_learning_notes_${user.uid}`;
       if (typeof window !== 'undefined') {
         try {
@@ -805,7 +802,7 @@ export default function Home() {
         setSelectedLearningNote(localNote);
       }
 
-      // 3. Reset inputs and close modal
+      // 3. RESET INPUTS & CLOSE MODAL INSTANTLY
       setLearningNoteTitle('');
       setLearningNoteContent('');
       setLearningNoteImage('');
@@ -814,8 +811,16 @@ export default function Home() {
       setEditingLearningNote(null);
       setShowLearningModal(false);
 
-      // Re-fetch silently in the background to sync server timestamps/fields
-      await loadLearningNotes(user.uid, true);
+      // 4. UPLOAD TO REMOTE FIRESTORE IN THE BACKGROUND (NON-BLOCKING)
+      saveLearningNote(noteToSave, !editingLearningNote)
+        .then(() => {
+          console.log('Learning note successfully saved to Cloud (Firestore)');
+          // Silently sync server timestamp or fields
+          loadLearningNotes(user.uid, true);
+        })
+        .catch((error) => {
+          console.error('Background Firestore save failed:', error);
+        });
 
     } catch (error: any) {
       console.error('Error saving learning note:', error);
