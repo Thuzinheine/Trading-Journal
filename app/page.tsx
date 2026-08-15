@@ -659,9 +659,10 @@ export default function Home() {
   const loadLearningNotes = async (userId: string, isSilentRefresh = false) => {
     const cachedKey = `trading_learning_notes_${userId}`;
     let hasLoadedFromCache = false;
+    let localNotesCount = 0;
 
     // 1. Try loading from localStorage first if not a silent sync
-    if (!isSilentRefresh && learningNotes.length === 0 && typeof window !== 'undefined') {
+    if (!isSilentRefresh && typeof window !== 'undefined') {
       const cached = localStorage.getItem(cachedKey);
       if (cached) {
         try {
@@ -669,6 +670,7 @@ export default function Home() {
           if (Array.isArray(parsed) && parsed.length > 0) {
             setLearningNotes(parsed);
             hasLoadedFromCache = true;
+            localNotesCount = parsed.length;
           }
         } catch (e) {
           console.error('Error loading cached learning notes:', e);
@@ -677,7 +679,7 @@ export default function Home() {
     }
 
     // 2. Set loading state only if memory/cache is completely empty and it's not a silent sync
-    if (!hasLoadedFromCache && learningNotes.length === 0 && !isSilentRefresh) {
+    if (!hasLoadedFromCache && learningNotes.length === 0 && localNotesCount === 0 && !isSilentRefresh) {
       setIsLearningNotesLoading(true);
     }
     
