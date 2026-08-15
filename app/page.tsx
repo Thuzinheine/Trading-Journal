@@ -545,12 +545,40 @@ export default function Home() {
     }
   };
 
-  const loadLearningNotes = async (userId: string) => {
-    setIsLearningNotesLoading(true);
+  const loadLearningNotes = async (userId: string, isSilentRefresh = false) => {
+    const cachedKey = `trading_learning_notes_${userId}`;
+    let hasLoadedFromCache = false;
+
+    // 1. Try loading from localStorage first if not a silent sync
+    if (!isSilentRefresh && learningNotes.length === 0 && typeof window !== 'undefined') {
+      const cached = localStorage.getItem(cachedKey);
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setLearningNotes(parsed);
+            hasLoadedFromCache = true;
+          }
+        } catch (e) {
+          console.error('Error loading cached learning notes:', e);
+        }
+      }
+    }
+
+    // 2. Set loading state only if memory/cache is completely empty and it's not a silent sync
+    if (!hasLoadedFromCache && learningNotes.length === 0 && !isSilentRefresh) {
+      setIsLearningNotesLoading(true);
+    }
+    
     setLearningError(null);
     try {
       const notes = await fetchLearningNotes(userId);
       setLearningNotes(notes);
+      
+      // Update cache
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(cachedKey, JSON.stringify(notes));
+      }
     } catch (error: any) {
       console.error('Error fetching learning notes:', error);
       setLearningError('သင်ခန်းစာများဆွဲယူရာတွင် အမှားအယွင်းရှိနေပါသည်။');
@@ -559,16 +587,31 @@ export default function Home() {
     }
   };
 
-  // Load learning notes auto-hook
+  // Load learning notes auto-hook with instant cached loading
   useEffect(() => {
     const timer = setTimeout(() => {
       if (user?.uid) {
+        const cachedKey = `trading_learning_notes_${user.uid}`;
+        if (typeof window !== 'undefined') {
+          const cached = localStorage.getItem(cachedKey);
+          if (cached) {
+            try {
+              const parsed = JSON.parse(cached);
+              if (Array.isArray(parsed)) {
+                setLearningNotes(parsed);
+              }
+            } catch (e) {
+              console.error('Error parsing initial cache:', e);
+            }
+          }
+        }
         loadLearningNotes(user.uid);
       } else {
         setLearningNotes([]);
       }
     }, 0);
     return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   const handleSaveLearningNote = async (e: React.FormEvent) => {
@@ -597,7 +640,9 @@ export default function Home() {
         tags: learningNoteTags
       };
 
-      // 1. Optimistic local update so the note is added or edited instantly in the UI
+      // 1. Save to remote Firestore and await completion to verify size/permissions
+      await saveLearningNote(noteToSave, !editingLearningNote);
+
       const localNote: LearningNote = {
         id: noteId,
         title: noteToSave.title,
@@ -609,6 +654,7 @@ export default function Home() {
         tags: noteToSave.tags || []
       };
 
+      // 2. Update local state
       setLearningNotes(prev => {
         const index = prev.findIndex(n => n.id === noteId);
         if (index > -1) {
@@ -620,7 +666,33 @@ export default function Home() {
         }
       });
 
-      // 2. Instantly reset inputs and close the modal so there's no visible "Saving..." delay for the user
+      // Update cached notes in localStorage instantly
+      const cachedKey = `trading_learning_notes_${user.uid}`;
+      if (typeof window !== 'undefined') {
+        try {
+          const cached = localStorage.getItem(cachedKey);
+          let currentList: LearningNote[] = [];
+          if (cached) {
+            currentList = JSON.parse(cached);
+          }
+          const index = currentList.findIndex(n => n.id === noteId);
+          if (index > -1) {
+            currentList[index] = localNote;
+          } else {
+            currentList.unshift(localNote);
+          }
+          localStorage.setItem(cachedKey, JSON.stringify(currentList));
+        } catch (e) {
+          console.error('Error updating cache on save:', e);
+        }
+      }
+
+      // If viewing the note that is being edited, update its details instantly too
+      if (selectedLearningNote?.id === noteId) {
+        setSelectedLearningNote(localNote);
+      }
+
+      // 3. Reset inputs and close modal
       setLearningNoteTitle('');
       setLearningNoteContent('');
       setLearningNoteImage('');
@@ -628,26 +700,25 @@ export default function Home() {
       setCustomTagInput('');
       setEditingLearningNote(null);
       setShowLearningModal(false);
-      setIsSavingLearningNote(false);
 
-      // If viewing the note that is being edited, update its details instantly too
-      if (selectedLearningNote?.id === noteId) {
-        setSelectedLearningNote(localNote);
-      }
-
-      // 3. Save to remote Firestore in the background
-      saveLearningNote(noteToSave, !editingLearningNote)
-        .then(() => {
-          // Re-fetch in the background to sync server timestamps/fields
-          loadLearningNotes(user.uid);
-        })
-        .catch(err => {
-          console.error('Background Firestore save failed:', err);
-        });
+      // Re-fetch silently in the background to sync server timestamps/fields
+      await loadLearningNotes(user.uid, true);
 
     } catch (error: any) {
       console.error('Error saving learning note:', error);
-      setLearningError('သင်ခန်းစာမှတ်စု သိမ်းဆည်းစဉ် အမှားအယွင်းရှိခဲ့ပါသည်။');
+      let userFriendlyError = 'သင်ခန်းစာမှတ်စု သိမ်းဆည်းစဉ် အမှားအယွင်းရှိခဲ့ပါသည်။';
+      try {
+        const parsed = JSON.parse(error.message);
+        if (parsed && parsed.error) {
+          userFriendlyError = `သိမ်းဆည်းရာတွင် အမှားရှိပါသည်: ${parsed.error}`;
+        }
+      } catch (e) {
+        if (error instanceof Error) {
+          userFriendlyError = `သိမ်းဆည်းရာတွင် အမှားရှိပါသည်: ${error.message}`;
+        }
+      }
+      setLearningError(userFriendlyError);
+    } finally {
       setIsSavingLearningNote(false);
     }
   };
@@ -656,14 +727,36 @@ export default function Home() {
     if (!user) return;
     if (!confirm('ဤသင်ခန်းစာမှတ်စုကို ဖျက်ရန် သေချာပါသလား?')) return;
     
+    // Save previous state for rollback on failure
+    const previousNotes = [...learningNotes];
+    
+    // 1. Optimistic UI delete
+    setLearningNotes(prev => prev.filter(n => n.id !== noteId));
+    if (selectedLearningNote?.id === noteId) {
+      setSelectedLearningNote(null);
+    }
+
+    // Update cache instantly
+    const cachedKey = `trading_learning_notes_${user.uid}`;
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(cachedKey, JSON.stringify(previousNotes.filter(n => n.id !== noteId)));
+      } catch (e) {
+        console.error('Error updating cache on delete:', e);
+      }
+    }
+
     try {
       await deleteLearningNote(noteId);
-      if (selectedLearningNote?.id === noteId) {
-        setSelectedLearningNote(null);
-      }
-      await loadLearningNotes(user.uid);
+      // Silent refresh to sync state
+      await loadLearningNotes(user.uid, true);
     } catch (error: any) {
       console.error('Error deleting note:', error);
+      // Rollback state and cache on failure
+      setLearningNotes(previousNotes);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(cachedKey, JSON.stringify(previousNotes));
+      }
       alert('ဖျက်ရာတွင် အမှားအယွင်းရှိခဲ့ပါသည်');
     }
   };
@@ -677,9 +770,9 @@ export default function Home() {
       const img = new window.Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        // Increase maximum bounds substantially to preserve original desktop chart resolution and readable text labels
-        const MAX_WIDTH = 1600;
-        const MAX_HEIGHT = 1200;
+        // Limit maximum bounds to preserve crisp chart labels while staying safely under Firestore's 1MB limit
+        const MAX_WIDTH = 1200;
+        const MAX_HEIGHT = 900;
         let width = img.width;
         let height = img.height;
 
@@ -700,8 +793,8 @@ export default function Home() {
         const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(img, 0, 0, width, height);
-          // Set JPEG quality to 88% (near indistinguishable from raw file) so text, lines, and candles remain pixel-perfect
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+          // Set JPEG quality to 75% (industry standard sweet spot: 10x smaller file sizes, visually identical)
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
           setLearningNoteImage(dataUrl);
         }
       };
