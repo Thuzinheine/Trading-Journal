@@ -240,9 +240,62 @@ export default function Home() {
     notes: '',
   });
 
-  // Next.js hydration safety
+  // Next.js hydration safety & load cached Google data instantly
   useEffect(() => {
-    const timer = setTimeout(() => setMounted(true), 0);
+    const timer = setTimeout(() => {
+      if (typeof window !== 'undefined') {
+        const token = localStorage.getItem('google_oauth_access_token');
+        const expiry = localStorage.getItem('google_oauth_token_expiry');
+        const cachedUserStr = localStorage.getItem('trading_cached_user');
+
+        if (token && expiry && cachedUserStr) {
+          const expiryTime = parseInt(expiry, 10);
+          if (Date.now() < expiryTime) {
+            try {
+              const cachedUser = JSON.parse(cachedUserStr);
+              setUser(cachedUser);
+              setToken(token);
+              setNeedsAuth(false);
+              setIsAuthLoading(false);
+            } catch (e) {
+              console.error('Error parsing cached user:', e);
+            }
+          }
+        }
+
+        // Load other cached fields
+        const cachedSheetId = localStorage.getItem('trading_spreadsheet_id');
+        if (cachedSheetId) setSpreadsheetId(cachedSheetId);
+
+        const cachedDocId = localStorage.getItem('trading_document_id');
+        if (cachedDocId) setDocumentId(cachedDocId);
+
+        const cachedAvailableDocs = localStorage.getItem('trading_available_docs');
+        if (cachedAvailableDocs) {
+          try {
+            setAvailableDocs(JSON.parse(cachedAvailableDocs));
+          } catch (e) {}
+        }
+
+        const cachedTrades = localStorage.getItem('trading_trades');
+        if (cachedTrades) {
+          try {
+            setTrades(JSON.parse(cachedTrades));
+          } catch (e) {}
+        }
+
+        const cachedDocText = localStorage.getItem('trading_doc_text');
+        if (cachedDocText) setDocText(cachedDocText);
+
+        const cachedKeepNotes = localStorage.getItem('trading_keep_notes');
+        if (cachedKeepNotes) {
+          try {
+            setKeepNotes(JSON.parse(cachedKeepNotes));
+          } catch (e) {}
+        }
+      }
+      setMounted(true);
+    }, 0);
     return () => clearTimeout(timer);
   }, []);
 
@@ -262,6 +315,9 @@ export default function Home() {
     try {
       const fetched = await fetchTrades(accessToken, sheetId);
       setTrades(fetched);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('trading_trades', JSON.stringify(fetched));
+      }
     } catch (error) {
       console.error('Error fetching trades:', error);
     } finally {
@@ -275,6 +331,9 @@ export default function Home() {
       const content = await fetchDocContent(accessToken, docId);
       setDocText(content.text);
       setDocSaveStatus('saved');
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('trading_doc_text', content.text);
+      }
     } catch (error) {
       console.error('Error loading document:', error);
     } finally {
@@ -295,6 +354,9 @@ export default function Home() {
         }
       }
       setAvailableDocs(uniqueDocs);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('trading_available_docs', JSON.stringify(uniqueDocs));
+      }
     } catch (error) {
       console.error('Error loading available docs:', error);
     }
@@ -329,6 +391,9 @@ export default function Home() {
     try {
       const notes = await fetchKeepNotes(accessToken);
       setKeepNotes(notes);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('trading_keep_notes', JSON.stringify(notes));
+      }
     } catch (error: any) {
       const errorMsg = error.message || 'Error listing Keep notes';
       if (errorMsg.includes('403') || errorMsg.includes('restricted') || errorMsg.includes('denied') || errorMsg.includes('enterprise')) {
@@ -434,7 +499,11 @@ export default function Home() {
   };
 
   const bootstrapGoogleFiles = async (accessToken: string) => {
-    setIsConnectingDrive(true);
+    // Only show connecting drive loader if we don't have cached files yet
+    const hasCache = !!spreadsheetId || (typeof window !== 'undefined' && !!localStorage.getItem('trading_spreadsheet_id'));
+    if (!hasCache) {
+      setIsConnectingDrive(true);
+    }
     try {
       // Find or create "Trading Journal (AI Studio)" Spreadsheet
       const sheetId = await findOrCreateFile(
@@ -443,6 +512,9 @@ export default function Home() {
         'application/vnd.google-apps.spreadsheet'
       );
       setSpreadsheetId(sheetId);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('trading_spreadsheet_id', sheetId);
+      }
       
       // Initialize Sheet with correct headers
       await initializeJournalSheet(accessToken, sheetId);
@@ -454,6 +526,9 @@ export default function Home() {
         'application/vnd.google-apps.document'
       );
       setDocumentId(docId);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('trading_document_id', docId);
+      }
 
       // Load initial data
       await loadTrades(accessToken, sheetId);
@@ -479,6 +554,15 @@ export default function Home() {
         setNeedsAuth(false);
         setIsAuthLoading(false);
         setIsMobileMenuOpen(false);
+        if (typeof window !== 'undefined') {
+          const serializableUser = {
+            uid: user.uid,
+            displayName: user.displayName,
+            email: user.email,
+            photoURL: user.photoURL,
+          };
+          localStorage.setItem('trading_cached_user', JSON.stringify(serializableUser));
+        }
       },
       () => {
         setUser(null);
@@ -486,6 +570,15 @@ export default function Home() {
         setNeedsAuth(true);
         setIsAuthLoading(false);
         setIsMobileMenuOpen(false);
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('trading_cached_user');
+          localStorage.removeItem('trading_spreadsheet_id');
+          localStorage.removeItem('trading_document_id');
+          localStorage.removeItem('trading_available_docs');
+          localStorage.removeItem('trading_trades');
+          localStorage.removeItem('trading_doc_text');
+          localStorage.removeItem('trading_keep_notes');
+        }
       }
     );
 
@@ -511,6 +604,15 @@ export default function Home() {
         setUser(result.user);
         setNeedsAuth(false);
         setIsMobileMenuOpen(false);
+        if (typeof window !== 'undefined') {
+          const serializableUser = {
+            uid: result.user.uid,
+            displayName: result.user.displayName,
+            email: result.user.email,
+            photoURL: result.user.photoURL,
+          };
+          localStorage.setItem('trading_cached_user', JSON.stringify(serializableUser));
+        }
       }
     } catch (err) {
       console.error('Login failed:', err);
@@ -528,6 +630,15 @@ export default function Home() {
       setDocText('');
       setNeedsAuth(true);
       setIsMobileMenuOpen(false);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('trading_cached_user');
+        localStorage.removeItem('trading_spreadsheet_id');
+        localStorage.removeItem('trading_document_id');
+        localStorage.removeItem('trading_available_docs');
+        localStorage.removeItem('trading_trades');
+        localStorage.removeItem('trading_doc_text');
+        localStorage.removeItem('trading_keep_notes');
+      }
     } catch (err) {
       console.error('Logout failed:', err);
     }
@@ -1441,7 +1552,7 @@ export default function Home() {
               </div>
             </div>
           </div>
-        ) : isConnectingDrive ? (
+        ) : (isConnectingDrive && !spreadsheetId) ? (
           /* Connecting to Drive spinner - Redesigned as Premium Modern UI */
           <div className="max-w-md mx-auto my-12 relative">
             <style>{`
