@@ -179,3 +179,54 @@ export async function createDoc(
   return await callProxy(accessToken, 'createDoc', { title });
 }
 
+export interface LearningNote {
+  row?: number;
+  id: string;
+  title: string;
+  content: string;
+  imageUrl?: string;
+  createdAt: string;
+  userId?: string;
+  userEmail?: string;
+  tags?: string[];
+  docId?: string;
+  docUrl?: string;
+}
+
+// Fetch all Learning Notes from Google Sheet (database proxy)
+export async function fetchGoogleLearningNotes(
+  accessToken: string,
+  spreadsheetId: string
+): Promise<LearningNote[]> {
+  const data = await callProxy(accessToken, 'fetchGoogleLearningNotes', { spreadsheetId });
+  return data.notes || [];
+}
+
+// Create a new Learning Note (appends to Google Sheet and creates/populates a new Google Doc)
+export async function addGoogleLearningNote(
+  accessToken: string,
+  spreadsheetId: string,
+  note: Omit<LearningNote, 'row'>
+): Promise<{ success: boolean; docId: string; docUrl: string; imageUrl: string }> {
+  return await callProxy(accessToken, 'addGoogleLearningNote', { spreadsheetId, note });
+}
+
+// Update an existing Learning Note in Google Sheet and updates its Google Doc
+export async function updateGoogleLearningNote(
+  accessToken: string,
+  spreadsheetId: string,
+  note: LearningNote
+): Promise<{ success: boolean; imageUrl: string }> {
+  return await callProxy(accessToken, 'updateGoogleLearningNote', { spreadsheetId, note });
+}
+
+// Delete a Learning Note from Google Sheet and deletes its Google Doc file
+export async function deleteGoogleLearningNote(
+  accessToken: string,
+  spreadsheetId: string,
+  noteId: string,
+  docId?: string
+): Promise<void> {
+  await callProxy(accessToken, 'deleteGoogleLearningNote', { spreadsheetId, noteId, docId });
+}
+

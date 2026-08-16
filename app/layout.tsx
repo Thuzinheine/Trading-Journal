@@ -2,17 +2,17 @@ import type {Metadata} from 'next';
 import './globals.css'; // Global styles
 
 export const metadata: Metadata = {
-  title: 'My Google AI Studio App',
-  description: 'An application built with Google AI Studio.',
+  title: 'iTrading Journal',
+  description: 'A professional Trading Journal and Notes dashboard integrated with Google Sheets and Google Docs.',
   openGraph: {
-    title: 'My Google AI Studio App',
-    description: 'An application built with Google AI Studio.',
+    title: 'iTrading Journal',
+    description: 'A professional Trading Journal and Notes dashboard integrated with Google Sheets and Google Docs.',
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'My Google AI Studio App',
-    description: 'An application built with Google AI Studio.',
+    title: 'iTrading Journal',
+    description: 'A professional Trading Journal and Notes dashboard integrated with Google Sheets and Google Docs.',
   },
 };
 

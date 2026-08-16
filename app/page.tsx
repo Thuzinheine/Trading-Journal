@@ -8,10 +8,6 @@ import {
   getAccessToken,
   setAccessToken,
   auth,
-  fetchLearningNotes,
-  saveLearningNote,
-  deleteLearningNote,
-  LearningNote
 } from '@/lib/firebase';
 import { 
   findOrCreateFile, 
@@ -27,7 +23,12 @@ import {
   listDocs,
   createDoc,
   Trade,
-  KeepNote
+  KeepNote,
+  LearningNote,
+  fetchGoogleLearningNotes,
+  addGoogleLearningNote,
+  updateGoogleLearningNote,
+  deleteGoogleLearningNote,
 } from '@/lib/google-api';
 import { 
   LineChart, 
@@ -79,6 +80,25 @@ import {
   Maximize2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+
+function getDirectDriveImageUrl(url: string | undefined): string {
+  if (!url) return '';
+  if (url.startsWith('data:image')) return url;
+  
+  // Try to match standard Google Drive /file/d/{id} links
+  const fileDMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (fileDMatch && fileDMatch[1]) {
+    return `https://drive.google.com/thumbnail?id=${fileDMatch[1]}&sz=w1600`;
+  }
+  
+  // Try to match id= query parameters
+  const idMatch = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (idMatch && idMatch[1]) {
+    return `https://drive.google.com/thumbnail?id=${idMatch[1]}&sz=w1600`;
+  }
+  
+  return url;
+}
 
 export default function Home() {
   const [mounted, setMounted] = useState(false);
@@ -678,6 +698,10 @@ export default function Home() {
       }
     }
 
+    if (!token || !spreadsheetId) {
+      return;
+    }
+
     // 2. Set loading state only if memory/cache is completely empty and it's not a silent sync
     if (!hasLoadedFromCache && learningNotes.length === 0 && localNotesCount === 0 && !isSilentRefresh) {
       setIsLearningNotesLoading(true);
@@ -685,12 +709,18 @@ export default function Home() {
     
     setLearningError(null);
     try {
-      const notes = await fetchLearningNotes(userId);
-      setLearningNotes(notes);
+      const notes = await fetchGoogleLearningNotes(token, spreadsheetId);
+      // Sort notes: newest first (based on date/createdAt)
+      const sortedNotes = notes.sort((a, b) => {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return dateB - dateA;
+      });
+      setLearningNotes(sortedNotes);
       
       // Update cache
       if (typeof window !== 'undefined') {
-        localStorage.setItem(cachedKey, JSON.stringify(notes));
+        localStorage.setItem(cachedKey, JSON.stringify(sortedNotes));
       }
     } catch (error: any) {
       console.error('Error fetching learning notes:', error);
@@ -718,18 +748,24 @@ export default function Home() {
             }
           }
         }
-        loadLearningNotes(user.uid);
+        if (token && spreadsheetId) {
+          loadLearningNotes(user.uid);
+        }
       } else {
         setLearningNotes([]);
       }
     }, 0);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, token, spreadsheetId]);
 
   const handleSaveLearningNote = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+    if (!token || !spreadsheetId) {
+      setLearningError('Google Drive သို့ ချိတ်ဆက်ထားခြင်းမရှိပါ။ ကျေးဇူးပြု၍ Google standard OAuth signature စတင်ပါ။');
+      return;
+    }
     if (!learningNoteTitle.trim()) {
       setLearningError('ခေါင်းစဉ်ထည့်သွင်းရန်လိုအပ်ပါသည်!');
       return;
@@ -743,36 +779,46 @@ export default function Home() {
     setLearningError(null);
     try {
       const noteId = editingLearningNote ? editingLearningNote.id : `note-${Date.now()}`;
-      const noteToSave: Omit<LearningNote, 'createdAt'> = {
+      const noteToSave: LearningNote = {
         id: noteId,
         title: learningNoteTitle.trim(),
         content: learningNoteContent.trim(),
         imageUrl: learningNoteImage,
-        userId: user.uid,
-        userEmail: user.email || '',
-        tags: learningNoteTags
-      };
-
-      const localNote: LearningNote = {
-        id: noteId,
-        title: noteToSave.title,
-        content: noteToSave.content,
-        imageUrl: noteToSave.imageUrl || '',
         createdAt: editingLearningNote ? editingLearningNote.createdAt : new Date().toISOString(),
-        userId: noteToSave.userId,
-        userEmail: noteToSave.userEmail,
-        tags: noteToSave.tags || []
+        tags: learningNoteTags,
+        docId: editingLearningNote?.docId || '',
+        docUrl: editingLearningNote?.docUrl || '',
       };
 
-      // 1. UPDATE LOCAL STATE INSTANTLY (Optimistic UI Update)
+      let updatedNote: LearningNote;
+
+      if (editingLearningNote) {
+        // Update existing note in Google Sheet/Doc
+        const res = await updateGoogleLearningNote(token, spreadsheetId, noteToSave);
+        updatedNote = {
+          ...noteToSave,
+          imageUrl: res.imageUrl || noteToSave.imageUrl,
+        };
+      } else {
+        // Add new note to Google Sheet/Doc
+        const res = await addGoogleLearningNote(token, spreadsheetId, noteToSave);
+        updatedNote = {
+          ...noteToSave,
+          docId: res.docId,
+          docUrl: res.docUrl,
+          imageUrl: res.imageUrl || noteToSave.imageUrl,
+        };
+      }
+
+      // 1. UPDATE LOCAL STATE INSTANTLY
       setLearningNotes(prev => {
         const index = prev.findIndex(n => n.id === noteId);
         if (index > -1) {
           const updated = [...prev];
-          updated[index] = localNote;
+          updated[index] = updatedNote;
           return updated;
         } else {
-          return [localNote, ...prev];
+          return [updatedNote, ...prev];
         }
       });
 
@@ -787,9 +833,9 @@ export default function Home() {
           }
           const index = currentList.findIndex(n => n.id === noteId);
           if (index > -1) {
-            currentList[index] = localNote;
+            currentList[index] = updatedNote;
           } else {
-            currentList.unshift(localNote);
+            currentList.unshift(updatedNote);
           }
           localStorage.setItem(cachedKey, JSON.stringify(currentList));
         } catch (e) {
@@ -799,7 +845,7 @@ export default function Home() {
 
       // If viewing the note that is being edited, update its details instantly too
       if (selectedLearningNote?.id === noteId) {
-        setSelectedLearningNote(localNote);
+        setSelectedLearningNote(updatedNote);
       }
 
       // 3. RESET INPUTS & CLOSE MODAL INSTANTLY
@@ -811,29 +857,14 @@ export default function Home() {
       setEditingLearningNote(null);
       setShowLearningModal(false);
 
-      // 4. UPLOAD TO REMOTE FIRESTORE IN THE BACKGROUND (NON-BLOCKING)
-      saveLearningNote(noteToSave, !editingLearningNote)
-        .then(() => {
-          console.log('Learning note successfully saved to Cloud (Firestore)');
-          // Silently sync server timestamp or fields
-          loadLearningNotes(user.uid, true);
-        })
-        .catch((error) => {
-          console.error('Background Firestore save failed:', error);
-        });
+      // 4. Silent sync
+      loadLearningNotes(user.uid, true);
 
     } catch (error: any) {
-      console.error('Error saving learning note:', error);
+      console.error('Error saving learning note to Google:', error);
       let userFriendlyError = 'သင်ခန်းစာမှတ်စု သိမ်းဆည်းစဉ် အမှားအယွင်းရှိခဲ့ပါသည်။';
-      try {
-        const parsed = JSON.parse(error.message);
-        if (parsed && parsed.error) {
-          userFriendlyError = `သိမ်းဆည်းရာတွင် အမှားရှိပါသည်: ${parsed.error}`;
-        }
-      } catch (e) {
-        if (error instanceof Error) {
-          userFriendlyError = `သိမ်းဆည်းရာတွင် အမှားရှိပါသည်: ${error.message}`;
-        }
+      if (error instanceof Error) {
+        userFriendlyError = `သိမ်းဆည်းရာတွင် အမှားရှိပါသည်: ${error.message}`;
       }
       setLearningError(userFriendlyError);
     } finally {
@@ -843,7 +874,13 @@ export default function Home() {
 
   const handleDeleteLearningNote = async (noteId: string) => {
     if (!user) return;
-    if (!confirm('ဤသင်ခန်းစာမှတ်စုကို ဖျက်ရန် သေချာပါသလား?')) return;
+    if (!token || !spreadsheetId) {
+      alert('Google Drive သို့ ချိတ်ဆက်ထားခြင်းမရှိပါ။ ကျေးဇူးပြု၍ Google standard OAuth signature စတင်ပါ။');
+      return;
+    }
+    
+    const targetNote = learningNotes.find(n => n.id === noteId);
+    const docId = targetNote?.docId;
     
     // Save previous state for rollback on failure
     const previousNotes = [...learningNotes];
@@ -865,7 +902,7 @@ export default function Home() {
     }
 
     try {
-      await deleteLearningNote(noteId);
+      await deleteGoogleLearningNote(token, spreadsheetId, noteId, docId);
       // Silent refresh to sync state
       await loadLearningNotes(user.uid, true);
     } catch (error: any) {
@@ -2131,13 +2168,13 @@ export default function Home() {
                             </td>
                           </tr>
                         ) : filteredTrades.length > 0 ? (
-                          filteredTrades.map((trade) => {
+                          filteredTrades.map((trade, idx) => {
                             const isWin = trade.winLoss === 'Win';
                             const isLoss = trade.winLoss === 'Loss';
                             const isPending = trade.winLoss === 'Pending';
                             
                             return (
-                              <tr key={trade.id} className={`transition-colors duration-150 ${
+                              <tr key={trade.id ? `trade-${trade.id}-${trade.row || idx}` : `trade-idx-${idx}`} className={`transition-colors duration-150 ${
                                 isDarkMode ? 'hover:bg-zinc-800/20' : 'hover:bg-slate-50/50'
                               }`}>
                                 <td className={`px-5 py-4 whitespace-nowrap text-xs font-semibold ${isDarkMode ? 'text-zinc-500' : 'text-slate-500'}`}>{trade.date}</td>
@@ -2233,14 +2270,14 @@ export default function Home() {
                         <span className={`text-xs font-semibold ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Google Sheet မှ Trade Data များ ဆွဲယူနေပါသည်...</span>
                       </div>
                     ) : filteredTrades.length > 0 ? (
-                      filteredTrades.map((trade) => {
+                      filteredTrades.map((trade, idx) => {
                         const isWin = trade.winLoss === 'Win';
                         const isLoss = trade.winLoss === 'Loss';
                         const isPending = trade.winLoss === 'Pending';
                         
                         return (
                           <div 
-                            key={trade.id} 
+                            key={trade.id ? `trade-mob-${trade.id}-${trade.row || idx}` : `trade-mob-idx-${idx}`} 
                             className={`p-4 space-y-3 transition-colors duration-150 ${
                               isDarkMode ? 'hover:bg-zinc-800/10' : 'hover:bg-slate-50/30'
                             }`}
@@ -2395,8 +2432,8 @@ export default function Home() {
                             isDarkMode ? 'bg-zinc-900 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 text-slate-700'
                           }`}
                         >
-                          {availableDocs.map((doc) => (
-                            <option key={doc.id} value={doc.id}>
+                          {availableDocs.map((doc, idx) => (
+                            <option key={doc.id ? `doc-${doc.id}-${idx}` : `doc-idx-${idx}`} value={doc.id}>
                               📓 {doc.name.replace('Trading Notes - ', '').replace('Trading Notes (AI Studio)', 'မူလပင်မ Trading Notes')}
                             </option>
                           ))}
@@ -2564,7 +2601,7 @@ export default function Home() {
 
                     {fallbackNotes.length > 0 ? (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[550px] overflow-y-auto pr-1">
-                        {fallbackNotes.map((note) => {
+                        {fallbackNotes.map((note, idx) => {
                           const isExpanded = expandedNotes[note.id];
                           const maxChars = 150;
                           const shouldTruncate = note.content && note.content.length > maxChars;
@@ -2574,7 +2611,7 @@ export default function Home() {
 
                           return (
                             <div 
-                              key={note.id}
+                              key={note.id ? `fallback-${note.id}-${idx}` : `fallback-idx-${idx}`}
                               className={`p-4 rounded-xl border flex flex-col justify-between transition-all ${
                                 isDarkMode 
                                   ? 'bg-zinc-800/30 border-zinc-800/80 text-zinc-100 hover:border-zinc-700/80' 
@@ -2807,9 +2844,9 @@ export default function Home() {
 
                         return (
                           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6 mt-6">
-                            {filtered.map((note) => (
+                            {filtered.map((note, idx) => (
                               <div
-                                key={note.id}
+                                key={note.id ? `note-${note.id}-${note.row || idx}` : `note-idx-${idx}`}
                                 className={`rounded-2xl border overflow-hidden flex flex-col justify-between transition-all duration-250 hover:shadow-md group ${
                                   isDarkMode 
                                     ? 'bg-zinc-900/30 border-zinc-800/70 hover:border-zinc-750/80 text-zinc-100' 
@@ -2824,7 +2861,7 @@ export default function Home() {
                                       onClick={() => setSelectedLearningNote(note)}
                                     >
                                       <img 
-                                        src={note.imageUrl} 
+                                        src={getDirectDriveImageUrl(note.imageUrl)} 
                                         alt={note.title} 
                                         className="h-full w-full object-cover transition-transform duration-350 group-hover:scale-102"
                                       />
@@ -3894,7 +3931,7 @@ export default function Home() {
                     title="ပုံကို အပြည့်ချဲ့ကြည့်ရန် နှိပ်ပါ (Click to view full screen)"
                   >
                     <img 
-                      src={selectedLearningNote.imageUrl} 
+                      src={getDirectDriveImageUrl(selectedLearningNote.imageUrl)} 
                       alt={selectedLearningNote.title} 
                       className="max-h-[45vh] w-auto object-contain transition-all duration-300 group-hover:scale-[1.01] group-hover:brightness-105"
                     />
@@ -3941,7 +3978,18 @@ export default function Home() {
                   📧 Owner: {selectedLearningNote.userEmail || user?.email}
                 </div>
                 
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-3 animate-fade-in">
+                  {selectedLearningNote.docUrl && (
+                    <a
+                      href={selectedLearningNote.docUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center space-x-1.5 px-3 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer border border-sky-500/30 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 shadow-sm"
+                    >
+                      <BookOpen className="h-3.5 w-3.5 text-sky-400" />
+                      <span>Google Doc ဖြင့် ဖတ်ရှုရန်</span>
+                    </a>
+                  )}
                   <button
                     type="button"
                     onClick={() => {
@@ -3995,7 +4043,7 @@ export default function Home() {
             {/* Close button on top-right */}
             <div className="absolute top-4 right-4 z-50 flex items-center space-x-3">
               <a 
-                href={lightboxImage} 
+                href={getDirectDriveImageUrl(lightboxImage)} 
                 target="_blank" 
                 rel="noreferrer"
                 className="p-2.5 bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 hover:text-white rounded-full transition-colors cursor-pointer border border-zinc-800/50 shadow-lg flex items-center justify-center"
@@ -4022,7 +4070,7 @@ export default function Home() {
               className="relative max-w-full max-h-[92vh] z-10 flex flex-col items-center justify-center pointer-events-none"
             >
               <img 
-                src={lightboxImage} 
+                src={getDirectDriveImageUrl(lightboxImage)} 
                 alt="Enlarged Note Asset" 
                 className="max-w-[98vw] sm:max-w-[92vw] max-h-[88vh] object-contain rounded-lg shadow-2xl border border-zinc-800/40 select-none pointer-events-auto cursor-zoom-out"
                 onClick={() => setLightboxImage(null)}

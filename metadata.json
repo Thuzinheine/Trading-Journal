@@ -1,5 +1,5 @@
 {
-  "name": "Trading Journal & Notes Dashboard",
+  "name": "iTrading Journal",
   "description": "A professional Trading Journal and Notes dashboard integrated with Google Sheets and Google Docs for tracking trades, automatic profit/loss calculation, and secure strategy logging.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
