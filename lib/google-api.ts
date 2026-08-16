@@ -215,9 +215,10 @@ export async function addGoogleLearningNote(
 export async function updateGoogleLearningNote(
   accessToken: string,
   spreadsheetId: string,
-  note: LearningNote
+  note: LearningNote,
+  oldImageUrl?: string
 ): Promise<{ success: boolean; imageUrl: string }> {
-  return await callProxy(accessToken, 'updateGoogleLearningNote', { spreadsheetId, note });
+  return await callProxy(accessToken, 'updateGoogleLearningNote', { spreadsheetId, note, oldImageUrl });
 }
 
 // Delete a Learning Note from Google Sheet and deletes its Google Doc file
@@ -225,8 +226,9 @@ export async function deleteGoogleLearningNote(
   accessToken: string,
   spreadsheetId: string,
   noteId: string,
-  docId?: string
+  docId?: string,
+  imageUrl?: string
 ): Promise<void> {
-  await callProxy(accessToken, 'deleteGoogleLearningNote', { spreadsheetId, noteId, docId });
+  await callProxy(accessToken, 'deleteGoogleLearningNote', { spreadsheetId, noteId, docId, imageUrl });
 }
 

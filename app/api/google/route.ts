@@ -59,6 +59,55 @@ async function docsFetch(token: string, path: string, options: RequestInit = {})
   return await res.json();
 }
 
+async function getOrCreateFolderId(token: string): Promise<string> {
+  try {
+    const folderSearch = await driveFetch(
+      token,
+      `/drive/v3/files?q=name='Trading Journal Workspace (AI Studio)' and mimeType='application/vnd.google-apps.folder' and trashed=false`
+    );
+    let folderId = folderSearch.files?.[0]?.id;
+
+    if (!folderId) {
+      const createFolder = await driveFetch(token, '/drive/v3/files', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: 'Trading Journal Workspace (AI Studio)',
+          mimeType: 'application/vnd.google-apps.folder',
+        }),
+      });
+      folderId = createFolder.id;
+    }
+    return folderId;
+  } catch (err) {
+    console.error('Error in getOrCreateFolderId:', err);
+    throw err;
+  }
+}
+
+function getDriveFileIdFromUrl(url: string | undefined): string | null {
+  if (!url) return null;
+  
+  // Match standard Google Drive /file/d/{id} links
+  const fileDMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (fileDMatch && fileDMatch[1]) {
+    return fileDMatch[1];
+  }
+  
+  // Match id= query parameters
+  const idMatch = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (idMatch && idMatch[1]) {
+    return idMatch[1];
+  }
+
+  // Match /thumbnail?id= query parameter
+  const thumbnailMatch = url.match(/thumbnail\?id=([a-zA-Z0-9_-]+)/);
+  if (thumbnailMatch && thumbnailMatch[1]) {
+    return thumbnailMatch[1];
+  }
+  
+  return null;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const authHeader = req.headers.get('Authorization') || '';
@@ -73,6 +122,8 @@ export async function POST(req: NextRequest) {
 
     switch (action) {
       case 'bootstrap': {
+        const folderId = await getOrCreateFolderId(token);
+
         // Find or create "Trading Journal (AI Studio)" Spreadsheet
         const sheetsSearch = await driveFetch(
           token,
@@ -86,9 +137,24 @@ export async function POST(req: NextRequest) {
             body: JSON.stringify({
               name: 'Trading Journal (AI Studio)',
               mimeType: 'application/vnd.google-apps.spreadsheet',
+              parents: [folderId],
             }),
           });
           spreadsheetId = createSheet.id;
+        } else {
+          // Verify and move to folder if not already there
+          try {
+            const fileMeta = await driveFetch(token, `/drive/v3/files/${spreadsheetId}?fields=parents`);
+            const parents = fileMeta.parents || [];
+            if (!parents.includes(folderId)) {
+              const previousParents = parents.join(',');
+              await driveFetch(token, `/drive/v3/files/${spreadsheetId}?addParents=${folderId}${previousParents ? `&removeParents=${previousParents}` : ''}`, {
+                method: 'PATCH'
+              });
+            }
+          } catch (err) {
+            console.error('Error moving spreadsheet to folder:', err);
+          }
         }
 
         // Initialize headers in Sheet1 if empty
@@ -192,9 +258,24 @@ export async function POST(req: NextRequest) {
             body: JSON.stringify({
               name: 'Trading Notes (AI Studio)',
               mimeType: 'application/vnd.google-apps.document',
+              parents: [folderId],
             }),
           });
           documentId = createDoc.id;
+        } else {
+          // Verify and move to folder if not already there
+          try {
+            const fileMeta = await driveFetch(token, `/drive/v3/files/${documentId}?fields=parents`);
+            const parents = fileMeta.parents || [];
+            if (!parents.includes(folderId)) {
+              const previousParents = parents.join(',');
+              await driveFetch(token, `/drive/v3/files/${documentId}?addParents=${folderId}${previousParents ? `&removeParents=${previousParents}` : ''}`, {
+                method: 'PATCH'
+              });
+            }
+          } catch (err) {
+            console.error('Error moving document to folder:', err);
+          }
         }
 
         return NextResponse.json({ spreadsheetId, documentId });
@@ -509,6 +590,13 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: 'Missing spreadsheetId or note' }, { status: 400 });
         }
 
+        let folderId: string | undefined = undefined;
+        try {
+          folderId = await getOrCreateFolderId(token);
+        } catch (fErr) {
+          console.error('Failed to get or create folder workspace:', fErr);
+        }
+
         let driveImageUrl = '';
         if (note.imageUrl && note.imageUrl.startsWith('data:image')) {
           try {
@@ -521,6 +609,7 @@ export async function POST(req: NextRequest) {
               body: JSON.stringify({
                 name: `iTrading Note Attachment - ${note.title || 'Untitled'} - ${Date.now()}`,
                 mimeType,
+                parents: folderId ? [folderId] : undefined,
               }),
             });
             const fileId = metadataRes.id;
@@ -564,6 +653,7 @@ export async function POST(req: NextRequest) {
             body: JSON.stringify({
               name: `iTrading Note - ${note.title || 'Untitled'} (${note.createdAt || ''})`,
               mimeType: 'application/vnd.google-apps.document',
+              parents: folderId ? [folderId] : undefined,
             }),
           });
           docId = createDoc.id;
@@ -608,9 +698,16 @@ export async function POST(req: NextRequest) {
       }
 
       case 'updateGoogleLearningNote': {
-        const { spreadsheetId, note } = args;
+        const { spreadsheetId, note, oldImageUrl } = args;
         if (!spreadsheetId || !note) {
           return NextResponse.json({ error: 'Missing spreadsheetId or note' }, { status: 400 });
+        }
+
+        let folderId: string | undefined = undefined;
+        try {
+          folderId = await getOrCreateFolderId(token);
+        } catch (fErr) {
+          console.error('Failed to get or create folder workspace:', fErr);
         }
 
         const currentSheetData = await sheetsFetch(token, `/v4/spreadsheets/${spreadsheetId}/values/LearningNotes!A2:A2000`);
@@ -633,6 +730,7 @@ export async function POST(req: NextRequest) {
               body: JSON.stringify({
                 name: `iTrading Note Attachment - ${note.title || 'Untitled'} - ${Date.now()}`,
                 mimeType,
+                parents: folderId ? [folderId] : undefined,
               }),
             });
             const fileId = metadataRes.id;
@@ -662,9 +760,37 @@ export async function POST(req: NextRequest) {
 
               const fileMeta = await driveFetch(token, `/drive/v3/files/${fileId}?fields=webViewLink,webContentLink`);
               driveImageUrl = fileMeta.webViewLink || fileMeta.webContentLink || '';
+
+              // Delete old image since we replaced it with a new one
+              if (oldImageUrl) {
+                const oldFileId = getDriveFileIdFromUrl(oldImageUrl);
+                if (oldFileId) {
+                  try {
+                    await driveFetch(token, `/drive/v3/files/${oldFileId}`, {
+                      method: 'DELETE',
+                    });
+                  } catch (err) {
+                    console.error('Error deleting old image file during replacement:', err);
+                  }
+                }
+              }
             }
           } catch (err) {
             console.error('Error uploading updated image:', err);
+          }
+        }
+
+        // If image was completely removed/cleared but no new image was uploaded
+        if (oldImageUrl && !note.imageUrl) {
+          const oldFileId = getDriveFileIdFromUrl(oldImageUrl);
+          if (oldFileId) {
+            try {
+              await driveFetch(token, `/drive/v3/files/${oldFileId}`, {
+                method: 'DELETE',
+              });
+            } catch (err) {
+              console.error('Error deleting old image file during clear:', err);
+            }
           }
         }
 
@@ -729,7 +855,7 @@ export async function POST(req: NextRequest) {
       }
 
       case 'deleteGoogleLearningNote': {
-        const { spreadsheetId, noteId, docId } = args;
+        const { spreadsheetId, noteId, docId, imageUrl } = args;
         if (!spreadsheetId || !noteId) {
           return NextResponse.json({ error: 'Missing spreadsheetId or noteId' }, { status: 400 });
         }
@@ -756,6 +882,19 @@ export async function POST(req: NextRequest) {
             });
           } catch (err) {
             console.error('Error deleting doc file during note delete:', err);
+          }
+        }
+
+        if (imageUrl) {
+          const imgFileId = getDriveFileIdFromUrl(imageUrl);
+          if (imgFileId) {
+            try {
+              await driveFetch(token, `/drive/v3/files/${imgFileId}`, {
+                method: 'DELETE',
+              });
+            } catch (err) {
+              console.error('Error deleting image file during note delete:', err);
+            }
           }
         }
 

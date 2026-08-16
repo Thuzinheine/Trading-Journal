@@ -794,7 +794,7 @@ export default function Home() {
 
       if (editingLearningNote) {
         // Update existing note in Google Sheet/Doc
-        const res = await updateGoogleLearningNote(token, spreadsheetId, noteToSave);
+        const res = await updateGoogleLearningNote(token, spreadsheetId, noteToSave, editingLearningNote.imageUrl);
         updatedNote = {
           ...noteToSave,
           imageUrl: res.imageUrl || noteToSave.imageUrl,
@@ -881,6 +881,7 @@ export default function Home() {
     
     const targetNote = learningNotes.find(n => n.id === noteId);
     const docId = targetNote?.docId;
+    const imageUrl = targetNote?.imageUrl;
     
     // Save previous state for rollback on failure
     const previousNotes = [...learningNotes];
@@ -902,7 +903,7 @@ export default function Home() {
     }
 
     try {
-      await deleteGoogleLearningNote(token, spreadsheetId, noteId, docId);
+      await deleteGoogleLearningNote(token, spreadsheetId, noteId, docId, imageUrl);
       // Silent refresh to sync state
       await loadLearningNotes(user.uid, true);
     } catch (error: any) {
@@ -1755,6 +1756,21 @@ export default function Home() {
                       }`}
                     >
                       <span>Docs ဖွင့်ရန်</span>
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                  )}
+                  {(spreadsheetId || documentId) && (
+                    <a
+                      href="https://drive.google.com/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl font-semibold border transition-all duration-150 ${
+                        isDarkMode 
+                          ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700/85 border-zinc-750' 
+                          : 'bg-slate-100 text-slate-800 hover:bg-slate-200 border-slate-200/80'
+                      }`}
+                    >
+                      <span>Google Drive ဖွင့်ရန်</span>
                       <ExternalLink className="h-3.5 w-3.5" />
                     </a>
                   )}
@@ -3618,7 +3634,7 @@ export default function Home() {
 
         {/* CREATE / EDIT LEARNING NOTE MODAL */}
         {showLearningModal && (
-          <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 animate-fade-in">
+          <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4">
             {/* Backdrop */}
             <motion.div
               initial={{ opacity: 0 }}
@@ -3630,35 +3646,42 @@ export default function Home() {
 
             {/* Modal Box */}
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              initial={{ opacity: 0, scale: 0.98, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              className={`relative w-full max-w-2xl rounded-2xl border shadow-2xl flex flex-col max-h-[90vh] overflow-hidden ${
+              exit={{ opacity: 0, scale: 0.98, y: 10 }}
+              className={`relative w-full max-w-2xl rounded-2xl border shadow-2xl flex flex-col max-h-[88vh] overflow-hidden ${
                 isDarkMode ? 'bg-zinc-900 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 text-slate-800'
               }`}
             >
-              {/* Header */}
-              <div className={`px-6 py-4 border-b flex justify-between items-center shrink-0 ${
-                isDarkMode ? 'border-zinc-800' : 'border-slate-100'
+              {/* Minimalist Notion Breadcrumbs Header */}
+              <div className={`px-6 py-3.5 border-b flex justify-between items-center shrink-0 ${
+                isDarkMode ? 'border-zinc-800/80 bg-zinc-900' : 'border-slate-100 bg-white'
               }`}>
-                <h3 className="font-bold text-base flex items-center gap-2">
-                  <ImageIcon className="h-5 w-5 text-indigo-500" />
-                  {editingLearningNote ? 'သင်ခန်းစာမှတ်စုအား ပြင်ဆင်ရန်' : 'သင်ခန်းစာမှတ်စုအသစ် ရေးသားရန်'}
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => setShowLearningModal(false)}
-                  className={`p-1 rounded-lg transition-colors cursor-pointer ${
-                    isDarkMode ? 'hover:bg-zinc-800 text-zinc-400' : 'hover:bg-slate-100 text-slate-500'
-                  }`}
-                >
-                  <X className="h-5 w-5" />
-                </button>
+                <div className="flex items-center space-x-2 text-xs text-zinc-400 dark:text-zinc-500 font-medium">
+                  <span className="hover:underline cursor-pointer">Workspace</span>
+                  <span>/</span>
+                  <span className="hover:underline cursor-pointer">Learning Notes</span>
+                  <span>/</span>
+                  <span className="font-semibold text-zinc-600 dark:text-zinc-300">
+                    {editingLearningNote ? 'Edit Draft' : 'New Note'}
+                  </span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowLearningModal(false)}
+                    className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                      isDarkMode ? 'hover:bg-zinc-800 text-zinc-400' : 'hover:bg-slate-100 text-slate-500'
+                    }`}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
 
               {/* Form Content */}
-              <form onSubmit={handleSaveLearningNote} className="flex flex-col flex-1 overflow-y-auto">
-                <div className="p-6 space-y-5">
+              <form onSubmit={handleSaveLearningNote} className="flex flex-col flex-1 overflow-y-auto bg-transparent">
+                <div className="p-8 space-y-6">
                   {learningError && (
                     <div className="p-3.5 rounded-xl text-xs bg-rose-500/10 border border-rose-500/20 text-rose-500 flex items-center gap-2 font-medium">
                       <AlertTriangle className="h-4 w-4 shrink-0" />
@@ -3666,178 +3689,177 @@ export default function Home() {
                     </div>
                   )}
 
-                  {/* Title */}
-                  <div>
-                    <label className={`block text-xs font-bold uppercase tracking-wider mb-1.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
-                      သင်ခန်းစာ ခေါင်းစဉ် (Title) <span className="text-rose-500">*</span>
-                    </label>
+                  {/* Notion-style Document Title */}
+                  <div className="space-y-1">
                     <input
                       type="text"
                       required
-                      placeholder="e.g. Break of Structure (BOS) နှင့် Liquidity ကောက်ပုံ"
+                      placeholder="Untitled"
                       value={learningNoteTitle}
                       onChange={(e) => setLearningNoteTitle(e.target.value)}
-                      className={`w-full px-3 py-2 border rounded-xl text-sm focus:outline-hidden focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 ${
-                        isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-800'
-                      }`}
+                      className="w-full bg-transparent border-0 border-b border-transparent focus:border-transparent focus:ring-0 text-3xl sm:text-4xl font-extrabold focus:outline-hidden px-0 pb-1.5 placeholder:text-zinc-300 dark:placeholder:text-zinc-700 tracking-tight"
                     />
                   </div>
 
-                  {/* Image Uploader */}
-                  <div>
-                    <label className={`block text-xs font-bold uppercase tracking-wider mb-1.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
-                      ပုံတင်ရန် (Upload Image) - <span className="text-[10px] text-zinc-400 font-normal">စာနှင့်အတူ တွဲသိမ်းချင်သော ပုံရှိလျှင်</span>
-                    </label>
-                    
-                    <div className="space-y-3">
-                      {learningNoteImage ? (
-                        <div className="relative rounded-xl overflow-hidden border border-zinc-700/50 max-h-56 bg-zinc-950">
-                          <img 
-                            src={learningNoteImage} 
-                            alt="Preview" 
-                            className="h-full w-full object-contain max-h-56 mx-auto"
+                  {/* Notion-style Properties Section */}
+                  <div className={`space-y-4 py-4 border-t border-b ${isDarkMode ? 'border-zinc-800/60' : 'border-slate-100'}`}>
+                    {/* Tags Property */}
+                    <div className="grid grid-cols-[120px_1fr] items-start gap-4">
+                      <div className="flex items-center gap-2 text-xs font-semibold text-zinc-400 dark:text-zinc-500 py-1 select-none">
+                        <Layers className="h-3.5 w-3.5" />
+                        <span>Tags</span>
+                      </div>
+                      <div className="space-y-2.5">
+                        {/* Selected Tags */}
+                        <div className="flex flex-wrap gap-1.5 min-h-[28px] items-center">
+                          {learningNoteTags.length === 0 ? (
+                            <span className="text-xs text-zinc-400 dark:text-zinc-600 italic">No tags selected</span>
+                          ) : (
+                            learningNoteTags.map((tag, idx) => (
+                              <span
+                                key={idx}
+                                className="inline-flex items-center gap-1.5 bg-indigo-500/10 text-indigo-400 px-2.5 py-0.5 rounded-md text-xs font-semibold border border-indigo-500/10"
+                              >
+                                #{tag}
+                                <button
+                                  type="button"
+                                  onClick={() => setLearningNoteTags(learningNoteTags.filter(t => t !== tag))}
+                                  className="hover:text-red-400 font-bold ml-0.5 transition-colors focus:outline-hidden"
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            ))
+                          )}
+                        </div>
+
+                        {/* Previously Used Tags for Quick Select */}
+                        {allUniqueTags.length > 0 && (
+                          <div className="space-y-1 bg-zinc-50 dark:bg-zinc-950/20 p-2 rounded-xl">
+                            <span className={`text-[10px] font-semibold block ${isDarkMode ? 'text-zinc-500' : 'text-slate-400'}`}>
+                              ယခင်အသုံးပြုခဲ့သော Tags များ (အမြန်ရွေးရန်):
+                            </span>
+                            <div className="flex flex-wrap gap-1">
+                              {allUniqueTags.map((tag) => {
+                                const isSelected = learningNoteTags.includes(tag);
+                                return (
+                                  <button
+                                    type="button"
+                                    key={tag}
+                                    onClick={() => {
+                                      if (isSelected) {
+                                        setLearningNoteTags(learningNoteTags.filter(t => t !== tag));
+                                      } else {
+                                        setLearningNoteTags([...learningNoteTags, tag]);
+                                      }
+                                    }}
+                                    className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
+                                      isSelected 
+                                        ? 'bg-indigo-600 text-white font-bold' 
+                                        : isDarkMode ? 'bg-zinc-800 text-zinc-400 hover:bg-zinc-750' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                                    }`}
+                                  >
+                                    #{tag}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Custom Tag Input */}
+                        <div className="flex items-center gap-2 max-w-xs">
+                          <input
+                            type="text"
+                            placeholder="Custom tag ရိုက်ပြီး Enter ခေါက်ပါ..."
+                            value={customTagInput}
+                            onChange={(e) => setCustomTagInput(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                const newTag = customTagInput.trim();
+                                if (newTag && !learningNoteTags.includes(newTag)) {
+                                  setLearningNoteTags([...learningNoteTags, newTag]);
+                                  setCustomTagInput('');
+                                }
+                              }
+                            }}
+                            className={`px-2.5 py-1.5 border rounded-lg text-xs w-full focus:outline-hidden focus:border-indigo-500 ${
+                              isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-800'
+                            }`}
                           />
                           <button
                             type="button"
-                            onClick={() => setLearningNoteImage('')}
-                            className="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white p-1.5 rounded-lg shadow-md transition-colors cursor-pointer"
-                            title="ပုံကို ဖယ်ရှားရန်"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      ) : (
-                        <div className={`border-2 border-dashed rounded-xl p-6 text-center transition-colors relative group ${
-                          isDarkMode 
-                            ? 'border-zinc-800 hover:border-zinc-700 bg-zinc-950/20' 
-                            : 'border-slate-200 hover:border-slate-300 bg-slate-50/50'
-                        }`}>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={handleImageChange}
-                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                          />
-                          <ImageIcon className="h-8 w-8 text-zinc-400 dark:text-zinc-600 mx-auto mb-2" />
-                          <p className="text-xs font-bold text-zinc-500 dark:text-zinc-400">ပုံရွေးချယ်ရန် ကလစ်နှိပ်ပါ သို့မဟုတ် Drag ဆွဲထည့်ပါ</p>
-                          <p className="text-[10px] text-zinc-400 mt-1">ပုံအရွယ်အစားကို client-side တွင် အလိုအလျောက် သင့်လျော်စွာ ချုံ့ပေးမည်ဖြစ်သည်။</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Tags Selector */}
-                  <div>
-                    <label className={`block text-xs font-bold uppercase tracking-wider mb-1.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
-                      Tags ရွေးချယ်ရန် / ထည့်သွင်းရန် (Tags)
-                    </label>
-                    <div className="space-y-2.5">
-                      {/* Previously used tags for quick toggle */}
-                      {allUniqueTags.length > 0 && (
-                        <div className="space-y-1">
-                          <span className={`text-[10px] font-semibold block ${isDarkMode ? 'text-zinc-500' : 'text-slate-400'}`}>ယခင်အသုံးပြုခဲ့သော Tags များမှ အမြန်ရွေးချယ်ရန်:</span>
-                          <div className="flex flex-wrap gap-1.5">
-                            {allUniqueTags.map((tag) => {
-                              const isSelected = learningNoteTags.includes(tag);
-                              return (
-                                <button
-                                  type="button"
-                                  key={tag}
-                                  onClick={() => {
-                                    if (isSelected) {
-                                      setLearningNoteTags(learningNoteTags.filter(t => t !== tag));
-                                    } else {
-                                      setLearningNoteTags([...learningNoteTags, tag]);
-                                    }
-                                  }}
-                                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors duration-100 ${
-                                    isSelected 
-                                      ? 'bg-indigo-600 text-white shadow-xs font-bold' 
-                                      : isDarkMode ? 'bg-zinc-800 text-zinc-400 hover:bg-zinc-750' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                                  }`}
-                                >
-                                  {isSelected ? '✓ ' : ''}#{tag}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Custom tag input */}
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          placeholder="Custom tag ရိုက်ထည့်ပါ (e.g. MyPattern) ပြီးလျှင် Enter ခေါက်ပါ..."
-                          value={customTagInput}
-                          onChange={(e) => setCustomTagInput(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))} // only allow alphanumeric and underscores
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
+                            onClick={() => {
                               const newTag = customTagInput.trim();
                               if (newTag && !learningNoteTags.includes(newTag)) {
                                 setLearningNoteTags([...learningNoteTags, newTag]);
                                 setCustomTagInput('');
                               }
-                            }
-                          }}
-                          className={`flex-1 px-3 py-2 border rounded-xl text-xs focus:outline-hidden focus:border-indigo-500 ${
-                            isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-800'
-                          }`}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const newTag = customTagInput.trim();
-                            if (newTag && !learningNoteTags.includes(newTag)) {
-                              setLearningNoteTags([...learningNoteTags, newTag]);
-                              setCustomTagInput('');
-                            }
-                          }}
-                          className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-xl cursor-pointer"
-                        >
-                          ထည့်ရန်
-                        </button>
-                      </div>
-
-                      {/* Active selected tags list */}
-                      {learningNoteTags.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 p-2.5 rounded-xl border border-zinc-200/10 bg-zinc-950/20 dark:bg-zinc-950/50">
-                          <span className="text-[10px] text-zinc-400 font-semibold block mr-1 self-center">ရွေးချယ်ထားသော Tags:</span>
-                          {learningNoteTags.map((tag, idx) => (
-                            <span
-                              key={idx}
-                              className="inline-flex items-center gap-1 bg-indigo-500/15 text-indigo-400 px-2 py-0.5 rounded-md text-xs font-semibold"
-                            >
-                              #{tag}
-                              <button
-                                type="button"
-                                onClick={() => setLearningNoteTags(learningNoteTags.filter(t => t !== tag))}
-                                className="hover:text-red-400 font-bold ml-1 focus:outline-hidden"
-                              >
-                                ×
-                              </button>
-                            </span>
-                          ))}
+                            }}
+                            className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-750 dark:bg-zinc-800 dark:hover:bg-zinc-750 text-zinc-300 hover:text-white font-semibold text-[11px] rounded-lg transition-colors cursor-pointer shrink-0"
+                          >
+                            ထည့်ရန်
+                          </button>
                         </div>
-                      )}
+                      </div>
+                    </div>
+
+                    {/* Cover Image / Attachment Property */}
+                    <div className="grid grid-cols-[120px_1fr] items-start gap-4">
+                      <div className="flex items-center gap-2 text-xs font-semibold text-zinc-400 dark:text-zinc-500 py-1 select-none">
+                        <ImageIcon className="h-3.5 w-3.5" />
+                        <span>Cover Image</span>
+                      </div>
+                      <div className="space-y-2">
+                        {learningNoteImage ? (
+                          <div className="relative rounded-xl overflow-hidden border border-zinc-750/50 max-h-56 bg-zinc-950 group">
+                            <img 
+                              src={learningNoteImage} 
+                              alt="Preview" 
+                              className="h-full w-full object-contain max-h-48 mx-auto"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setLearningNoteImage('')}
+                              className="absolute top-2 right-2 bg-red-600/90 hover:bg-red-700 text-white p-1.5 rounded-lg shadow-md transition-colors cursor-pointer"
+                              title="ပုံကို ဖယ်ရှားရန်"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className={`border border-dashed rounded-xl p-4 text-center transition-all relative group ${
+                            isDarkMode 
+                              ? 'border-zinc-800 hover:border-zinc-700 hover:bg-zinc-950/40 bg-zinc-950/20' 
+                              : 'border-slate-200 hover:border-slate-300 hover:bg-slate-100 bg-slate-50/20'
+                          }`}>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleImageChange}
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                            />
+                            <div className="flex items-center justify-center gap-1.5 text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+                              <Plus className="h-3.5 w-3.5" />
+                              <span>ပုံတင်ရန် (Upload Image)</span>
+                            </div>
+                            <p className="text-[10px] text-zinc-400 mt-0.5">နှိပ်ပါ သို့မဟုတ် ပုံကို ဆွဲထည့်ပါ (Drag & Drop)</p>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
 
-                  {/* Content */}
-                  <div>
-                    <label className={`block text-xs font-bold uppercase tracking-wider mb-1.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
-                      သင်ခန်းစာအကြောင်းအရာ / မှတ်စုစာသား (Content) <span className="text-rose-500">*</span>
-                    </label>
+                  {/* Notion-style Document Body */}
+                  <div className="pt-2">
                     <textarea
                       required
-                      placeholder="Market Structure Shift ဖြစ်သွားတဲ့အချိန်မှာ Order Block နေရာမှာ Limit တင်ပြီးစောင့်ဝင်ရမယ်..."
+                      placeholder="ဒီနေရာမှာ သင်ခန်းစာမှတ်စု သို့မဟုတ် ကိုယ်ပိုင်မဟာဗျူဟာအကြောင်းအရာများကို Notion ရဲ့ စာမျက်နှာလွတ်တစ်ခုလို စိတ်ကြိုက် လွတ်လပ်စွာ ရေးသားနိုင်ပါသည်။ (Markdown format ဖြင့် စာလုံးများကို အလှဆင်နိုင်ပါသည်...)"
                       value={learningNoteContent}
                       onChange={(e) => setLearningNoteContent(e.target.value)}
-                      rows={8}
-                      className={`w-full px-3 py-2 border rounded-xl text-sm focus:outline-hidden focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 whitespace-pre-wrap ${
-                        isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-800'
-                      }`}
+                      rows={10}
+                      className="w-full bg-transparent border-0 focus:ring-0 text-sm sm:text-base focus:outline-hidden px-0 py-2 placeholder:text-zinc-400/80 whitespace-pre-wrap leading-relaxed resize-none"
                     />
                   </div>
                 </div>
