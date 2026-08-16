@@ -77,7 +77,8 @@ import {
   Percent,
   Image as ImageIcon,
   ZoomIn,
-  Maximize2
+  Maximize2,
+  Minimize2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -160,6 +161,23 @@ export default function Home() {
   const [customTagInput, setCustomTagInput] = useState('');
   const [learningError, setLearningError] = useState<string | null>(null);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const [isLearningModalFullPage, setIsLearningModalFullPage] = useState(false);
+
+  useEffect(() => {
+    if (showLearningModal) {
+      setIsLearningModalFullPage(false);
+    }
+  }, [showLearningModal]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (isDarkMode) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    }
+  }, [isDarkMode]);
 
   const allUniqueTags = useMemo(() => {
     const tagSet = new Set<string>();
@@ -3546,7 +3564,7 @@ export default function Home() {
                           <button
                             type="button"
                             onClick={() => setFormData({ ...formData, pnl: formData.winLoss === 'Win' ? (calculatedSuggestions.suggestedPnlWin || '+3R') : '-1R' })}
-                            className="text-[9px] bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 px-1.5 py-0.5 rounded text-slate-500 dark:text-zinc-300 font-bold cursor-pointer"
+                            className="text-[9px] bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-750 px-1.5 py-0.5 rounded text-slate-500 dark:text-zinc-300 font-bold cursor-pointer"
                           >
                             Auto-Fill
                           </button>
@@ -3646,10 +3664,16 @@ export default function Home() {
 
             {/* Modal Box */}
             <motion.div
+              layout
               initial={{ opacity: 0, scale: 0.98, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.98, y: 10 }}
-              className={`relative w-full max-w-2xl rounded-2xl border shadow-2xl flex flex-col max-h-[88vh] overflow-hidden ${
+              transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+              className={`relative w-full flex flex-col overflow-hidden border shadow-2xl transition-all duration-300 ease-in-out ${
+                isLearningModalFullPage 
+                  ? 'max-w-7xl h-[95vh] w-[96vw] rounded-2xl' 
+                  : 'max-w-3xl h-[85vh] rounded-2xl'
+              } ${
                 isDarkMode ? 'bg-zinc-900 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 text-slate-800'
               }`}
             >
@@ -3665,8 +3689,35 @@ export default function Home() {
                   <span className="font-semibold text-zinc-600 dark:text-zinc-300">
                     {editingLearningNote ? 'Edit Draft' : 'New Note'}
                   </span>
+                  {isLearningModalFullPage && (
+                    <>
+                      <span>/</span>
+                      <span className="text-[10px] bg-indigo-500/10 text-indigo-400 px-1.5 py-0.5 rounded font-bold">Full Page</span>
+                    </>
+                  )}
                 </div>
                 <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsLearningModalFullPage(!isLearningModalFullPage)}
+                    className={`inline-flex items-center space-x-1 px-2 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                      isDarkMode ? 'hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200' : 'hover:bg-slate-100 text-slate-500 hover:text-slate-700'
+                    }`}
+                    title={isLearningModalFullPage ? "Center Peek အဖြစ် ပြောင်းလဲရန်" : "Full Page အဖြစ် ချဲ့ရန်"}
+                  >
+                    {isLearningModalFullPage ? (
+                      <>
+                        <Minimize2 className="h-3.5 w-3.5 mr-1" />
+                        <span className="hidden sm:inline">Center Peek</span>
+                      </>
+                    ) : (
+                      <>
+                        <Maximize2 className="h-3.5 w-3.5 mr-1" />
+                        <span className="hidden sm:inline">Full Page</span>
+                      </>
+                    )}
+                  </button>
+                  <div className={`h-4 w-px ${isDarkMode ? 'bg-zinc-800' : 'bg-slate-200'}`} />
                   <button
                     type="button"
                     onClick={() => setShowLearningModal(false)}
@@ -3680,7 +3731,14 @@ export default function Home() {
               </div>
 
               {/* Form Content */}
-              <form onSubmit={handleSaveLearningNote} className="flex flex-col flex-1 overflow-y-auto bg-transparent">
+              <form 
+                onSubmit={handleSaveLearningNote} 
+                className={`flex flex-col flex-1 overflow-y-auto bg-transparent scrollbar-thin ${
+                  isDarkMode 
+                    ? '[&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-zinc-800 hover:[&::-webkit-scrollbar-thumb]:bg-zinc-750 [&::-webkit-scrollbar-thumb]:rounded-full' 
+                    : '[&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-slate-200 hover:[&::-webkit-scrollbar-thumb]:bg-slate-300 [&::-webkit-scrollbar-thumb]:rounded-full'
+                }`}
+              >
                 <div className="p-8 space-y-6">
                   {learningError && (
                     <div className="p-3.5 rounded-xl text-xs bg-rose-500/10 border border-rose-500/20 text-rose-500 flex items-center gap-2 font-medium">
@@ -3797,7 +3855,7 @@ export default function Home() {
                                 setCustomTagInput('');
                               }
                             }}
-                            className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-750 dark:bg-zinc-800 dark:hover:bg-zinc-750 text-zinc-300 hover:text-white font-semibold text-[11px] rounded-lg transition-colors cursor-pointer shrink-0"
+                            className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 dark:bg-zinc-800 dark:hover:bg-zinc-750 text-zinc-300 hover:text-white font-semibold text-[11px] rounded-lg transition-colors cursor-pointer shrink-0"
                           >
                             ထည့်ရန်
                           </button>
