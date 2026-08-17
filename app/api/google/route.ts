@@ -245,6 +245,107 @@ export async function POST(req: NextRequest) {
           console.error('Failed to initialize LearningNotes sheet tab:', notesSheetErr);
         }
 
+        // Ensure "MicroLogs" and "MacroLogs" sheet tabs exist for storing analysis logs
+        try {
+          const sheetMeta = await sheetsFetch(token, `/v4/spreadsheets/${spreadsheetId}`);
+          const hasMicroLogsTab = sheetMeta.sheets?.some((s: any) => s.properties?.title === 'MicroLogs');
+          const hasMacroLogsTab = sheetMeta.sheets?.some((s: any) => s.properties?.title === 'MacroLogs');
+          
+          const requests: any[] = [];
+          if (!hasMicroLogsTab) {
+            requests.push({
+              addSheet: {
+                properties: {
+                  title: 'MicroLogs',
+                },
+              },
+            });
+          }
+          if (!hasMacroLogsTab) {
+            requests.push({
+              addSheet: {
+                properties: {
+                  title: 'MacroLogs',
+                },
+              },
+            });
+          }
+
+          if (requests.length > 0) {
+            await sheetsFetch(token, `/v4/spreadsheets/${spreadsheetId}:batchUpdate`, {
+              method: 'POST',
+              body: JSON.stringify({ requests }),
+            });
+          }
+
+          // Initialize MicroLogs headers if empty
+          const microHeadersCheck = await sheetsFetch(
+            token,
+            `/v4/spreadsheets/${spreadsheetId}/values/MicroLogs!A1:L1`
+          );
+          if (!microHeadersCheck.values || microHeadersCheck.values.length === 0) {
+            await sheetsFetch(
+              token,
+              `/v4/spreadsheets/${spreadsheetId}/values/MicroLogs!A1:L1?valueInputOption=USER_ENTERED`,
+              {
+                method: 'PUT',
+                body: JSON.stringify({
+                  range: 'MicroLogs!A1:L1',
+                  majorDimension: 'ROWS',
+                  values: [[
+                    'ID',
+                    'Date',
+                    'Asset',
+                    'SetupType',
+                    'Score',
+                    'StructureAligned',
+                    'LiquiditySwept',
+                    'FvgTested',
+                    'BlockRefined',
+                    'VolumeConfirmed',
+                    'EntryNotes',
+                    'PnlR'
+                  ]],
+                }),
+              }
+            );
+          }
+
+          // Initialize MacroLogs headers if empty
+          const macroHeadersCheck = await sheetsFetch(
+            token,
+            `/v4/spreadsheets/${spreadsheetId}/values/MacroLogs!A1:K1`
+          );
+          if (!macroHeadersCheck.values || macroHeadersCheck.values.length === 0) {
+            await sheetsFetch(
+              token,
+              `/v4/spreadsheets/${spreadsheetId}/values/MacroLogs!A1:K1?valueInputOption=USER_ENTERED`,
+              {
+                method: 'PUT',
+                body: JSON.stringify({
+                  range: 'MacroLogs!A1:K1',
+                  majorDimension: 'ROWS',
+                  values: [[
+                    'ID',
+                    'Date',
+                    'WeeklyBias',
+                    'FundamentalSentiment',
+                    'CorrelationNotes',
+                    'KeyDemandSupply',
+                    'M1_Bias',
+                    'W1_Bias',
+                    'D1_Bias',
+                    'H4_Bias',
+                    'H1_Bias'
+                  ]],
+                }),
+              }
+            );
+          }
+        } catch (logsSheetErr) {
+          console.error('Failed to initialize MicroLogs/MacroLogs sheet tabs:', logsSheetErr);
+        }
+
         // Find or create "Trading Notes (AI Studio)" Document
         const docsSearch = await driveFetch(
           token,
@@ -898,6 +999,184 @@ export async function POST(req: NextRequest) {
           }
         }
 
+        return NextResponse.json({ success: true });
+      }
+
+      case 'fetchMicroLogs': {
+        const { spreadsheetId } = args;
+        if (!spreadsheetId) {
+          return NextResponse.json({ error: 'Missing spreadsheetId' }, { status: 400 });
+        }
+        try {
+          const data = await sheetsFetch(
+            token,
+            `/v4/spreadsheets/${spreadsheetId}/values/MicroLogs!A2:L2000`
+          );
+          const logs = (data.values || []).map((row: any[]) => {
+            return {
+              id: row[0] || '',
+              date: row[1] || '',
+              asset: row[2] || '',
+              setupType: row[3] || '',
+              score: parseInt(row[4], 10) || 0,
+              ltfChecklist: {
+                structureAligned: row[5] === 'TRUE',
+                liquiditySwept: row[6] === 'TRUE',
+                fvgTested: row[7] === 'TRUE',
+                blockRefined: row[8] === 'TRUE',
+                volumeConfirmed: row[9] === 'TRUE',
+              },
+              entryNotes: row[10] || '',
+              pnlR: parseFloat(row[11]) || 0,
+            };
+          }).filter((log: any) => log.id !== '');
+          return NextResponse.json({ logs });
+        } catch (err) {
+          console.error('Error fetching google micro logs:', err);
+          return NextResponse.json({ logs: [] });
+        }
+      }
+
+      case 'addMicroLog': {
+        const { spreadsheetId, log } = args;
+        if (!spreadsheetId || !log) {
+          return NextResponse.json({ error: 'Missing spreadsheetId or log' }, { status: 400 });
+        }
+        await sheetsFetch(
+          token,
+          `/v4/spreadsheets/${spreadsheetId}/values/MicroLogs!A2:L2:append?valueInputOption=USER_ENTERED`,
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              range: 'MicroLogs!A2:L2',
+              majorDimension: 'ROWS',
+              values: [[
+                log.id,
+                log.date,
+                log.asset,
+                log.setupType,
+                log.score,
+                log.ltfChecklist.structureAligned,
+                log.ltfChecklist.liquiditySwept,
+                log.ltfChecklist.fvgTested,
+                log.ltfChecklist.blockRefined,
+                log.ltfChecklist.volumeConfirmed,
+                log.entryNotes,
+                log.pnlR
+              ]],
+            }),
+          }
+        );
+        return NextResponse.json({ success: true });
+      }
+
+      case 'deleteMicroLog': {
+        const { spreadsheetId, logId } = args;
+        if (!spreadsheetId || !logId) {
+          return NextResponse.json({ error: 'Missing spreadsheetId or logId' }, { status: 400 });
+        }
+        const currentSheetData = await sheetsFetch(token, `/v4/spreadsheets/${spreadsheetId}/values/MicroLogs!A2:A2000`);
+        const ids = (currentSheetData.values || []).map((r: any[]) => r[0]);
+        const relativeIndex = ids.indexOf(logId);
+        if (relativeIndex > -1) {
+          const rowIndex = relativeIndex + 2;
+          await sheetsFetch(token, `/v4/spreadsheets/${spreadsheetId}/values/MicroLogs!A${rowIndex}:L${rowIndex}?valueInputOption=USER_ENTERED`, {
+            method: 'PUT',
+            body: JSON.stringify({
+              range: `MicroLogs!A${rowIndex}:L${rowIndex}`,
+              majorDimension: 'ROWS',
+              values: [['', '', '', '', '', '', '', '', '', '', '', '']],
+            }),
+          });
+        }
+        return NextResponse.json({ success: true });
+      }
+
+      case 'fetchMacroLogs': {
+        const { spreadsheetId } = args;
+        if (!spreadsheetId) {
+          return NextResponse.json({ error: 'Missing spreadsheetId' }, { status: 400 });
+        }
+        try {
+          const data = await sheetsFetch(
+            token,
+            `/v4/spreadsheets/${spreadsheetId}/values/MacroLogs!A2:K2000`
+          );
+          const logs = (data.values || []).map((row: any[]) => {
+            return {
+              id: row[0] || '',
+              date: row[1] || '',
+              weeklyBias: row[2] || 'Ranging',
+              fundamentalSentiment: row[3] || '',
+              correlationNotes: row[4] || '',
+              keyDemandSupply: row[5] || '',
+              timeframeMatrix: {
+                m1: row[6] || 'Ranging',
+                w1: row[7] || 'Ranging',
+                d1: row[8] || 'Ranging',
+                h4: row[9] || 'Ranging',
+                h1: row[10] || 'Ranging',
+              },
+            };
+          }).filter((log: any) => log.id !== '');
+          return NextResponse.json({ logs });
+        } catch (err) {
+          console.error('Error fetching google macro logs:', err);
+          return NextResponse.json({ logs: [] });
+        }
+      }
+
+      case 'addMacroLog': {
+        const { spreadsheetId, log } = args;
+        if (!spreadsheetId || !log) {
+          return NextResponse.json({ error: 'Missing spreadsheetId or log' }, { status: 400 });
+        }
+        await sheetsFetch(
+          token,
+          `/v4/spreadsheets/${spreadsheetId}/values/MacroLogs!A2:K2:append?valueInputOption=USER_ENTERED`,
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              range: 'MacroLogs!A2:K2',
+              majorDimension: 'ROWS',
+              values: [[
+                log.id,
+                log.date,
+                log.weeklyBias,
+                log.fundamentalSentiment,
+                log.correlationNotes,
+                log.keyDemandSupply,
+                log.timeframeMatrix.m1,
+                log.timeframeMatrix.w1,
+                log.timeframeMatrix.d1,
+                log.timeframeMatrix.h4,
+                log.timeframeMatrix.h1
+              ]],
+            }),
+          }
+        );
+        return NextResponse.json({ success: true });
+      }
+
+      case 'deleteMacroLog': {
+        const { spreadsheetId, logId } = args;
+        if (!spreadsheetId || !logId) {
+          return NextResponse.json({ error: 'Missing spreadsheetId or logId' }, { status: 400 });
+        }
+        const currentSheetData = await sheetsFetch(token, `/v4/spreadsheets/${spreadsheetId}/values/MacroLogs!A2:A2000`);
+        const ids = (currentSheetData.values || []).map((r: any[]) => r[0]);
+        const relativeIndex = ids.indexOf(logId);
+        if (relativeIndex > -1) {
+          const rowIndex = relativeIndex + 2;
+          await sheetsFetch(token, `/v4/spreadsheets/${spreadsheetId}/values/MacroLogs!A${rowIndex}:K${rowIndex}?valueInputOption=USER_ENTERED`, {
+            method: 'PUT',
+            body: JSON.stringify({
+              range: `MacroLogs!A${rowIndex}:K${rowIndex}`,
+              majorDimension: 'ROWS',
+              values: [['', '', '', '', '', '', '', '', '', '', '']],
+            }),
+          });
+        }
         return NextResponse.json({ success: true });
       }
 

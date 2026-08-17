@@ -232,3 +232,85 @@ export async function deleteGoogleLearningNote(
   await callProxy(accessToken, 'deleteGoogleLearningNote', { spreadsheetId, noteId, docId, imageUrl });
 }
 
+export interface MicroLog {
+  id: string;
+  date: string;
+  asset: string;
+  setupType: string;
+  score: number;
+  ltfChecklist: {
+    structureAligned: boolean;
+    liquiditySwept: boolean;
+    fvgTested: boolean;
+    blockRefined: boolean;
+    volumeConfirmed: boolean;
+  };
+  entryNotes: string;
+  pnlR: number;
+}
+
+export interface MacroLog {
+  id: string;
+  date: string;
+  weeklyBias: 'Bullish' | 'Bearish' | 'Ranging';
+  fundamentalSentiment: string;
+  correlationNotes: string;
+  keyDemandSupply: string;
+  timeframeMatrix: {
+    m1: 'Bullish' | 'Bearish' | 'Ranging';
+    w1: 'Bullish' | 'Bearish' | 'Ranging';
+    d1: 'Bullish' | 'Bearish' | 'Ranging';
+    h4: 'Bullish' | 'Bearish' | 'Ranging';
+    h1: 'Bullish' | 'Bearish' | 'Ranging';
+  };
+}
+
+export async function fetchGoogleMicroLogs(
+  accessToken: string,
+  spreadsheetId: string
+): Promise<MicroLog[]> {
+  const data = await callProxy(accessToken, 'fetchMicroLogs', { spreadsheetId });
+  return data.logs || [];
+}
+
+export async function addGoogleMicroLog(
+  accessToken: string,
+  spreadsheetId: string,
+  log: MicroLog
+): Promise<void> {
+  await callProxy(accessToken, 'addMicroLog', { spreadsheetId, log });
+}
+
+export async function deleteGoogleMicroLog(
+  accessToken: string,
+  spreadsheetId: string,
+  logId: string
+): Promise<void> {
+  await callProxy(accessToken, 'deleteMicroLog', { spreadsheetId, logId });
+}
+
+export async function fetchGoogleMacroLogs(
+  accessToken: string,
+  spreadsheetId: string
+): Promise<MacroLog[]> {
+  const data = await callProxy(accessToken, 'fetchMacroLogs', { spreadsheetId });
+  return data.logs || [];
+}
+
+export async function addGoogleMacroLog(
+  accessToken: string,
+  spreadsheetId: string,
+  log: MacroLog
+): Promise<void> {
+  await callProxy(accessToken, 'addMacroLog', { spreadsheetId, log });
+}
+
+export async function deleteGoogleMacroLog(
+  accessToken: string,
+  spreadsheetId: string,
+  logId: string
+): Promise<void> {
+  await callProxy(accessToken, 'deleteMacroLog', { spreadsheetId, logId });
+}
+
+

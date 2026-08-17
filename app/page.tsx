@@ -26,6 +26,12 @@ import {
   addGoogleLearningNote,
   updateGoogleLearningNote,
   deleteGoogleLearningNote,
+  fetchGoogleMicroLogs,
+  addGoogleMicroLog,
+  deleteGoogleMicroLog,
+  fetchGoogleMacroLogs,
+  addGoogleMacroLog,
+  deleteGoogleMacroLog,
 } from '@/lib/google-api';
 import { 
   LineChart, 
@@ -638,6 +644,35 @@ export default function Home() {
     }
   };
 
+  const [isLoadingMicro, setIsLoadingMicro] = useState(false);
+  const [isLoadingMacro, setIsLoadingMacro] = useState(false);
+  const [isSavingMicro, setIsSavingMicro] = useState(false);
+  const [isSavingMacro, setIsSavingMacro] = useState(false);
+
+  const loadGoogleMicroLogs = async (accessToken: string, sId: string) => {
+    setIsLoadingMicro(true);
+    try {
+      const logs = await fetchGoogleMicroLogs(accessToken, sId);
+      setMicroLogs(logs);
+    } catch (error) {
+      console.error('Error fetching micro logs:', error);
+    } finally {
+      setIsLoadingMicro(false);
+    }
+  };
+
+  const loadGoogleMacroLogs = async (accessToken: string, sId: string) => {
+    setIsLoadingMacro(true);
+    try {
+      const logs = await fetchGoogleMacroLogs(accessToken, sId);
+      setMacroLogs(logs);
+    } catch (error) {
+      console.error('Error fetching macro logs:', error);
+    } finally {
+      setIsLoadingMacro(false);
+    }
+  };
+
   // --- Micro & Macro Analysis Default Logs & Handlers ---
   const defaultMicroLogs = [
     {
@@ -696,37 +731,45 @@ export default function Home() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedMicro = localStorage.getItem('trading_micro_logs');
-      if (savedMicro) {
+      if (savedMicro && !token) {
         try { setMicroLogs(JSON.parse(savedMicro)); } catch (e) {}
-      } else {
+      } else if (!token) {
         setMicroLogs(defaultMicroLogs);
       }
       setIsMicroLoaded(true);
 
       const savedMacro = localStorage.getItem('trading_macro_logs');
-      if (savedMacro) {
+      if (savedMacro && !token) {
         try { setMacroLogs(JSON.parse(savedMacro)); } catch (e) {}
-      } else {
+      } else if (!token) {
         setMacroLogs(defaultMacroLogs);
       }
       setIsMacroLoaded(true);
     }
-  }, []);
+  }, [token]);
 
   useEffect(() => {
     if (isMicroLoaded && typeof window !== 'undefined') {
-      localStorage.setItem('trading_micro_logs', JSON.stringify(microLogs));
+      if (!token) {
+        localStorage.setItem('trading_micro_logs', JSON.stringify(microLogs));
+      } else {
+        localStorage.removeItem('trading_micro_logs');
+      }
     }
-  }, [microLogs, isMicroLoaded]);
+  }, [microLogs, isMicroLoaded, token]);
 
   useEffect(() => {
     if (isMacroLoaded && typeof window !== 'undefined') {
-      localStorage.setItem('trading_macro_logs', JSON.stringify(macroLogs));
+      if (!token) {
+        localStorage.setItem('trading_macro_logs', JSON.stringify(macroLogs));
+      } else {
+        localStorage.removeItem('trading_macro_logs');
+      }
     }
-  }, [macroLogs, isMacroLoaded]);
+  }, [macroLogs, isMacroLoaded, token]);
 
   // Micro Handlers
-  const handleAddMicroLog = (e: React.FormEvent) => {
+  const handleAddMicroLog = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!microAsset.trim()) return;
 
@@ -750,7 +793,21 @@ export default function Home() {
       pnlR: microPnlR
     };
 
-    setMicroLogs([newLog, ...microLogs]);
+    if (token && spreadsheetId) {
+      setIsSavingMicro(true);
+      try {
+        await addGoogleMicroLog(token, spreadsheetId, newLog);
+        setMicroLogs([newLog, ...microLogs]);
+      } catch (err) {
+        console.error('Error saving micro log to Google Sheet:', err);
+        alert('Google Sheets သို့ သိမ်းဆည်းရန် မအောင်မြင်ပါ!');
+      } finally {
+        setIsSavingMicro(false);
+      }
+    } else {
+      setMicroLogs([newLog, ...microLogs]);
+    }
+
     setMicroEntryNotes('');
     setMicroChecklist({
       structureAligned: false,
@@ -761,8 +818,23 @@ export default function Home() {
     });
   };
 
-  const handleDeleteMicroLog = (id: string) => {
-    setMicroLogs(microLogs.filter(log => log.id !== id));
+  const handleDeleteMicroLog = async (id: string) => {
+    if (token && spreadsheetId) {
+      const confirmed = window.confirm('ဤ Setup Log ကို Google Sheet မှ ဖျက်ရန် သေချာပါသလား?');
+      if (!confirmed) return;
+      setIsSavingMicro(true);
+      try {
+        await deleteGoogleMicroLog(token, spreadsheetId, id);
+        setMicroLogs(microLogs.filter(log => log.id !== id));
+      } catch (err) {
+        console.error('Error deleting micro log from Google Sheet:', err);
+        alert('Google Sheets မှ ဖျက်ရန် မအောင်မြင်ပါ!');
+      } finally {
+        setIsSavingMicro(false);
+      }
+    } else {
+      setMicroLogs(microLogs.filter(log => log.id !== id));
+    }
   };
 
   const handleDownloadMicroLogs = () => {
@@ -782,7 +854,7 @@ export default function Home() {
   };
 
   // Macro Handlers
-  const handleAddMacroLog = (e: React.FormEvent) => {
+  const handleAddMacroLog = async (e: React.FormEvent) => {
     e.preventDefault();
     const newLog = {
       id: `macro-${Date.now()}`,
@@ -794,14 +866,43 @@ export default function Home() {
       timeframeMatrix: { ...macroTimeframeMatrix }
     };
 
-    setMacroLogs([newLog, ...macroLogs]);
+    if (token && spreadsheetId) {
+      setIsSavingMacro(true);
+      try {
+        await addGoogleMacroLog(token, spreadsheetId, newLog);
+        setMacroLogs([newLog, ...macroLogs]);
+      } catch (err) {
+        console.error('Error saving macro log to Google Sheet:', err);
+        alert('Google Sheets သို့ သိမ်းဆည်းရန် မအောင်မြင်ပါ!');
+      } finally {
+        setIsSavingMacro(false);
+      }
+    } else {
+      setMacroLogs([newLog, ...macroLogs]);
+    }
+
     setMacroFundamentalSentiment('');
     setMacroCorrelationNotes('');
     setMacroKeyDemandSupply('');
   };
 
-  const handleDeleteMacroLog = (id: string) => {
-    setMacroLogs(macroLogs.filter(log => log.id !== id));
+  const handleDeleteMacroLog = async (id: string) => {
+    if (token && spreadsheetId) {
+      const confirmed = window.confirm('ဤ Macro Log ကို Google Sheet မှ ဖျက်ရန် သေချာပါသလား?');
+      if (!confirmed) return;
+      setIsSavingMacro(true);
+      try {
+        await deleteGoogleMacroLog(token, spreadsheetId, id);
+        setMacroLogs(macroLogs.filter(log => log.id !== id));
+      } catch (err) {
+        console.error('Error deleting macro log from Google Sheet:', err);
+        alert('Google Sheets မှ ဖျက်ရန် မအောင်မြင်ပါ!');
+      } finally {
+        setIsSavingMacro(false);
+      }
+    } else {
+      setMacroLogs(macroLogs.filter(log => log.id !== id));
+    }
   };
 
   const handleDownloadMacroLogs = () => {
@@ -856,6 +957,8 @@ export default function Home() {
       await loadTrades(accessToken, sheetId);
       await loadDocContent(accessToken, docId);
       await loadAvailableDocs(accessToken);
+      await loadGoogleMicroLogs(accessToken, sheetId);
+      await loadGoogleMacroLogs(accessToken, sheetId);
       
     } catch (error) {
       console.error('Error bootstrapping Google Files:', error);
@@ -897,6 +1000,8 @@ export default function Home() {
           localStorage.removeItem('trading_trades');
           localStorage.removeItem('trading_doc_text');
           localStorage.removeItem('trading_keep_notes');
+          localStorage.removeItem('trading_micro_logs');
+          localStorage.removeItem('trading_macro_logs');
         }
       }
     );
@@ -957,6 +1062,8 @@ export default function Home() {
         localStorage.removeItem('trading_trades');
         localStorage.removeItem('trading_doc_text');
         localStorage.removeItem('trading_keep_notes');
+        localStorage.removeItem('trading_micro_logs');
+        localStorage.removeItem('trading_macro_logs');
       }
     } catch (err) {
       console.error('Logout failed:', err);
