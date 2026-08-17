@@ -4493,15 +4493,41 @@ export default function Home() {
                     {/* Date */}
                     <div>
                       <label className={`block text-[11px] sm:text-xs font-bold uppercase tracking-wider mb-1 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Date</label>
-                      <input
-                        type="date"
-                        required
-                        value={formData.date}
-                        onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                        className={`w-full px-3 py-1.5 sm:py-2 border rounded-xl text-sm focus:outline-hidden focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 ${
-                          isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-800'
-                        }`}
-                      />
+                      <div className="relative">
+                        {/* Custom visual container */}
+                        <div
+                          className={`w-full flex items-center justify-between px-3 py-1.5 sm:py-2 border rounded-xl text-sm transition-all ${
+                            isDarkMode 
+                              ? 'bg-zinc-950 border-zinc-800 text-zinc-100' 
+                              : 'bg-slate-50 border-slate-200 text-slate-800'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-slate-400 dark:text-zinc-500 shrink-0" />
+                            <span className="font-medium text-slate-700 dark:text-zinc-200">
+                              {formData.date ? (() => {
+                                try {
+                                  const d = new Date(formData.date);
+                                  if (!isNaN(d.getTime())) {
+                                    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+                                  }
+                                } catch (e) {}
+                                return formData.date;
+                              })() : 'ရက်စွဲရွေးချယ်ပါ'}
+                            </span>
+                          </div>
+                          <ChevronDown className="h-4 w-4 text-slate-400 dark:text-zinc-500 shrink-0" />
+                        </div>
+                        
+                        {/* Native date input styled to be fully invisible but filling the container */}
+                        <input
+                          type="date"
+                          required
+                          value={formData.date}
+                          onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                        />
+                      </div>
                     </div>
 
                     {/* Pair */}
