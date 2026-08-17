@@ -114,6 +114,7 @@ export default function Home() {
   const [token, setToken] = useState<string | null>(null);
   const [needsAuth, setNeedsAuth] = useState(true);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [isConnectingDrive, setIsConnectingDrive] = useState(false);
 
   // File system IDs
@@ -1021,6 +1022,7 @@ export default function Home() {
 
   const handleLogin = async () => {
     setIsAuthLoading(true);
+    setAuthError(null);
     try {
       const result = await googleSignIn();
       if (result) {
@@ -1038,8 +1040,19 @@ export default function Home() {
           localStorage.setItem('trading_cached_user', JSON.stringify(serializableUser));
         }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Login failed:', err);
+      let msg = 'Google Account ဖြင့် ဝင်ရောက်ခြင်း မအောင်မြင်ပါ။';
+      if (err?.code === 'auth/unauthorized-domain') {
+        msg = `ဒိုမိန်း (Domain) ခွင့်ပြုချက်မရှိပါ။ Firebase Console ရှိ "Authentication > Settings > Authorized domains" တွင် "${window.location.hostname}" ကို ထည့်သွင်းပေးရန် လိုအပ်ပါသည်။`;
+      } else if (err?.code === 'auth/popup-blocked') {
+        msg = 'သီးခြား Window Popup ဖွင့်ခြင်းကို Browser က ပိတ်ပင်ထားပါသည်။ Browser address bar တွင် Popup blocker ကို ပိတ်ပြီး ထပ်မံကြိုးစားပါ။';
+      } else if (err?.code === 'auth/popup-closed-by-user') {
+        msg = 'အကောင့်ဝင်သည့် Window Popup ကို အသုံးပြုသူမှ ပိတ်လိုက်သဖြင့် မအောင်မြင်ပါ။';
+      } else if (err?.message) {
+        msg = `အမှားအယွင်း ဖြစ်ပွားခဲ့သည်: ${err.message}`;
+      }
+      setAuthError(msg);
     } finally {
       setIsAuthLoading(false);
     }
@@ -1955,6 +1968,16 @@ export default function Home() {
               <p className="text-slate-500 text-sm max-w-md mx-auto mb-8 leading-relaxed">
                 သင့်၏ Google Drive ပေါ်တွင် &quot;Trading Journal (AI Studio)&quot; Spreadsheet နှင့် &quot;Trading Notes (AI Studio)&quot; Document တို့ကို အလိုအလျောက် ဖန်တီးသိမ်းဆည်းပေးမည် ဖြစ်ပါသည်။
               </p>
+
+              {authError && (
+                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-left max-w-md mx-auto flex items-start gap-3">
+                  <AlertTriangle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="font-semibold text-red-800 text-sm">အကောင့်ဝင်ရန် မအောင်မြင်ပါ</h4>
+                    <p className="text-xs text-red-600 mt-1 leading-relaxed">{authError}</p>
+                  </div>
+                </div>
+              )}
 
               {isAuthLoading ? (
                 <div className="flex flex-col items-center justify-center space-y-4">
