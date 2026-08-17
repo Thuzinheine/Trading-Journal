@@ -18,12 +18,9 @@ import {
   deleteTradeRow, 
   fetchDocContent, 
   saveDocContent,
-  fetchKeepNotes,
-  createKeepNote,
   listDocs,
   createDoc,
   Trade,
-  KeepNote,
   LearningNote,
   fetchGoogleLearningNotes,
   addGoogleLearningNote,
@@ -78,7 +75,9 @@ import {
   Image as ImageIcon,
   ZoomIn,
   Maximize2,
-  Minimize2
+  Minimize2,
+  Target,
+  Globe
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -123,19 +122,66 @@ export default function Home() {
   const [docSaveStatus, setDocSaveStatus] = useState<'saved' | 'dirty' | 'saving' | 'error'>('saved');
   const [isLoadingTrades, setIsLoadingTrades] = useState(false);
 
-  // Keep Notes states
-  const [keepNotes, setKeepNotes] = useState<KeepNote[]>([]);
-  const [isKeepLoading, setIsKeepLoading] = useState(false);
-  const [keepError, setKeepError] = useState<string | null>(null);
-  const [newNoteTitle, setNewNoteTitle] = useState('');
-  const [newNoteText, setNewNoteText] = useState('');
-  const [isCreatingKeepNote, setIsCreatingKeepNote] = useState(false);
+  // Micro Analysis Type Definitions & States
+  const [microLogs, setMicroLogs] = useState<{
+    id: string;
+    date: string;
+    asset: string;
+    setupType: string;
+    score: number;
+    ltfChecklist: {
+      structureAligned: boolean;
+      liquiditySwept: boolean;
+      fvgTested: boolean;
+      blockRefined: boolean;
+      volumeConfirmed: boolean;
+    };
+    entryNotes: string;
+    pnlR: number;
+  }[]>([]);
+  const [isMicroLoaded, setIsMicroLoaded] = useState(false);
 
-  // Local/Personal fallback notes (for regular gmail accounts or offline use)
-  const [fallbackNotes, setFallbackNotes] = useState<{ id: string; title: string; content: string; date: string }[]>([]);
-  const [fallbackNoteTitle, setFallbackNoteTitle] = useState('');
-  const [fallbackNoteText, setFallbackNoteText] = useState('');
-  const [expandedNotes, setExpandedNotes] = useState<Record<string, boolean>>({});
+  const [microAsset, setMicroAsset] = useState('EURUSD');
+  const [microSetupType, setMicroSetupType] = useState('Order Block');
+  const [microEntryNotes, setMicroEntryNotes] = useState('');
+  const [microPnlR, setMicroPnlR] = useState(1);
+  const [microChecklist, setMicroChecklist] = useState({
+    structureAligned: true,
+    liquiditySwept: true,
+    fvgTested: false,
+    blockRefined: false,
+    volumeConfirmed: false,
+  });
+
+  // Macro Analysis Type Definitions & States
+  const [macroLogs, setMacroLogs] = useState<{
+    id: string;
+    date: string;
+    weeklyBias: 'Bullish' | 'Bearish' | 'Ranging';
+    fundamentalSentiment: string;
+    correlationNotes: string;
+    keyDemandSupply: string;
+    timeframeMatrix: {
+      m1: 'Bullish' | 'Bearish' | 'Ranging';
+      w1: 'Bullish' | 'Bearish' | 'Ranging';
+      d1: 'Bullish' | 'Bearish' | 'Ranging';
+      h4: 'Bullish' | 'Bearish' | 'Ranging';
+      h1: 'Bullish' | 'Bearish' | 'Ranging';
+    };
+  }[]>([]);
+  const [isMacroLoaded, setIsMacroLoaded] = useState(false);
+
+  const [macroWeeklyBias, setMacroWeeklyBias] = useState<'Bullish' | 'Bearish' | 'Ranging'>('Bullish');
+  const [macroFundamentalSentiment, setMacroFundamentalSentiment] = useState('');
+  const [macroCorrelationNotes, setMacroCorrelationNotes] = useState('');
+  const [macroKeyDemandSupply, setMacroKeyDemandSupply] = useState('');
+  const [macroTimeframeMatrix, setMacroTimeframeMatrix] = useState({
+    m1: 'Bullish' as 'Bullish' | 'Bearish' | 'Ranging',
+    w1: 'Bullish' as 'Bullish' | 'Bearish' | 'Ranging',
+    d1: 'Bullish' as 'Bullish' | 'Bearish' | 'Ranging',
+    h4: 'Bullish' as 'Bullish' | 'Bearish' | 'Ranging',
+    h1: 'Bullish' as 'Bullish' | 'Bearish' | 'Ranging',
+  });
 
   // Dark UI toggle state
   const [isDarkMode, setIsDarkMode] = useState(true); // Default to Dark UI as requested
@@ -144,7 +190,7 @@ export default function Home() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Active view
-  const [activeTab, setActiveTab] = useState<'overview' | 'journal' | 'notes' | 'keep' | 'alignment' | 'learning'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'journal' | 'micro' | 'macro' | 'alignment' | 'learning'>('overview');
 
   // Learning Notes States
   const [learningNotes, setLearningNotes] = useState<LearningNote[]>([]);
@@ -251,8 +297,6 @@ export default function Home() {
     setAlignChecks([false, false, false, false]);
   };
 
-  const isKeepRestricted = !!(keepError && (keepError.includes('403') || keepError.includes('restricted') || keepError.includes('denied')));
-
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'ALL' | 'BUY' | 'SELL'>('ALL');
@@ -324,13 +368,6 @@ export default function Home() {
 
         const cachedDocText = localStorage.getItem('trading_doc_text');
         if (cachedDocText) setDocText(cachedDocText);
-
-        const cachedKeepNotes = localStorage.getItem('trading_keep_notes');
-        if (cachedKeepNotes) {
-          try {
-            setKeepNotes(JSON.parse(cachedKeepNotes));
-          } catch (e) {}
-        }
       }
       setMounted(true);
     }, 0);
@@ -423,113 +460,182 @@ export default function Home() {
     }
   };
 
-  const loadKeepNotes = async (accessToken: string) => {
-    setIsKeepLoading(true);
-    setKeepError(null);
-    try {
-      const notes = await fetchKeepNotes(accessToken);
-      setKeepNotes(notes);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('trading_keep_notes', JSON.stringify(notes));
-      }
-    } catch (error: any) {
-      const errorMsg = error.message || 'Error listing Keep notes';
-      if (errorMsg.includes('403') || errorMsg.includes('restricted') || errorMsg.includes('denied') || errorMsg.includes('enterprise')) {
-        console.info('Google Keep notes are restricted (standard for personal @gmail.com accounts). Dashboard Local Notes fallback is active and ready.');
-      } else {
-        console.error('Error loading Keep notes:', error);
-      }
-      setKeepError(errorMsg);
-    } finally {
-      setIsKeepLoading(false);
+  // --- Micro & Macro Analysis Default Logs & Handlers ---
+  const defaultMicroLogs = [
+    {
+      id: 'micro-1',
+      date: '2026-08-15',
+      asset: 'XAUUSD',
+      setupType: 'Liquidity Hunt',
+      score: 80,
+      ltfChecklist: {
+        structureAligned: true,
+        liquiditySwept: true,
+        fvgTested: true,
+        blockRefined: true,
+        volumeConfirmed: false,
+      },
+      entryNotes: 'Sweep of Asian high on lower timeframe followed by clean structure break on 1m chart. Executed at the premium FVG.',
+      pnlR: 3.5,
+    },
+    {
+      id: 'micro-2',
+      date: '2026-08-14',
+      asset: 'EURUSD',
+      setupType: 'Order Block',
+      score: 100,
+      ltfChecklist: {
+        structureAligned: true,
+        liquiditySwept: true,
+        fvgTested: true,
+        blockRefined: true,
+        volumeConfirmed: true,
+      },
+      entryNotes: 'High probability A+ setup. Daily trend is bullish. Lower timeframe mitigated order block perfectly with surging volume confirmation.',
+      pnlR: 5.0,
     }
-  };
+  ];
 
-  const handleCreateKeepNote = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!token) return;
-    if (!newNoteTitle.trim() && !newNoteText.trim()) return;
-
-    setIsCreatingKeepNote(true);
-    try {
-      await createKeepNote(token, newNoteTitle.trim(), newNoteText.trim());
-      setNewNoteTitle('');
-      setNewNoteText('');
-      await loadKeepNotes(token);
-    } catch (error: any) {
-      console.error('Error creating Keep note:', error);
-      alert('Google Keep API Error: ' + (error.message || 'Failed to create note'));
-    } finally {
-      setIsCreatingKeepNote(false);
+  const defaultMacroLogs = [
+    {
+      id: 'macro-1',
+      date: '2026-08-16',
+      weeklyBias: 'Bearish' as 'Bullish' | 'Bearish' | 'Ranging',
+      fundamentalSentiment: 'Hawkish FOMC expectations and rising US yields supporting DXY. Core CPI due soon might beat expectations.',
+      correlationNotes: 'XAUUSD correlated negatively with DXY. Strong bearish pressure on Gold as DXY reclaims 104.5 key daily zone.',
+      keyDemandSupply: 'Major supply at 2540-2550 on XAUUSD Daily chart. Daily demand sitting at 2480-2490.',
+      timeframeMatrix: {
+        m1: 'Bullish' as 'Bullish' | 'Bearish' | 'Ranging',
+        w1: 'Bearish' as 'Bullish' | 'Bearish' | 'Ranging',
+        d1: 'Bearish' as 'Bullish' | 'Bearish' | 'Ranging',
+        h4: 'Bearish' as 'Bullish' | 'Bearish' | 'Ranging',
+        h1: 'Bearish' as 'Bullish' | 'Bearish' | 'Ranging',
+      }
     }
-  };
+  ];
 
-  // Local/Personal fallback notes handlers
+  // Local Storage Synchronization Hooks
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('trading_fallback_notes');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          setTimeout(() => {
-            setFallbackNotes(parsed);
-          }, 0);
-        } catch (e) {
-          console.error('Error parsing fallback notes:', e);
-        }
+      const savedMicro = localStorage.getItem('trading_micro_logs');
+      if (savedMicro) {
+        try { setMicroLogs(JSON.parse(savedMicro)); } catch (e) {}
+      } else {
+        setMicroLogs(defaultMicroLogs);
       }
+      setIsMicroLoaded(true);
+
+      const savedMacro = localStorage.getItem('trading_macro_logs');
+      if (savedMacro) {
+        try { setMacroLogs(JSON.parse(savedMacro)); } catch (e) {}
+      } else {
+        setMacroLogs(defaultMacroLogs);
+      }
+      setIsMacroLoaded(true);
     }
   }, []);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('trading_fallback_notes', JSON.stringify(fallbackNotes));
+    if (isMicroLoaded && typeof window !== 'undefined') {
+      localStorage.setItem('trading_micro_logs', JSON.stringify(microLogs));
     }
-  }, [fallbackNotes]);
+  }, [microLogs, isMicroLoaded]);
 
-  const handleAddFallbackNote = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (isMacroLoaded && typeof window !== 'undefined') {
+      localStorage.setItem('trading_macro_logs', JSON.stringify(macroLogs));
+    }
+  }, [macroLogs, isMacroLoaded]);
+
+  // Micro Handlers
+  const handleAddMicroLog = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fallbackNoteTitle.trim() && !fallbackNoteText.trim()) return;
-    const newNote = {
-      id: `fallback-note-${Date.now()}`,
-      title: fallbackNoteTitle.trim(),
-      content: fallbackNoteText.trim(),
-      date: new Date().toLocaleDateString('my-MM', { year: 'numeric', month: 'short', day: 'numeric' })
+    if (!microAsset.trim()) return;
+
+    // Calculate score based on checklist
+    let checkCount = 0;
+    if (microChecklist.structureAligned) checkCount++;
+    if (microChecklist.liquiditySwept) checkCount++;
+    if (microChecklist.fvgTested) checkCount++;
+    if (microChecklist.blockRefined) checkCount++;
+    if (microChecklist.volumeConfirmed) checkCount++;
+    const score = checkCount * 20;
+
+    const newLog = {
+      id: `micro-${Date.now()}`,
+      date: new Date().toISOString().slice(0, 10),
+      asset: microAsset.toUpperCase().trim(),
+      setupType: microSetupType,
+      score,
+      ltfChecklist: { ...microChecklist },
+      entryNotes: microEntryNotes.trim(),
+      pnlR: microPnlR
     };
-    setFallbackNotes([newNote, ...fallbackNotes]);
-    setFallbackNoteTitle('');
-    setFallbackNoteText('');
+
+    setMicroLogs([newLog, ...microLogs]);
+    setMicroEntryNotes('');
+    setMicroChecklist({
+      structureAligned: false,
+      liquiditySwept: false,
+      fvgTested: false,
+      blockRefined: false,
+      volumeConfirmed: false,
+    });
   };
 
-  const handleDeleteFallbackNote = (id: string) => {
-    // Note deletion is made fully direct and iframe-safe, avoiding window.confirm blocks in iFrames
-    setFallbackNotes(fallbackNotes.filter(n => n.id !== id));
+  const handleDeleteMicroLog = (id: string) => {
+    setMicroLogs(microLogs.filter(log => log.id !== id));
   };
 
-  const handleDownloadNote = (note: { title: string; content: string; date: string }) => {
-    const text = `Title: ${note.title || 'Untitled Note'}\nDate: ${note.date || ''}\n-----------------------------------------\n\n${note.content || ''}`;
+  const handleDownloadMicroLogs = () => {
+    if (microLogs.length === 0) return;
+    const text = microLogs.map(log => 
+      `Date: ${log.date}\nAsset: ${log.asset}\nSetup: ${log.setupType} (Quality Score: ${log.score}%)\nPnL (R-multiple): ${log.pnlR}R\nLTF Checklist:\n - Structure Aligned: ${log.ltfChecklist.structureAligned ? 'Yes' : 'No'}\n - Liquidity Swept: ${log.ltfChecklist.liquiditySwept ? 'Yes' : 'No'}\n - FVG Tested: ${log.ltfChecklist.fvgTested ? 'Yes' : 'No'}\n - Order Block Refined: ${log.ltfChecklist.blockRefined ? 'Yes' : 'No'}\n - Volume Confirmation: ${log.ltfChecklist.volumeConfirmed ? 'Yes' : 'No'}\nNotes: ${log.entryNotes}\n`
+    ).join('\n' + '='.repeat(40) + '\n\n');
     const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${(note.title || 'note').replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}.txt`;
+    a.download = `micro_analysis_logs_${new Date().toISOString().slice(0, 10)}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
 
-  const handleDownloadAllNotes = () => {
-    if (fallbackNotes.length === 0) return;
-    const separator = '\n\n' + '='.repeat(50) + '\n\n';
-    const text = fallbackNotes.map(note => 
-      `Title: ${note.title || 'Untitled Note'}\nDate: ${note.date || ''}\n-----------------------------------------\n\n${note.content || ''}`
-    ).join(separator);
+  // Macro Handlers
+  const handleAddMacroLog = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newLog = {
+      id: `macro-${Date.now()}`,
+      date: new Date().toISOString().slice(0, 10),
+      weeklyBias: macroWeeklyBias,
+      fundamentalSentiment: macroFundamentalSentiment.trim(),
+      correlationNotes: macroCorrelationNotes.trim(),
+      keyDemandSupply: macroKeyDemandSupply.trim(),
+      timeframeMatrix: { ...macroTimeframeMatrix }
+    };
+
+    setMacroLogs([newLog, ...macroLogs]);
+    setMacroFundamentalSentiment('');
+    setMacroCorrelationNotes('');
+    setMacroKeyDemandSupply('');
+  };
+
+  const handleDeleteMacroLog = (id: string) => {
+    setMacroLogs(macroLogs.filter(log => log.id !== id));
+  };
+
+  const handleDownloadMacroLogs = () => {
+    if (macroLogs.length === 0) return;
+    const text = macroLogs.map(log => 
+      `Date: ${log.date}\nWeekly Market Bias: ${log.weeklyBias}\nFundamental & Sentiment factors: ${log.fundamentalSentiment}\nIntermarket Correlation Notes: ${log.correlationNotes}\nKey Supply & Demand Levels: ${log.keyDemandSupply}\nMulti-Timeframe Structure Matrix:\n - Monthly: ${log.timeframeMatrix.m1}\n - Weekly: ${log.timeframeMatrix.w1}\n - Daily: ${log.timeframeMatrix.d1}\n - 4-Hour: ${log.timeframeMatrix.h4}\n - 1-Hour: ${log.timeframeMatrix.h1}\n`
+    ).join('\n' + '='.repeat(40) + '\n\n');
     const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `trading_notes_backup_${new Date().toISOString().slice(0, 10)}.txt`;
+    a.download = `macro_analysis_logs_${new Date().toISOString().slice(0, 10)}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -573,9 +679,6 @@ export default function Home() {
       await loadDocContent(accessToken, docId);
       await loadAvailableDocs(accessToken);
       
-      // Load Google Keep Notes
-      await loadKeepNotes(accessToken);
-
     } catch (error) {
       console.error('Error bootstrapping Google Files:', error);
     } finally {
@@ -981,7 +1084,6 @@ export default function Home() {
     if (!token) return;
     if (spreadsheetId) await loadTrades(token, spreadsheetId);
     if (documentId) await loadDocContent(token, documentId);
-    await loadKeepNotes(token);
     if (user?.uid) await loadLearningNotes(user.uid);
   };
 
@@ -1339,27 +1441,27 @@ export default function Home() {
               </button>
 
               <button
-                onClick={() => { setActiveTab('notes'); setIsMobileMenuOpen(false); }}
+                onClick={() => { setActiveTab('micro'); setIsMobileMenuOpen(false); }}
                 className={`flex items-center space-x-3 w-full px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150 cursor-pointer ${
-                  activeTab === 'notes'
+                  activeTab === 'micro'
                     ? 'bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-950 shadow-sm'
                     : isDarkMode ? 'hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200' : 'hover:bg-slate-50 text-slate-600 hover:text-slate-900'
                 }`}
               >
-                <FileText className="h-4 w-4" />
-                <span>Trading Notes (Docs)</span>
+                <Target className="h-4 w-4" />
+                <span>Micro Analysis</span>
               </button>
 
               <button
-                onClick={() => { setActiveTab('keep'); setIsMobileMenuOpen(false); }}
+                onClick={() => { setActiveTab('macro'); setIsMobileMenuOpen(false); }}
                 className={`flex items-center space-x-3 w-full px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150 cursor-pointer ${
-                  activeTab === 'keep'
+                  activeTab === 'macro'
                     ? 'bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-950 shadow-sm'
                     : isDarkMode ? 'hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200' : 'hover:bg-slate-50 text-slate-600 hover:text-slate-900'
                 }`}
               >
-                <StickyNote className="h-4 w-4" />
-                <span>Local Notes (မှတ်စုများ)</span>
+                <Globe className="h-4 w-4" />
+                <span>Macro Analysis</span>
               </button>
 
               <button
@@ -1498,23 +1600,23 @@ export default function Home() {
                   </button>
                   
                   <button
-                    onClick={() => { setActiveTab('notes'); setIsMobileMenuOpen(false); }}
+                    onClick={() => { setActiveTab('micro'); setIsMobileMenuOpen(false); }}
                     className={`flex items-center space-x-3 w-full px-3 py-3 rounded-xl text-xs sm:text-sm font-semibold cursor-pointer ${
-                      activeTab === 'notes' ? 'bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-950' : isDarkMode ? 'text-zinc-400 hover:bg-zinc-800' : 'text-slate-600 hover:bg-slate-100'
+                      activeTab === 'micro' ? 'bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-950' : isDarkMode ? 'text-zinc-400 hover:bg-zinc-800' : 'text-slate-600 hover:bg-slate-100'
                     }`}
                   >
-                    <FileText className="h-4.5 w-4.5" />
-                    <span>Trading Notes (Docs)</span>
+                    <Target className="h-4.5 w-4.5" />
+                    <span>Micro Analysis</span>
                   </button>
                   
                   <button
-                    onClick={() => { setActiveTab('keep'); setIsMobileMenuOpen(false); }}
+                    onClick={() => { setActiveTab('macro'); setIsMobileMenuOpen(false); }}
                     className={`flex items-center space-x-3 w-full px-3 py-3 rounded-xl text-xs sm:text-sm font-semibold cursor-pointer ${
-                      activeTab === 'keep' ? 'bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-950' : isDarkMode ? 'text-zinc-400 hover:bg-zinc-800' : 'text-slate-600 hover:bg-slate-100'
+                      activeTab === 'macro' ? 'bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-950' : isDarkMode ? 'text-zinc-400 hover:bg-zinc-800' : 'text-slate-600 hover:bg-slate-100'
                     }`}
                   >
-                    <StickyNote className="h-4.5 w-4.5" />
-                    <span>Local Notes (မှတ်စုများ)</span>
+                    <Globe className="h-4.5 w-4.5" />
+                    <span>Macro Analysis</span>
                   </button>
 
                   <button
@@ -1722,90 +1824,80 @@ export default function Home() {
                 <div>
                   <h2 className="text-xl font-bold tracking-tight">
                     {activeTab === 'journal' && 'Trading Journal (အရောင်းအဝယ်မှတ်တမ်း)'}
-                    {activeTab === 'notes' && 'Strategy Notes (ကိုယ်ပိုင်မဟာဗျူဟာများ)'}
-                    {activeTab === 'keep' && 'Local Notes (အမြန်မှတ်စုများ)'}
+                    {activeTab === 'micro' && 'Micro Analysis (အသေးစိတ်အရောင်းအဝယ်ဆန်းစစ်ချက်)'}
+                    {activeTab === 'macro' && 'Macro Analysis (အကြီးစားဈေးကွက်ဆန်းစစ်ချက်)'}
+                    {activeTab === 'alignment' && 'Alignment Calculator (Trend အဝင်ကိုက်တွက်ချက်မှု)'}
+                    {activeTab === 'learning' && 'Learning Notes (သင်ခန်းစာမှတ်တမ်း)'}
                   </h2>
                   <p className="text-xs text-zinc-500 mt-0.5">
                     {activeTab === 'journal' && 'Google Sheets နှင့် ချိတ်ဆက်ထားသော trade data မှတ်တမ်းဇယား'}
-                    {activeTab === 'notes' && 'Google Doc နှင့် တိုက်ရိုက်ချိတ်ဆက်ထားသော strategy မှတ်စုစာမျက်နှာ'}
-                    {activeTab === 'keep' && 'သင်၏ Trading Note မှတ်စုစာစုများ နှင့် backup notes စနစ်'}
+                    {activeTab === 'micro' && 'သတ်မှတ်ထားသော trade တစ်ခုချင်းစီ၏ entry details, risk matrix နှင့် setup အရည်အသွေး ဆန်းစစ်ချက်'}
+                    {activeTab === 'macro' && 'ဈေးကွက်၏ trend ကြီးများ၊ multi-timeframe alignment နှင့် သတင်း/အခြေခံအချက်အလက် ဆန်းစစ်ချက်'}
+                    {activeTab === 'alignment' && 'Trend alignment နှင့် multi-timeframe concordance တွက်ချက်ခြင်း'}
+                    {activeTab === 'learning' && 'ကိုယ်ပိုင်သင်ယူလေ့လာမှုများနှင့် trade setup screenshot မှတ်စုများ'}
                   </p>
                 </div>
 
                 {/* Sync Indicators & Google Direct Links */}
                 <div className="flex items-center flex-wrap gap-2.5 text-xs">
-                  <button
-                    onClick={triggerRefresh}
-                    className={`flex items-center space-x-1.5 px-3.5 py-2 border rounded-xl font-semibold transition-all duration-150 cursor-pointer ${
-                      isDarkMode 
-                        ? 'bg-zinc-800/50 hover:bg-zinc-800 border-zinc-700/50 text-zinc-300 hover:text-white' 
-                        : 'bg-slate-50 border-slate-200 hover:bg-slate-100 hover:text-slate-900 text-slate-600'
-                    }`}
-                    title="Google Workspace မှ Data များ တစ်ပြိုင်နက် Sync ပြန်လုပ်ပါ"
-                  >
-                    <RefreshCw className={`h-3.5 w-3.5 ${isLoadingTrades || isDocLoading || isKeepLoading ? 'animate-spin' : ''}`} />
-                    <span>Sync Refresh</span>
-                  </button>
-                  
-                  {spreadsheetId && (
-                    <a
-                      href={`https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl font-semibold border transition-all duration-150 ${
-                        isDarkMode 
-                          ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700/85 border-zinc-750' 
-                          : 'bg-slate-100 text-slate-800 hover:bg-slate-200 border-slate-200/80'
-                      }`}
-                    >
-                      <span>Sheets ဖွင့်ရန်</span>
-                      <ExternalLink className="h-3.5 w-3.5" />
-                    </a>
+                  {activeTab === 'journal' && (
+                    <>
+                      <button
+                        onClick={triggerRefresh}
+                        className={`flex items-center space-x-1.5 px-3.5 py-2 border rounded-xl font-semibold transition-all duration-150 cursor-pointer ${
+                          isDarkMode 
+                            ? 'bg-zinc-800/50 hover:bg-zinc-800 border-zinc-700/50 text-zinc-300 hover:text-white' 
+                            : 'bg-slate-50 border-slate-200 hover:bg-slate-100 hover:text-slate-900 text-slate-600'
+                        }`}
+                        title="Google Workspace မှ Data များ တစ်ပြိုင်နက် Sync ပြန်လုပ်ပါ"
+                      >
+                        <RefreshCw className={`h-3.5 w-3.5 ${isLoadingTrades ? 'animate-spin' : ''}`} />
+                        <span>Sync Refresh</span>
+                      </button>
+                      {spreadsheetId && (
+                        <a
+                          href={`https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl font-semibold border transition-all duration-150 ${
+                            isDarkMode 
+                              ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700/85 border-zinc-750' 
+                              : 'bg-slate-100 text-slate-800 hover:bg-slate-200 border-slate-200/80'
+                          }`}
+                        >
+                          <span>Sheets ဖွင့်ရန်</span>
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </a>
+                      )}
+                    </>
                   )}
-                  {documentId && (
-                    <a
-                      href={`https://docs.google.com/document/d/${documentId}/edit`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl font-semibold border transition-all duration-150 ${
+
+                  {activeTab === 'micro' && (
+                    <button
+                      onClick={handleDownloadMicroLogs}
+                      className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl font-semibold border transition-all duration-150 cursor-pointer ${
                         isDarkMode 
                           ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700/85 border-zinc-750' 
                           : 'bg-slate-100 text-slate-800 hover:bg-slate-200 border-slate-200/80'
                       }`}
                     >
-                      <span>Docs ဖွင့်ရန်</span>
-                      <ExternalLink className="h-3.5 w-3.5" />
-                    </a>
+                      <Download className="h-3.5 w-3.5" />
+                      <span>Backup Micro Logs</span>
+                    </button>
                   )}
-                  {(spreadsheetId || documentId) && (
-                    <a
-                      href="https://drive.google.com/"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl font-semibold border transition-all duration-150 ${
+
+                  {activeTab === 'macro' && (
+                    <button
+                      onClick={handleDownloadMacroLogs}
+                      className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl font-semibold border transition-all duration-150 cursor-pointer ${
                         isDarkMode 
                           ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700/85 border-zinc-750' 
                           : 'bg-slate-100 text-slate-800 hover:bg-slate-200 border-slate-200/80'
                       }`}
                     >
-                      <span>Google Drive ဖွင့်ရန်</span>
-                      <ExternalLink className="h-3.5 w-3.5" />
-                    </a>
-                  )}
-                  {activeTab === 'keep' && (
-                    <a
-                      href="https://keep.google.com"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl font-semibold border transition-all duration-150 ${
-                        isDarkMode 
-                          ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700/85 border-zinc-750' 
-                          : 'bg-slate-100 text-slate-800 hover:bg-slate-200 border-slate-200/80'
-                      }`}
-                    >
-                      <span>Keep ဖွင့်ရန်</span>
-                      <ExternalLink className="h-3.5 w-3.5" />
-                    </a>
+                      <Download className="h-3.5 w-3.5" />
+                      <span>Backup Macro Logs</span>
+                    </button>
                   )}
                 </div>
               </div>
@@ -2413,298 +2505,548 @@ export default function Home() {
               </div>
             )}
 
-            {/* TRADING NOTES (DOCS) TAB VIEW */}
-            {activeTab === 'notes' && (
-              <div className="space-y-6">
-                <div className={`p-5 rounded-2xl border transition-all ${
-                  isDarkMode ? 'bg-zinc-900/40 border-zinc-800/80 text-zinc-100' : 'bg-white border-slate-200 shadow-xs'
-                }`}>
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-                    <div>
-                      <h4 className={`text-lg font-bold flex items-center gap-2 ${isDarkMode ? 'text-zinc-100' : 'text-slate-900'}`}>
-                        <FileText className="h-5 w-5 text-emerald-600" />
-                        Trading Notes & Journal Workspaces
-                      </h4>
-                      <p className="text-xs text-slate-400">သင့်၏ စိတ်ကြိုက်အတွေ့အကြုံများနှင့် Strategy များကို Google Doc တွင် အလိုအလျောက် ပေါင်းစပ်သိမ်းဆည်းပေးမည်ဖြစ်ပါသည်။</p>
-                    </div>
-
-                    <div className="flex items-center space-x-3 self-end sm:self-center">
-                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-md border ${
-                        docSaveStatus === 'saved' ? (isDarkMode ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-emerald-50 border-emerald-100 text-emerald-700') :
-                        docSaveStatus === 'dirty' ? (isDarkMode ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-amber-50 border-amber-100 text-amber-700') :
-                        docSaveStatus === 'saving' ? (isDarkMode ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400 animate-pulse' : 'bg-emerald-50 border-emerald-100 text-emerald-700 animate-pulse') :
-                        (isDarkMode ? 'bg-rose-500/10 border-rose-500/20 text-rose-400' : 'bg-rose-50 border-rose-100 text-rose-700')
-                      }`}>
-                        {docSaveStatus === 'saved' ? 'Saved to Google Doc' :
-                         docSaveStatus === 'dirty' ? 'Unsaved Draft' :
-                         docSaveStatus === 'saving' ? 'Saving to Google...' :
-                         'Saving Error'}
-                      </span>
-
-                      <button
-                        onClick={handleSaveNotes}
-                        disabled={isDocLoading || docSaveStatus === 'saving'}
-                        className="inline-flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-semibold text-sm px-4 py-2 rounded-xl shadow-md shadow-emerald-50/5 transition-all duration-200 cursor-pointer"
-                      >
-                        <Check className="h-4 w-4" />
-                        <span>Save Notes</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* DOCUMENT LIST & CREATOR BLOCK */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 p-4 rounded-xl border border-slate-100 dark:border-zinc-800 bg-slate-50/40 dark:bg-zinc-950/20">
-                    <div>
-                      <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
-                        ၁။ မှတ်စုစာအုပ် ရွေးချယ်ရန် (Active Document)
-                      </label>
-                      <div className="relative flex items-center">
-                        <select
-                          value={documentId || ''}
-                          onChange={(e) => handleSelectDoc(e.target.value)}
-                          className={`appearance-none w-full pl-3 pr-10 py-2 border rounded-xl text-xs font-semibold focus:outline-hidden focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10 cursor-pointer ${
-                            isDarkMode ? 'bg-zinc-900 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 text-slate-700'
-                          }`}
-                        >
-                          {availableDocs.map((doc, idx) => (
-                            <option key={doc.id ? `doc-${doc.id}-${idx}` : `doc-idx-${idx}`} value={doc.id}>
-                              📓 {doc.name.replace('Trading Notes - ', '').replace('Trading Notes (AI Studio)', 'မူလပင်မ Trading Notes')}
-                            </option>
-                          ))}
-                        </select>
-                        <ChevronDown className="h-4 w-4 absolute right-3 pointer-events-none text-slate-400 dark:text-zinc-500" />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
-                        ၂။ Note အသစ်မှတ်ရန် ခေါင်းစဉ်အသစ် ဖန်တီးရန် (New Note Document)
-                      </label>
-                      <form onSubmit={handleCreateNewDoc} className="flex gap-2">
-                        <input
-                          type="text"
-                          value={newDocTitle}
-                          onChange={(e) => setNewDocTitle(e.target.value)}
-                          placeholder="ဥပမာ- Gold Strategy, Weekly Plan, Risk Management..."
-                          className={`flex-1 px-3 py-2 border rounded-xl text-xs focus:outline-hidden focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10 ${
-                            isDarkMode ? 'bg-zinc-900 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 text-slate-700'
-                          }`}
-                        />
-                        <button
-                          type="submit"
-                          disabled={isCreatingDoc || !newDocTitle.trim()}
-                          className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs px-4 py-2 rounded-xl transition-all duration-200 cursor-pointer shrink-0"
-                        >
-                          {isCreatingDoc ? 'ဖန်တီးနေသည်...' : '+ Note အသစ်'}
-                        </button>
-                      </form>
-                    </div>
-                  </div>
-
-                  {isDocLoading ? (
-                    <div className={`h-96 flex flex-col items-center justify-center border border-dashed rounded-xl ${
-                      isDarkMode ? 'border-zinc-800 bg-zinc-900/20' : 'border-slate-200 bg-slate-50/50'
-                    }`}>
-                      <RefreshCw className="h-8 w-8 text-emerald-600 animate-spin mb-2" />
-                      <span className="text-xs font-bold text-slate-500">Google Docs မှ စာမျက်နှာအချက်အလက်များ ဖတ်ရှုနေပါသည်...</span>
-                    </div>
-                  ) : (
-                    <div className="relative">
-                      <textarea
-                        value={docText}
-                        onChange={(e) => {
-                          setDocText(e.target.value);
-                          setDocSaveStatus('dirty');
-                        }}
-                        placeholder="သင်၏ trading အတွေးအမြင်များ၊ Strategy များ၊ သတိထားရမည့်အချက်များအားလုံးကို စိတ်ကြိုက် ရေးသားမှတ်သားနိုင်ပါသည်။"
-                        rows={16}
-                        className={`w-full p-4 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all duration-200 leading-relaxed font-mono ${
-                          isDarkMode 
-                            ? 'bg-zinc-950 border-zinc-800 text-zinc-100' 
-                            : 'bg-slate-50 border-slate-200 text-slate-800'
-                        }`}
-                      />
-                      <div className="absolute bottom-3 right-3 text-[10px] text-slate-400 font-semibold pointer-events-none">
-                        Characters: {docText.length}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Helpful guides block */}
-                <div className={`p-4 rounded-xl flex items-start space-x-3 border ${
-                  isDarkMode 
-                    ? 'bg-amber-950/10 border-amber-500/20 text-amber-300' 
-                    : 'bg-amber-50 border-amber-200 text-amber-800'
-                }`}>
-                  <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
-                  <div>
-                    <h5 className="font-bold text-sm">မှတ်သားရန်</h5>
-                    <p className="text-xs mt-1 leading-relaxed">
-                      &quot;Save Notes&quot; ခလုတ်ကို နှိပ်လိုက်သည့်အခါတွင် Google Doc ရှိ စာသားအားလုံးကို လက်ရှိရေးသားထားသော စာသားများဖြင့် အစားထိုး သိမ်းဆည်းသွားမည်ဖြစ်ပါသည်။ Google Doc API update တိုက်ရိုက်လုပ်ဆောင်ရန် အထက်ပါ link မှလည်း Docs ထဲဝင်ရောက်ပြီး စိတ်ကြိုက် format များဖြင့် တိုက်ရိုက်ရေးသားပြင်ဆင်နိုင်ပါသည်။
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* LOCAL NOTES WORKSPACE VIEW */}
-            {activeTab === 'keep' && (
+            {/* MICRO ANALYSIS VIEW */}
+            {activeTab === 'micro' && (
               <div className="space-y-6">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                  {/* Create Local Note Form Column */}
+                  {/* Left Column: Create Setup Log / Entry Evaluation Form */}
                   <div className={`p-6 rounded-2xl border transition-all lg:col-span-1 h-fit ${
                     isDarkMode ? 'bg-zinc-900/40 border-zinc-800/80 text-zinc-100' : 'bg-white border-slate-200/80 shadow-xs text-slate-800'
                   }`}>
                     <div className="flex items-center space-x-3 mb-5 pb-4 border-b border-zinc-200/30 dark:border-zinc-800/80">
                       <div className="bg-emerald-500/10 p-2 rounded-xl text-emerald-500">
-                        <StickyNote className="h-6 w-6" />
+                        <Target className="h-6 w-6" />
                       </div>
                       <div>
-                        <h4 className="text-md font-bold">Note အသစ်ရေးသားရန်</h4>
-                        <p className="text-xs text-zinc-500 mt-0.5">အော့ဖ်လိုင်း/ကွန်ပျူတာပေါ် တိုက်ရိုက်သိမ်းရန်</p>
+                        <h4 className="text-md font-bold">New Setup Evaluation</h4>
+                        <p className="text-xs text-zinc-500 mt-0.5">အသေးစိတ် setup အရည်အသွေး ဆန်းစစ်ရန်</p>
                       </div>
                     </div>
 
-                    <form onSubmit={handleAddFallbackNote} className="space-y-4">
+                    <form onSubmit={handleAddMicroLog} className="space-y-4">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className={`block text-[11px] font-bold uppercase tracking-wider mb-1.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                            Asset Pair
+                          </label>
+                          <input
+                            type="text"
+                            value={microAsset}
+                            onChange={(e) => setMicroAsset(e.target.value)}
+                            placeholder="EURUSD, Gold..."
+                            required
+                            className={`w-full p-2.5 rounded-xl text-xs font-semibold border focus:outline-hidden transition-all ${
+                              isDarkMode 
+                                ? 'bg-zinc-900 border-zinc-800 focus:border-slate-500/50 focus:ring-2 focus:ring-slate-500/10 text-zinc-100' 
+                                : 'bg-slate-50 border-slate-200 focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 text-slate-800'
+                            }`}
+                          />
+                        </div>
+                        <div>
+                          <label className={`block text-[11px] font-bold uppercase tracking-wider mb-1.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                            Setup Type
+                          </label>
+                          <select
+                            value={microSetupType}
+                            onChange={(e) => setMicroSetupType(e.target.value)}
+                            className={`w-full p-2.5 rounded-xl text-xs font-semibold border focus:outline-hidden transition-all cursor-pointer ${
+                              isDarkMode 
+                                ? 'bg-zinc-900 border-zinc-800 text-zinc-100' 
+                                : 'bg-slate-50 border-slate-200 text-slate-800'
+                            }`}
+                          >
+                            <option value="Order Block">Order Block</option>
+                            <option value="Liquidity Hunt">Liquidity Hunt</option>
+                            <option value="FVG Mitigation">FVG Mitigation</option>
+                            <option value="Break of Structure">Break of Structure</option>
+                            <option value="Silver Bullet">Silver Bullet</option>
+                          </select>
+                        </div>
+                      </div>
+
                       <div>
+                        <div className="flex justify-between items-center mb-1.5">
+                          <label className={`block text-[11px] font-bold uppercase tracking-wider ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                            Risk PnL Target (R-Multiple)
+                          </label>
+                          <span className="text-xs font-bold text-emerald-500">{microPnlR}R</span>
+                        </div>
                         <input
-                          type="text"
-                          placeholder="ခေါင်းစဉ် (Title)..."
-                          value={fallbackNoteTitle}
-                          onChange={(e) => setFallbackNoteTitle(e.target.value)}
-                          className={`w-full p-3 rounded-xl text-sm font-semibold border focus:outline-hidden transition-all ${
-                            isDarkMode 
-                              ? 'bg-zinc-900 border-zinc-800 focus:border-slate-500/50 focus:ring-4 focus:ring-slate-500/10 text-zinc-100' 
-                              : 'bg-slate-50 border-slate-200 focus:border-slate-500 focus:ring-4 focus:ring-slate-500/10 text-slate-800'
-                          }`}
+                          type="range"
+                          min="0.5"
+                          max="15"
+                          step="0.5"
+                          value={microPnlR}
+                          onChange={(e) => setMicroPnlR(parseFloat(e.target.value))}
+                          className="w-full h-1.5 bg-slate-200 dark:bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
                         />
                       </div>
+
+                      <div className="space-y-2 border-t border-b border-zinc-200/30 dark:border-zinc-800/80 py-3 my-2">
+                        <span className={`block text-[10px] font-bold uppercase tracking-wider ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                          LTF Checklist (Lower Timeframe Validation)
+                        </span>
+
+                        <label className="flex items-center space-x-3 cursor-pointer text-xs">
+                          <input
+                            type="checkbox"
+                            checked={microChecklist.structureAligned}
+                            onChange={(e) => setMicroChecklist({ ...microChecklist, structureAligned: e.target.checked })}
+                            className="rounded-sm border-slate-300 dark:border-zinc-750 text-emerald-600 focus:ring-emerald-500 h-4 w-4"
+                          />
+                          <span className={isDarkMode ? 'text-zinc-300' : 'text-slate-700'}>Structure Aligned with HTF Trend</span>
+                        </label>
+
+                        <label className="flex items-center space-x-3 cursor-pointer text-xs">
+                          <input
+                            type="checkbox"
+                            checked={microChecklist.liquiditySwept}
+                            onChange={(e) => setMicroChecklist({ ...microChecklist, liquiditySwept: e.target.checked })}
+                            className="rounded-sm border-slate-300 dark:border-zinc-750 text-emerald-600 focus:ring-emerald-500 h-4 w-4"
+                          />
+                          <span className={isDarkMode ? 'text-zinc-300' : 'text-slate-700'}>Liquidity Hunt / Sweep Confirmed</span>
+                        </label>
+
+                        <label className="flex items-center space-x-3 cursor-pointer text-xs">
+                          <input
+                            type="checkbox"
+                            checked={microChecklist.fvgTested}
+                            onChange={(e) => setMicroChecklist({ ...microChecklist, fvgTested: e.target.checked })}
+                            className="rounded-sm border-slate-300 dark:border-zinc-750 text-emerald-600 focus:ring-emerald-500 h-4 w-4"
+                          />
+                          <span className={isDarkMode ? 'text-zinc-300' : 'text-slate-700'}>FVG Mitigation (Fair Value Gap)</span>
+                        </label>
+
+                        <label className="flex items-center space-x-3 cursor-pointer text-xs">
+                          <input
+                            type="checkbox"
+                            checked={microChecklist.blockRefined}
+                            onChange={(e) => setMicroChecklist({ ...microChecklist, blockRefined: e.target.checked })}
+                            className="rounded-sm border-slate-300 dark:border-zinc-750 text-emerald-600 focus:ring-emerald-500 h-4 w-4"
+                          />
+                          <span className={isDarkMode ? 'text-zinc-300' : 'text-slate-700'}>Order Block Refined on LTF (1m/5m)</span>
+                        </label>
+
+                        <label className="flex items-center space-x-3 cursor-pointer text-xs">
+                          <input
+                            type="checkbox"
+                            checked={microChecklist.volumeConfirmed}
+                            onChange={(e) => setMicroChecklist({ ...microChecklist, volumeConfirmed: e.target.checked })}
+                            className="rounded-sm border-slate-300 dark:border-zinc-750 text-emerald-600 focus:ring-emerald-500 h-4 w-4"
+                          />
+                          <span className={isDarkMode ? 'text-zinc-300' : 'text-slate-700'}>Volume / Delta Surge Confirmed</span>
+                        </label>
+                      </div>
+
                       <div>
+                        <label className={`block text-[11px] font-bold uppercase tracking-wider mb-1.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                          Entry Evaluation Notes
+                        </label>
                         <textarea
-                          placeholder="အသေးစိတ်အချက်အလက်များ ရေးသားပါ..."
-                          value={fallbackNoteText}
-                          onChange={(e) => setFallbackNoteText(e.target.value)}
-                          rows={6}
-                          className={`w-full p-3 rounded-xl text-sm border focus:outline-hidden transition-all leading-relaxed ${
+                          value={microEntryNotes}
+                          onChange={(e) => setMicroEntryNotes(e.target.value)}
+                          placeholder="အဝင် trade ၏ အခြေအနေ၊ စိတ်ခံစားမှု သို့မဟုတ် analysis အသေးစိတ်များကို ရေးသားပါ..."
+                          rows={4}
+                          className={`w-full p-2.5 rounded-xl text-xs border focus:outline-hidden transition-all leading-relaxed ${
                             isDarkMode 
-                              ? 'bg-zinc-900 border-zinc-800 focus:border-slate-500/50 focus:ring-4 focus:ring-slate-500/10 text-zinc-100' 
-                              : 'bg-slate-50 border-slate-200 focus:border-slate-500 focus:ring-4 focus:ring-slate-500/10 text-slate-800'
+                              ? 'bg-zinc-900 border-zinc-800 focus:border-slate-500/50 focus:ring-2 focus:ring-slate-500/10 text-zinc-100' 
+                              : 'bg-slate-50 border-slate-200 focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 text-slate-800'
                           }`}
                         />
                       </div>
+
                       <button
                         type="submit"
-                        disabled={!fallbackNoteTitle.trim() && !fallbackNoteText.trim()}
-                        className="w-full inline-flex items-center justify-center space-x-2 bg-slate-900 hover:bg-slate-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 text-white dark:text-zinc-950 font-bold text-sm px-4 py-3 rounded-xl transition-all cursor-pointer shadow-xs disabled:opacity-50"
+                        className="w-full inline-flex items-center justify-center space-x-2 bg-slate-900 hover:bg-slate-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 text-white dark:text-zinc-950 font-bold text-xs px-4 py-3 rounded-xl transition-all cursor-pointer shadow-xs"
                       >
                         <Plus className="h-4 w-4" />
-                        <span>Local Note အသစ်သိမ်းရန်</span>
+                        <span>Save Setup Log (မှတ်တမ်းသိမ်းရန်)</span>
                       </button>
                     </form>
                   </div>
 
-                  {/* Local Notes List Column */}
+                  {/* Right Column: Setup Quality Scoring and Log List */}
                   <div className={`p-6 rounded-2xl border transition-all lg:col-span-2 ${
                     isDarkMode ? 'bg-zinc-900/40 border-zinc-800/80' : 'bg-white border-slate-200/80 shadow-xs'
                   }`}>
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5 border-b pb-4 border-zinc-200/30 dark:border-zinc-800/80">
-                      <div>
-                        <h4 className="text-lg font-bold flex items-center gap-2">
-                          <BookOpen className="h-5 w-5 text-slate-500 dark:text-zinc-400" />
-                          သိမ်းဆည်းထားသော Local Notes များ ({fallbackNotes.length})
-                        </h4>
-                        <p className="text-xs text-zinc-500 mt-0.5">မည်သည့် account မဆို Browser storage တွင် အော့ဖ်လိုင်းအပြည့်အဝ အခမဲ့သုံးနိုင်သောစနစ်</p>
+                    {/* Setup Analytics cards */}
+                    <div className="grid grid-cols-3 gap-3 mb-6">
+                      <div className={`p-3.5 rounded-xl border ${
+                        isDarkMode ? 'bg-zinc-950/40 border-zinc-800' : 'bg-slate-50/50 border-slate-100'
+                      }`}>
+                        <span className="text-[10px] uppercase font-bold text-slate-400">Total Setup</span>
+                        <div className="text-xl font-black mt-0.5">{microLogs.length}</div>
                       </div>
-
-                      {fallbackNotes.length > 0 && (
-                        <button
-                          onClick={handleDownloadAllNotes}
-                          className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all duration-150 cursor-pointer ${
-                            isDarkMode 
-                              ? 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-700/80 hover:text-white' 
-                              : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                          }`}
-                          title="Notes အားလုံးကို PC ပေါ်သို့ Backup Text File အဖြစ် ဒေါင်းလုဒ်လုပ်ရန်"
-                        >
-                          <Download className="h-3.5 w-3.5" />
-                          <span>Backup All Notes (ဒေါင်းလုဒ်)</span>
-                        </button>
-                      )}
+                      <div className={`p-3.5 rounded-xl border ${
+                        isDarkMode ? 'bg-zinc-950/40 border-zinc-800' : 'bg-slate-50/50 border-slate-100'
+                      }`}>
+                        <span className="text-[10px] uppercase font-bold text-slate-400">Avg Setup Quality</span>
+                        <div className="text-xl font-black mt-0.5 text-emerald-500">
+                          {microLogs.length > 0 
+                            ? Math.round(microLogs.reduce((acc, log) => acc + log.score, 0) / microLogs.length) 
+                            : 0}%
+                        </div>
+                      </div>
+                      <div className={`p-3.5 rounded-xl border ${
+                        isDarkMode ? 'bg-zinc-950/40 border-zinc-800' : 'bg-slate-50/50 border-slate-100'
+                      }`}>
+                        <span className="text-[10px] uppercase font-bold text-slate-400">Target Total Reward</span>
+                        <div className="text-xl font-black mt-0.5 text-sky-500">
+                          {microLogs.reduce((acc, log) => acc + log.pnlR, 0).toFixed(1)}R
+                        </div>
+                      </div>
                     </div>
 
-                    {fallbackNotes.length > 0 ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[550px] overflow-y-auto pr-1">
-                        {fallbackNotes.map((note, idx) => {
-                          const isExpanded = expandedNotes[note.id];
-                          const maxChars = 150;
-                          const shouldTruncate = note.content && note.content.length > maxChars;
-                          const displayedContent = shouldTruncate && !isExpanded 
-                            ? `${note.content.slice(0, maxChars)}...` 
-                            : note.content;
+                    <div className="flex items-center justify-between mb-4 border-b pb-3 border-zinc-200/30 dark:border-zinc-800/80">
+                      <h4 className="text-sm font-bold flex items-center gap-2">
+                        <BookOpen className="h-4 w-4 text-emerald-500" />
+                        Setup Evaluation Records
+                      </h4>
+                    </div>
 
-                          return (
-                            <div 
-                              key={note.id ? `fallback-${note.id}-${idx}` : `fallback-idx-${idx}`}
-                              className={`p-4 rounded-xl border flex flex-col justify-between transition-all ${
-                                isDarkMode 
-                                  ? 'bg-zinc-800/30 border-zinc-800/80 text-zinc-100 hover:border-zinc-700/80' 
-                                  : 'bg-slate-50 border-slate-200/70 text-slate-800 hover:bg-slate-100/50'
-                              }`}
-                            >
+                    {microLogs.length > 0 ? (
+                      <div className="space-y-4 max-h-[500px] overflow-y-auto pr-1">
+                        {microLogs.map((log) => (
+                          <div 
+                            key={log.id}
+                            className={`p-4 rounded-xl border transition-all ${
+                              isDarkMode 
+                                ? 'bg-zinc-950/20 border-zinc-800/80 text-zinc-100 hover:border-zinc-700/80' 
+                                : 'bg-slate-50 border-slate-200/70 text-slate-800 hover:bg-slate-100/50'
+                            }`}
+                          >
+                            <div className="flex justify-between items-start gap-4 mb-2.5">
                               <div>
-                                <div className="flex justify-between items-start gap-2 mb-2">
-                                  <div>
-                                    {note.title && <h6 className="font-bold text-sm text-slate-700 dark:text-zinc-200">{note.title}</h6>}
-                                    <span className="text-[10px] text-zinc-400 font-medium">{note.date}</span>
-                                  </div>
-                                  <div className="flex items-center space-x-1 shrink-0">
-                                    <button
-                                      onClick={() => handleDownloadNote(note)}
-                                      className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                                        isDarkMode ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200'
-                                      }`}
-                                      title="PC ပေါ်သို့ Text File အဖြစ် ဒေါင်းလုဒ်လုပ်ရန်"
-                                    >
-                                      <Download className="h-4 w-4" />
-                                    </button>
-                                    <button
-                                      onClick={() => handleDeleteFallbackNote(note.id)}
-                                      className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                                        isDarkMode ? 'text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10' : 'text-slate-400 hover:text-rose-500 hover:bg-rose-50'
-                                      }`}
-                                      title="Delete note"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </button>
-                                  </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-sm text-slate-700 dark:text-zinc-200">{log.asset}</span>
+                                  <span className={`text-[10px] px-2 py-0.5 rounded-md font-semibold ${
+                                    isDarkMode ? 'bg-zinc-800 text-zinc-300' : 'bg-slate-200/60 text-slate-700'
+                                  }`}>{log.setupType}</span>
+                                  <span className="text-xs font-bold text-emerald-500">+{log.pnlR}R</span>
                                 </div>
-                                {note.content && (
-                                  <p className="text-xs leading-relaxed text-zinc-500 dark:text-zinc-300 whitespace-pre-wrap">
-                                    {displayedContent}
-                                  </p>
-                                )}
+                                <span className="text-[10px] text-zinc-500">{log.date}</span>
                               </div>
 
-                              {shouldTruncate && (
+                              <div className="flex items-center gap-2.5">
+                                <div className="text-right">
+                                  <span className="text-[10px] block text-zinc-500 uppercase font-bold">Setup Quality</span>
+                                  <span className={`text-xs font-black px-2 py-0.5 rounded-md ${
+                                    log.score >= 80 ? 'bg-emerald-500/10 text-emerald-400' :
+                                    log.score >= 60 ? 'bg-yellow-500/10 text-yellow-400' :
+                                    'bg-rose-500/10 text-rose-400'
+                                  }`}>
+                                    {log.score >= 100 ? 'A+' : log.score >= 80 ? 'A' : log.score >= 60 ? 'B' : 'C'} ({log.score}%)
+                                  </span>
+                                </div>
                                 <button
-                                  onClick={() => setExpandedNotes({
-                                    ...expandedNotes,
-                                    [note.id]: !isExpanded
-                                  })}
-                                  className="mt-3 text-left text-[10px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
+                                  onClick={() => handleDeleteMicroLog(log.id)}
+                                  className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                                    isDarkMode ? 'text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10' : 'text-slate-400 hover:text-rose-500 hover:bg-rose-50'
+                                  }`}
+                                  title="Delete setup log"
                                 >
-                                  {isExpanded ? 'လျှော့ရန် (Show Less)' : 'ဆက်ဖတ်ရန် (Show More)'}
+                                  <Trash2 className="h-4 w-4" />
                                 </button>
-                              )}
+                              </div>
                             </div>
-                          );
-                        })}
+
+                            {/* Checklist items list */}
+                            <div className="flex flex-wrap gap-1.5 mb-2.5">
+                              {Object.entries(log.ltfChecklist).map(([key, value]) => {
+                                const labels: Record<string, string> = {
+                                  structureAligned: 'Structure Aligned',
+                                  liquiditySwept: 'Liquidity Swept',
+                                  fvgTested: 'FVG Tested',
+                                  blockRefined: 'OB Refined',
+                                  volumeConfirmed: 'Volume Confirmed'
+                                };
+                                return (
+                                  <span 
+                                    key={key} 
+                                    className={`text-[9px] px-1.5 py-0.5 rounded-sm font-semibold border ${
+                                      value 
+                                        ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
+                                        : 'bg-zinc-800/10 border-zinc-800/50 text-zinc-500 dark:text-zinc-600 line-through'
+                                    }`}
+                                  >
+                                    {labels[key] || key}
+                                  </span>
+                                );
+                              })}
+                            </div>
+
+                            {log.entryNotes && (
+                              <p className="text-xs leading-relaxed text-zinc-500 dark:text-zinc-400 bg-slate-100/50 dark:bg-zinc-900/40 p-2.5 rounded-lg border border-slate-200/40 dark:border-zinc-800/50 font-sans whitespace-pre-wrap">
+                                {log.entryNotes}
+                              </p>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     ) : (
-                      <div className="py-16 text-center border border-dashed rounded-xl border-zinc-200/50 dark:border-zinc-800">
-                        <StickyNote className="h-10 w-10 text-zinc-400 dark:text-zinc-700 mx-auto mb-2 stroke-1" />
-                        <p className="text-xs text-zinc-500">သိမ်းထားသော Note မရှိသေးပါ။ Note အသစ်စတင်ရေးသားနိုင်ပါသည်။</p>
+                      <div className="py-24 text-center border border-dashed rounded-xl border-zinc-200/50 dark:border-zinc-800">
+                        <Target className="h-10 w-10 text-zinc-400 dark:text-zinc-700 mx-auto mb-2 stroke-1" />
+                        <p className="text-xs text-zinc-500">သိမ်းဆည်းထားသော setup log မရှိသေးပါ။ setup အသစ်စတင်ဆန်းစစ်နိုင်ပါသည်။</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* MACRO ANALYSIS VIEW */}
+            {activeTab === 'macro' && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                  {/* Left Column: Create Macro Analysis Form */}
+                  <div className={`p-6 rounded-2xl border transition-all lg:col-span-1 h-fit ${
+                    isDarkMode ? 'bg-zinc-900/40 border-zinc-800/80 text-zinc-100' : 'bg-white border-slate-200/80 shadow-xs text-slate-800'
+                  }`}>
+                    <div className="flex items-center space-x-3 mb-5 pb-4 border-b border-zinc-200/30 dark:border-zinc-800/80">
+                      <div className="bg-sky-500/10 p-2 rounded-xl text-sky-500">
+                        <Globe className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <h4 className="text-md font-bold">New Macro Analysis</h4>
+                        <p className="text-xs text-zinc-500 mt-0.5">ဈေးကွက် Trend ကြီးများနှင့် bias သတ်မှတ်ရန်</p>
+                      </div>
+                    </div>
+
+                    <form onSubmit={handleAddMacroLog} className="space-y-4">
+                      <div>
+                        <label className={`block text-[11px] font-bold uppercase tracking-wider mb-1.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                          Weekly Market Bias
+                        </label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {(['Bullish', 'Bearish', 'Ranging'] as const).map((bias) => (
+                            <button
+                              key={bias}
+                              type="button"
+                              onClick={() => setMacroWeeklyBias(bias)}
+                              className={`py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
+                                macroWeeklyBias === bias 
+                                  ? (bias === 'Bullish' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' :
+                                     bias === 'Bearish' ? 'bg-rose-500/10 border-rose-500/30 text-rose-400' :
+                                     'bg-amber-500/10 border-amber-500/30 text-amber-400')
+                                  : (isDarkMode ? 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100')
+                              }`}
+                            >
+                              {bias}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Timeframe Structure Matrix Grid */}
+                      <div className="border-t border-b border-zinc-200/30 dark:border-zinc-800/80 py-3 my-2 space-y-2">
+                        <span className={`block text-[10px] font-bold uppercase tracking-wider ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                          Multi-Timeframe Structure Matrix
+                        </span>
+                        
+                        <div className="space-y-2">
+                          {([
+                            { key: 'm1', label: 'Monthly Trend (M1)' },
+                            { key: 'w1', label: 'Weekly Trend (W1)' },
+                            { key: 'd1', label: 'Daily Trend (D1)' },
+                            { key: 'h4', label: '4-Hour Trend (H4)' },
+                            { key: 'h1', label: '1-Hour Trend (H1)' }
+                          ] as const).map(({ key, label }) => (
+                            <div key={key} className="flex items-center justify-between">
+                              <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">{label}</span>
+                              <div className="flex gap-1">
+                                {(['Bullish', 'Bearish', 'Ranging'] as const).map((bias) => (
+                                  <button
+                                    key={bias}
+                                    type="button"
+                                    onClick={() => setMacroTimeframeMatrix({
+                                      ...macroTimeframeMatrix,
+                                      [key]: bias
+                                    })}
+                                    className={`px-2 py-0.5 text-[10px] font-bold rounded-sm border transition-all cursor-pointer ${
+                                      macroTimeframeMatrix[key] === bias
+                                        ? (bias === 'Bullish' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' :
+                                           bias === 'Bearish' ? 'bg-rose-500/10 border-rose-500/30 text-rose-400' :
+                                           'bg-amber-500/10 border-amber-500/30 text-amber-400')
+                                        : (isDarkMode ? 'bg-zinc-900 border-zinc-800 text-zinc-500' : 'bg-slate-50 border-slate-200 text-slate-500')
+                                    }`}
+                                  >
+                                    {bias === 'Bullish' ? '▲' : bias === 'Bearish' ? '▼' : '■'}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div>
+                          <label className={`block text-[11px] font-bold uppercase tracking-wider mb-1 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                            Fundamental & Sentiment Factors
+                          </label>
+                          <textarea
+                            value={macroFundamentalSentiment}
+                            onChange={(e) => setMacroFundamentalSentiment(e.target.value)}
+                            placeholder="သတင်းများ၊ FOMC, CPI, central bank sentiment သို့မဟုတ် ဈေးကွက်ခံစားချက်များ..."
+                            rows={2}
+                            className={`w-full p-2 rounded-xl text-xs border focus:outline-hidden transition-all ${
+                              isDarkMode 
+                                ? 'bg-zinc-900 border-zinc-800 focus:border-slate-500/50 focus:ring-2 focus:ring-slate-500/10 text-zinc-100' 
+                                : 'bg-slate-50 border-slate-200 focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 text-slate-800'
+                            }`}
+                          />
+                        </div>
+
+                        <div>
+                          <label className={`block text-[11px] font-bold uppercase tracking-wider mb-1 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                            Intermarket Correlation Notes
+                          </label>
+                          <textarea
+                            value={macroCorrelationNotes}
+                            onChange={(e) => setMacroCorrelationNotes(e.target.value)}
+                            placeholder="DXY, Yields, Correlation details..."
+                            rows={2}
+                            className={`w-full p-2 rounded-xl text-xs border focus:outline-hidden transition-all ${
+                              isDarkMode 
+                                ? 'bg-zinc-900 border-zinc-800 focus:border-slate-500/50 focus:ring-2 focus:ring-slate-500/10 text-zinc-100' 
+                                : 'bg-slate-50 border-slate-200 focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 text-slate-800'
+                            }`}
+                          />
+                        </div>
+
+                        <div>
+                          <label className={`block text-[11px] font-bold uppercase tracking-wider mb-1 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                            Key Demand & Supply Levels
+                          </label>
+                          <textarea
+                            value={macroKeyDemandSupply}
+                            onChange={(e) => setMacroKeyDemandSupply(e.target.value)}
+                            placeholder="အဓိက အဝယ်/အရောင်း ဇုန်များ (ဥပမာ- Supply 2540-2550)..."
+                            rows={2}
+                            className={`w-full p-2 rounded-xl text-xs border focus:outline-hidden transition-all ${
+                              isDarkMode 
+                                ? 'bg-zinc-900 border-zinc-800 focus:border-slate-500/50 focus:ring-2 focus:ring-slate-500/10 text-zinc-100' 
+                                : 'bg-slate-50 border-slate-200 focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 text-slate-800'
+                            }`}
+                          />
+                        </div>
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="w-full inline-flex items-center justify-center space-x-2 bg-slate-900 hover:bg-slate-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 text-white dark:text-zinc-950 font-bold text-xs px-4 py-3 rounded-xl transition-all cursor-pointer shadow-xs"
+                      >
+                        <Plus className="h-4 w-4" />
+                        <span>Save Analysis Log (မှတ်တမ်းသိမ်းရန်)</span>
+                      </button>
+                    </form>
+                  </div>
+
+                  {/* Right Column: Macro Market Analysis Logs List */}
+                  <div className={`p-6 rounded-2xl border transition-all lg:col-span-2 ${
+                    isDarkMode ? 'bg-zinc-900/40 border-zinc-800/80' : 'bg-white border-slate-200/80 shadow-xs'
+                  }`}>
+                    <div className="flex items-center justify-between mb-5 border-b pb-4 border-zinc-200/30 dark:border-zinc-800/80">
+                      <div>
+                        <h4 className="text-sm font-bold flex items-center gap-2">
+                          <BookOpen className="h-4 w-4 text-sky-500" />
+                          Market Structure & Bias History ({macroLogs.length})
+                        </h4>
+                      </div>
+                    </div>
+
+                    {macroLogs.length > 0 ? (
+                      <div className="space-y-6 max-h-[600px] overflow-y-auto pr-1">
+                        {macroLogs.map((log) => (
+                          <div 
+                            key={log.id}
+                            className={`p-5 rounded-xl border transition-all ${
+                              isDarkMode 
+                                ? 'bg-zinc-950/20 border-zinc-800/80 text-zinc-100 hover:border-zinc-700/80' 
+                                : 'bg-slate-50 border-slate-200/70 text-slate-800 hover:bg-slate-100/50'
+                            }`}
+                          >
+                            <div className="flex justify-between items-start gap-4 mb-3">
+                              <div>
+                                <span className="text-[10px] text-zinc-500 block uppercase font-bold">Weekly Market Bias</span>
+                                <span className={`text-md font-black px-3 py-1 rounded-lg inline-block mt-0.5 ${
+                                  log.weeklyBias === 'Bullish' ? 'bg-emerald-500/10 text-emerald-400' :
+                                  log.weeklyBias === 'Bearish' ? 'bg-rose-500/10 text-rose-400' :
+                                  'bg-amber-500/10 text-amber-400'
+                                }`}>
+                                  {log.weeklyBias} {log.weeklyBias === 'Bullish' ? '▲' : log.weeklyBias === 'Bearish' ? '▼' : '■'}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center gap-3">
+                                <div className="text-right">
+                                  <span className="text-[10px] text-zinc-500 block uppercase font-bold">Date Logged</span>
+                                  <span className="text-xs font-bold text-slate-500">{log.date}</span>
+                                </div>
+                                <button
+                                  onClick={() => handleDeleteMacroLog(log.id)}
+                                  className={`p-2 rounded-lg transition-colors cursor-pointer ${
+                                    isDarkMode ? 'text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10' : 'text-slate-400 hover:text-rose-500 hover:bg-rose-50'
+                                  }`}
+                                  title="Delete macro log"
+                                >
+                                  <Trash2 className="h-4.5 w-4.5" />
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Matrix Visualization Grid */}
+                            <div className="grid grid-cols-5 gap-2 mb-4 p-2 bg-slate-100/50 dark:bg-zinc-900/40 rounded-lg border border-slate-250/20 dark:border-zinc-800/50">
+                              {Object.entries(log.timeframeMatrix).map(([tf, bias]) => (
+                                <div key={tf} className="text-center p-1">
+                                  <span className="text-[9px] uppercase font-bold text-zinc-500">{tf}</span>
+                                  <span className={`block text-xs font-black mt-0.5 ${
+                                    bias === 'Bullish' ? 'text-emerald-500' :
+                                    bias === 'Bearish' ? 'text-rose-500' :
+                                    'text-amber-500'
+                                  }`}>
+                                    {bias === 'Bullish' ? '▲ Bull' : bias === 'Bearish' ? '▼ Bear' : '■ Range'}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+
+                            {/* Sectioned notes detail */}
+                            <div className="space-y-2.5">
+                              {log.fundamentalSentiment && (
+                                <div className="text-xs">
+                                  <span className="font-bold text-[10px] uppercase text-zinc-400">Fundamentals & Sentiment</span>
+                                  <p className="mt-1 leading-relaxed text-zinc-600 dark:text-zinc-300 bg-slate-100/20 dark:bg-zinc-900/10 p-2.5 rounded-md border border-slate-200/20 dark:border-zinc-800/20">
+                                    {log.fundamentalSentiment}
+                                  </p>
+                                </div>
+                              )}
+
+                              {log.correlationNotes && (
+                                <div className="text-xs">
+                                  <span className="font-bold text-[10px] uppercase text-zinc-400">Market Correlation</span>
+                                  <p className="mt-1 leading-relaxed text-zinc-600 dark:text-zinc-300 bg-slate-100/20 dark:bg-zinc-900/10 p-2.5 rounded-md border border-slate-200/20 dark:border-zinc-800/20">
+                                    {log.correlationNotes}
+                                  </p>
+                                </div>
+                              )}
+
+                              {log.keyDemandSupply && (
+                                <div className="text-xs">
+                                  <span className="font-bold text-[10px] uppercase text-zinc-400">Key Demand & Supply Levels</span>
+                                  <p className="mt-1 leading-relaxed text-zinc-600 dark:text-zinc-300 bg-slate-100/20 dark:bg-zinc-900/10 p-2.5 rounded-md border border-slate-200/20 dark:border-zinc-800/20 font-mono">
+                                    {log.keyDemandSupply}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="py-24 text-center border border-dashed rounded-xl border-zinc-200/50 dark:border-zinc-800">
+                        <Globe className="h-10 w-10 text-zinc-400 dark:text-zinc-700 mx-auto mb-2 stroke-1" />
+                        <p className="text-xs text-zinc-500">ဆန်းစစ်ချက်မှတ်တမ်းမရှိသေးပါ။ အထက်ပါပုံစံမှ အသစ်စတင်ထည့်သွင်းနိုင်ပါသည်။</p>
                       </div>
                     )}
                   </div>
