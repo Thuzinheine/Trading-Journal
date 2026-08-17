@@ -77,7 +77,9 @@ import {
   Maximize2,
   Minimize2,
   Target,
-  Globe
+  Globe,
+  Calendar,
+  Clock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -182,6 +184,182 @@ export default function Home() {
     h4: 'Bullish' as 'Bullish' | 'Bearish' | 'Ranging',
     h1: 'Bullish' as 'Bullish' | 'Bearish' | 'Ranging',
   });
+  const [fomcYear, setFomcYear] = useState<2026 | 2027>(2026);
+
+  const fomcMeetings = [
+    { date: 'Jan 27–28', year: 2026, originalDate: '2026-01-27', label: 'Jan 27-28', sep: false, notes: 'Interest Rate Decision' },
+    { date: 'Mar 17–18', year: 2026, originalDate: '2026-03-17', label: 'Mar 17-18', sep: true, notes: 'Rate Decision & Economic Projections' },
+    { date: 'Apr 28–29', year: 2026, originalDate: '2026-04-28', label: 'Apr 28-29', sep: false, notes: 'Interest Rate Decision' },
+    { date: 'Jun 16–17', year: 2026, originalDate: '2026-06-16', label: 'Jun 16-17', sep: true, notes: 'Rate Decision & Economic Projections' },
+    { date: 'Jul 28–29', year: 2026, originalDate: '2026-07-28', label: 'Jul 28-29', sep: false, notes: 'Interest Rate Decision' },
+    { date: 'Sep 15–16', year: 2026, originalDate: '2026-09-15', label: 'Sep 15-16', sep: true, notes: 'Rate Decision & Economic Projections' },
+    { date: 'Oct 27–28', year: 2026, originalDate: '2026-10-27', label: 'Oct 27-28', sep: false, notes: 'Interest Rate Decision' },
+    { date: 'Dec 8–9', year: 2026, originalDate: '2026-12-08', label: 'Dec 8-9', sep: true, notes: 'Rate Decision & Economic Projections' },
+    { date: 'Jan 26–27', year: 2027, originalDate: '2027-01-26', label: 'Jan 26-27', sep: false, notes: 'Interest Rate Decision' },
+    { date: 'Mar 16–17', year: 2027, originalDate: '2027-03-16', label: 'Mar 16-17', sep: true, notes: 'Rate Decision & Economic Projections' },
+    { date: 'Apr 27–28', year: 2027, originalDate: '2027-04-27', label: 'Apr 27-28', sep: false, notes: 'Interest Rate Decision' },
+    { date: 'Jun 8–9', year: 2027, originalDate: '2027-06-08', label: 'Jun 8-9', sep: true, notes: 'Rate Decision & Economic Projections' },
+    { date: 'Jul 27–28', year: 2027, originalDate: '2027-07-27', label: 'Jul 27-28', sep: false, notes: 'Interest Rate Decision' },
+    { date: 'Sep 14–15', year: 2027, originalDate: '2027-09-14', label: 'Sep 14-15', sep: true, notes: 'Rate Decision & Economic Projections' },
+    { date: 'Oct 26–27', year: 2027, originalDate: '2027-10-26', label: 'Oct 26-27', sep: false, notes: 'Interest Rate Decision' },
+    { date: 'Dec 7–8', year: 2027, originalDate: '2027-12-07', label: 'Dec 7-8', sep: true, notes: 'Rate Decision & Economic Projections' },
+  ];
+
+  const getTodayDateString = () => {
+    try {
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const r = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${r}`;
+    } catch (e) {
+      return '2026-08-16';
+    }
+  };
+
+  const todayDateString = getTodayDateString();
+  const upcomingFomcMeetings = fomcMeetings.filter(meeting => meeting.originalDate >= todayDateString);
+  const nextFomcMeeting = upcomingFomcMeetings.length > 0 ? upcomingFomcMeetings[0] : null;
+
+  let daysRemaining: number | null = null;
+  if (nextFomcMeeting) {
+    try {
+      const diffTime = new Date(nextFomcMeeting.originalDate).getTime() - new Date(todayDateString).getTime();
+      daysRemaining = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+    } catch (e) {
+      daysRemaining = null;
+    }
+  }
+
+  const filteredFomcMeetings = fomcMeetings.filter(m => m.year === fomcYear);
+
+  // NFP & CPI Macro Indicators State
+  const [selectedIndicatorMonth, setSelectedIndicatorMonth] = useState('Aug 2026');
+  const [nfpAct, setNfpAct] = useState(165);
+  const [nfpFc, setNfpFc] = useState(155);
+  const [cpiMmAct, setCpiMmAct] = useState(0.2);
+  const [cpiMmFc, setCpiMmFc] = useState(0.2);
+  const [cpiYyAct, setCpiYyAct] = useState(2.9);
+  const [cpiYyFc, setCpiYyFc] = useState(3.0);
+  const [coreCpiMmAct, setCoreCpiMmAct] = useState(0.2);
+  const [coreCpiMmFc, setCoreCpiMmFc] = useState(0.2);
+  const [coreCpiYyAct, setCoreCpiYyAct] = useState(3.2);
+  const [coreCpiYyFc, setCoreCpiYyFc] = useState(3.2);
+
+  const indicatorPresets: Record<string, {
+    nfpAct: number; nfpFc: number;
+    cpiMmAct: number; cpiMmFc: number;
+    cpiYyAct: number; cpiYyFc: number;
+    coreCpiMmAct: number; coreCpiMmFc: number;
+    coreCpiYyAct: number; coreCpiYyFc: number;
+  }> = useMemo(() => ({
+    'Aug 2026': { nfpAct: 165, nfpFc: 155, cpiMmAct: 0.2, cpiMmFc: 0.2, cpiYyAct: 2.9, cpiYyFc: 3.0, coreCpiMmAct: 0.2, coreCpiMmFc: 0.2, coreCpiYyAct: 3.2, coreCpiYyFc: 3.2 },
+    'Sep 2026': { nfpAct: 150, nfpFc: 160, cpiMmAct: 0.1, cpiMmFc: 0.2, cpiYyAct: 2.7, cpiYyFc: 2.8, coreCpiMmAct: 0.2, coreCpiMmFc: 0.2, coreCpiYyAct: 3.1, coreCpiYyFc: 3.1 },
+    'Oct 2026': { nfpAct: 140, nfpFc: 145, cpiMmAct: 0.2, cpiMmFc: 0.2, cpiYyAct: 2.6, cpiYyFc: 2.6, coreCpiMmAct: 0.1, coreCpiMmFc: 0.2, coreCpiYyAct: 3.0, coreCpiYyFc: 3.1 },
+    'Nov 2026': { nfpAct: 180, nfpFc: 140, cpiMmAct: 0.3, cpiMmFc: 0.2, cpiYyAct: 2.8, cpiYyFc: 2.5, coreCpiMmAct: 0.3, coreCpiMmFc: 0.2, coreCpiYyAct: 3.2, coreCpiYyFc: 3.0 },
+    'Dec 2026': { nfpAct: 120, nfpFc: 150, cpiMmAct: 0.1, cpiMmFc: 0.2, cpiYyAct: 2.4, cpiYyFc: 2.5, coreCpiMmAct: 0.1, coreCpiMmFc: 0.2, coreCpiYyAct: 2.9, coreCpiYyFc: 3.0 },
+  }), []);
+
+  const handleSelectIndicatorPreset = (month: string) => {
+    setSelectedIndicatorMonth(month);
+    const preset = indicatorPresets[month];
+    if (preset) {
+      setNfpAct(preset.nfpAct);
+      setNfpFc(preset.nfpFc);
+      setCpiMmAct(preset.cpiMmAct);
+      setCpiMmFc(preset.cpiMmFc);
+      setCpiYyAct(preset.cpiYyAct);
+      setCpiYyFc(preset.cpiYyFc);
+      setCoreCpiMmAct(preset.coreCpiMmAct);
+      setCoreCpiMmFc(preset.coreCpiMmFc);
+      setCoreCpiYyAct(preset.coreCpiYyAct);
+      setCoreCpiYyFc(preset.coreCpiYyFc);
+    }
+  };
+
+  const ratePredictor = useMemo(() => {
+    let hawkishPoints = 0;
+    let dovishPoints = 0;
+
+    // NFP comparison
+    if (nfpAct > nfpFc) {
+      hawkishPoints += 1.5;
+    } else if (nfpAct < nfpFc) {
+      dovishPoints += 1.5;
+    }
+    // NFP absolute value
+    if (nfpAct >= 180) {
+      hawkishPoints += 1.5;
+    } else if (nfpAct <= 120) {
+      dovishPoints += 1.5;
+    }
+
+    // CPI m/m
+    if (cpiMmAct > cpiMmFc) {
+      hawkishPoints += 1;
+    } else if (cpiMmAct < cpiMmFc) {
+      dovishPoints += 1;
+    }
+
+    // CPI y/y
+    if (cpiYyAct > cpiYyFc) {
+      hawkishPoints += 1.5;
+    } else if (cpiYyAct < cpiYyFc) {
+      dovishPoints += 1.5;
+    }
+    if (cpiYyAct >= 2.5) {
+      hawkishPoints += 1.5;
+    } else if (cpiYyAct <= 2.2) {
+      dovishPoints += 1.5;
+    }
+
+    // Core CPI m/m
+    if (coreCpiMmAct > coreCpiMmFc) {
+      hawkishPoints += 1;
+    } else if (coreCpiMmAct < coreCpiMmFc) {
+      dovishPoints += 1;
+    }
+
+    // Core CPI y/y
+    if (coreCpiYyAct > coreCpiYyFc) {
+      hawkishPoints += 1.5;
+    } else if (coreCpiYyAct < coreCpiYyFc) {
+      dovishPoints += 1.5;
+    }
+    if (coreCpiYyAct >= 2.8) {
+      hawkishPoints += 1.5;
+    } else if (coreCpiYyAct <= 2.3) {
+      dovishPoints += 1.5;
+    }
+
+    const total = hawkishPoints + dovishPoints;
+    let percentage = 0;
+    let result: 'Hike' | 'Cut' | 'Hold' = 'Hold';
+    let label = 'Rate Pause / Hold (ဆိုင်းငံ့စောင့်ကြည့်မည်)';
+    let colorClass = 'text-amber-500';
+    let bgClass = 'bg-amber-500/10 border-amber-500/20';
+    let desc = 'အလုပ်အကိုင်နှင့် ငွေကြေးဖောင်းပွမှုဒေတာများ ရောထွေးနေသောကြောင့် ဗဟိုဘဏ်သည် အတိုးနှုန်းကို ဆိုင်းငံ့စောင့်ကြည့်ရန် ရာခိုင်နှုန်း ပိုမိုများပြားပါသည်။ (Neutral Bias)';
+
+    if (total > 0) {
+      percentage = Math.round(((hawkishPoints - dovishPoints) / total) * 100);
+    }
+
+    if (percentage >= 25) {
+      result = 'Hike';
+      label = 'Rate Hike or Hold High (အတိုးနှုန်းတိုးမြှင့်ရန်/ထိန်းသိမ်းရန်)';
+      colorClass = 'text-rose-500 dark:text-rose-400';
+      bgClass = 'bg-rose-500/10 border-rose-500/20';
+      desc = 'ငွေကြေးဖောင်းပွမှု ဖိအားမြင့်မားပြီး အလုပ်အကိုင်စျေးကွက် တောင့်တင်းနေသောကြောင့် Fed သည် အတိုးနှုန်းကို လက်ရှိအမြင့်၌ ဆက်လက်ထိန်းသိမ်းရန် သို့မဟုတ် ထပ်မံမြှင့်တင်ရန် တွန်းအားပေးနေပါသည်။ (Hawkish Bias)';
+    } else if (percentage <= -25) {
+      result = 'Cut';
+      label = 'Rate Cut (အတိုးနှုန်းလျှော့ချရန်)';
+      colorClass = 'text-emerald-500 dark:text-emerald-400';
+      bgClass = 'bg-emerald-500/10 border-emerald-500/20';
+      desc = 'ငွေကြေးဖောင်းပွမှု လျော့ကျလာပြီး အလုပ်အကိုင်စျေးကွက် အေးခဲလာသောကြောင့် စီးပွားရေးကို ပြန်လည်နှိုးဆွရန် အတိုးနှုန်းကို လျှော့ချရန် လိုလားသော အခြေအနေဖြစ်ပါသည်။ (Dovish Bias)';
+    }
+
+    return { percentage, result, label, colorClass, bgClass, desc, hawkishPoints, dovishPoints };
+  }, [nfpAct, nfpFc, cpiMmAct, cpiMmFc, cpiYyAct, cpiYyFc, coreCpiMmAct, coreCpiMmFc, coreCpiYyAct, coreCpiYyFc]);
 
   // Dark UI toggle state
   const [isDarkMode, setIsDarkMode] = useState(true); // Default to Dark UI as requested
@@ -2797,149 +2975,570 @@ export default function Home() {
             {/* MACRO ANALYSIS VIEW */}
             {activeTab === 'macro' && (
               <div className="space-y-6">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                  {/* Left Column: Create Macro Analysis Form */}
-                  <div className={`p-6 rounded-2xl border transition-all lg:col-span-1 h-fit ${
+                
+                {/* 1. TOP PANEL: FOMC Calendar & US NFP/CPI rate predictor side-by-side */}
+                <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+                  
+                  {/* FOMC Meeting Calendar Card */}
+                  <div className={`p-6 rounded-2xl border transition-all xl:col-span-5 flex flex-col justify-between ${
                     isDarkMode ? 'bg-zinc-900/40 border-zinc-800/80 text-zinc-100' : 'bg-white border-slate-200/80 shadow-xs text-slate-800'
                   }`}>
-                    <div className="flex items-center space-x-3 mb-5 pb-4 border-b border-zinc-200/30 dark:border-zinc-800/80">
-                      <div className="bg-sky-500/10 p-2 rounded-xl text-sky-500">
-                        <Globe className="h-6 w-6" />
-                      </div>
-                      <div>
-                        <h4 className="text-md font-bold">New Macro Analysis</h4>
-                        <p className="text-xs text-zinc-500 mt-0.5">ဈေးကွက် Trend ကြီးများနှင့် bias သတ်မှတ်ရန်</p>
-                      </div>
-                    </div>
+                    <div>
+                      <div className="flex items-center justify-between pb-3 mb-4 border-b border-zinc-200/30 dark:border-zinc-800/80">
+                        <div className="flex items-center space-x-2.5">
+                          <div className="bg-amber-500/10 p-2 rounded-xl text-amber-500">
+                            <Calendar className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-bold">FOMC Calendar</h4>
+                            <p className="text-[10px] text-zinc-500">Fed Meeting Schedule</p>
+                          </div>
+                        </div>
 
-                    <form onSubmit={handleAddMacroLog} className="space-y-4">
-                      <div>
-                        <label className={`block text-[11px] font-bold uppercase tracking-wider mb-1.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
-                          Weekly Market Bias
-                        </label>
-                        <div className="grid grid-cols-3 gap-2">
-                          {(['Bullish', 'Bearish', 'Ranging'] as const).map((bias) => (
+                        {/* Year Selector Tabs */}
+                        <div className="flex bg-slate-100 dark:bg-zinc-900/80 p-0.5 rounded-lg border border-slate-250/20 dark:border-zinc-800">
+                          {([2026, 2027] as const).map((yr) => (
                             <button
-                              key={bias}
-                              type="button"
-                              onClick={() => setMacroWeeklyBias(bias)}
-                              className={`py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
-                                macroWeeklyBias === bias 
-                                  ? (bias === 'Bullish' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' :
-                                     bias === 'Bearish' ? 'bg-rose-500/10 border-rose-500/30 text-rose-400' :
-                                     'bg-amber-500/10 border-amber-500/30 text-amber-400')
-                                  : (isDarkMode ? 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100')
+                              key={yr}
+                              onClick={() => setFomcYear(yr)}
+                              className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
+                                fomcYear === yr
+                                  ? 'bg-white dark:bg-zinc-850 text-slate-900 dark:text-zinc-100 shadow-xs'
+                                  : 'text-zinc-400 hover:text-zinc-200'
                               }`}
                             >
-                              {bias}
+                              {yr}
                             </button>
                           ))}
                         </div>
                       </div>
 
-                      {/* Timeframe Structure Matrix Grid */}
-                      <div className="border-t border-b border-zinc-200/30 dark:border-zinc-800/80 py-3 my-2 space-y-2">
-                        <span className={`block text-[10px] font-bold uppercase tracking-wider ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
-                          Multi-Timeframe Structure Matrix
-                        </span>
-                        
-                        <div className="space-y-2">
-                          {([
-                            { key: 'm1', label: 'Monthly Trend (M1)' },
-                            { key: 'w1', label: 'Weekly Trend (W1)' },
-                            { key: 'd1', label: 'Daily Trend (D1)' },
-                            { key: 'h4', label: '4-Hour Trend (H4)' },
-                            { key: 'h1', label: '1-Hour Trend (H1)' }
-                          ] as const).map(({ key, label }) => (
-                            <div key={key} className="flex items-center justify-between">
-                              <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">{label}</span>
-                              <div className="flex gap-1">
-                                {(['Bullish', 'Bearish', 'Ranging'] as const).map((bias) => (
-                                  <button
-                                    key={bias}
-                                    type="button"
-                                    onClick={() => setMacroTimeframeMatrix({
-                                      ...macroTimeframeMatrix,
-                                      [key]: bias
-                                    })}
-                                    className={`px-2 py-0.5 text-[10px] font-bold rounded-sm border transition-all cursor-pointer ${
-                                      macroTimeframeMatrix[key] === bias
-                                        ? (bias === 'Bullish' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' :
-                                           bias === 'Bearish' ? 'bg-rose-500/10 border-rose-500/30 text-rose-400' :
-                                           'bg-amber-500/10 border-amber-500/30 text-amber-400')
-                                        : (isDarkMode ? 'bg-zinc-900 border-zinc-800 text-zinc-500' : 'bg-slate-50 border-slate-200 text-slate-500')
-                                    }`}
-                                  >
-                                    {bias === 'Bullish' ? '▲' : bias === 'Bearish' ? '▼' : '■'}
-                                  </button>
-                                ))}
+                      {/* Next Meeting Banner */}
+                      {nextFomcMeeting && (
+                        <div className={`mb-4 p-3 rounded-xl border flex items-center gap-3 text-xs leading-relaxed ${
+                          isDarkMode 
+                            ? 'bg-amber-950/10 border-amber-900/30 text-amber-300' 
+                            : 'bg-amber-50/50 border-amber-100 text-amber-800'
+                        }`}>
+                          <Clock className="h-4 w-4 shrink-0 animate-pulse text-amber-500" />
+                          <div className="font-medium text-[11px]">
+                            နောက်ထပ် FOMC Meeting: <span className="font-bold underline">{nextFomcMeeting.date}, {nextFomcMeeting.year}</span> 
+                            {daysRemaining !== null && (
+                              <span className="ml-1 font-semibold block sm:inline">
+                                ({daysRemaining === 0 ? 'ယနေ့ ဖြစ်ပါသည်!' : `နောက်ထပ် ${daysRemaining} ရက်အလို`})
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Meetings List */}
+                      <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
+                        {filteredFomcMeetings.map((m, idx) => {
+                          const isPassed = m.originalDate < todayDateString;
+                          return (
+                            <div
+                              key={idx}
+                              className={`flex items-center justify-between p-2.5 rounded-xl border text-xs transition-all ${
+                                isPassed
+                                  ? (isDarkMode ? 'bg-zinc-950/10 border-zinc-900/60 opacity-60' : 'bg-slate-50/50 border-slate-100 opacity-60')
+                                  : (m.originalDate === nextFomcMeeting?.originalDate && m.year === nextFomcMeeting?.year
+                                    ? (isDarkMode ? 'bg-amber-500/5 border-amber-500/30 text-amber-200' : 'bg-amber-50/40 border-amber-200/60 text-slate-900')
+                                    : (isDarkMode ? 'bg-zinc-900/30 border-zinc-800/40 text-zinc-100 hover:border-zinc-700/50' : 'bg-white border-slate-200 text-slate-800 hover:bg-slate-50'))
+                              }`}
+                            >
+                              <div className="flex items-center space-x-3">
+                                {/* Calendar style square badge */}
+                                <div className={`flex flex-col items-center justify-center h-9 w-9 rounded-lg border text-center font-mono font-bold leading-none shrink-0 ${
+                                  isPassed
+                                    ? 'bg-zinc-100 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-500'
+                                    : m.originalDate === nextFomcMeeting?.originalDate && m.year === nextFomcMeeting?.year
+                                      ? 'bg-amber-500/10 border-amber-500/30 text-amber-500'
+                                      : 'bg-sky-500/5 border-sky-500/20 text-sky-500'
+                                }`}>
+                                  <span className="text-[8px] uppercase tracking-wider">{m.date.split(' ')[0]}</span>
+                                  <span className="text-xs mt-0.5">{m.date.split(' ')[1]?.split('–')[0] || m.date.split(' ')[1]}</span>
+                                </div>
+
+                                <div>
+                                  <div className="font-bold text-[11px] flex items-center gap-1.5">
+                                    <span>{m.date}</span>
+                                    {m.sep && (
+                                      <span className="bg-rose-500/10 text-rose-500 text-[8px] font-black uppercase px-1 rounded-sm border border-rose-500/20">
+                                        SEP
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5 font-sans leading-none">{m.notes}</p>
+                                </div>
+                              </div>
+
+                              {/* Status Badge */}
+                              <div className="shrink-0">
+                                {isPassed ? (
+                                  <span className="text-[9px] font-bold uppercase text-zinc-500 px-1.5 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+                                    Passed
+                                  </span>
+                                ) : m.originalDate === nextFomcMeeting?.originalDate && m.year === nextFomcMeeting?.year ? (
+                                  <span className="text-[9px] font-bold uppercase text-amber-500 px-1.5 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/20 animate-pulse">
+                                    Next
+                                  </span>
+                                ) : (
+                                  <span className="text-[9px] font-bold uppercase text-sky-500 px-1.5 py-0.5 rounded-md bg-sky-500/10 border border-sky-500/20">
+                                    Upcoming
+                                  </span>
+                                )}
                               </div>
                             </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* General Info Footer */}
+                    <div className="mt-4 pt-3 border-t border-zinc-200/20 dark:border-zinc-800/60 text-[9px] leading-relaxed text-zinc-500 space-y-1">
+                      <p>🎯 SEP = Summary of Economic Projections (ထွက်ရှိပါက ဈေးကွက်လှုပ်ခတ်မှု အလွန်ပြင်းထန်နိုင်ပါသည်)</p>
+                      <p>📅 Policy Statement: Day 2 at 2:00 PM ET (မြန်မာစံတော်ချိန် နောက်တစ်နေ့ မနက် ၁:၃၀ နာရီ ဝန်းကျင်)</p>
+                      <p>📰 Meeting Minutes: ၃ ပတ်အကြာတွင် ထပ်မံထုတ်ပြန်လေ့ရှိသည်</p>
+                    </div>
+                  </div>
+
+                  {/* US NFP & CPI Macro Indicators Rate Predictor Card */}
+                  <div className={`p-6 rounded-2xl border transition-all xl:col-span-7 flex flex-col justify-between ${
+                    isDarkMode ? 'bg-zinc-900/40 border-zinc-800/80 text-zinc-100' : 'bg-white border-slate-200/80 shadow-xs text-slate-800'
+                  }`}>
+                    <div>
+                      {/* Card Header */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 mb-4 border-b border-zinc-200/30 dark:border-zinc-800/80 gap-3">
+                        <div className="flex items-center space-x-2.5">
+                          <div className="bg-sky-500/10 p-2 rounded-xl text-sky-500">
+                            <Activity className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-bold">NFP & CPI Rate Bias Predictor</h4>
+                            <p className="text-[10px] text-zinc-500">အလုပ်အကိုင်နှင့် ငွေကြေးဖောင်းပွမှု အခြေခံ အတိုးနှုန်းခန့်မှန်းချက်</p>
+                          </div>
+                        </div>
+
+                        {/* Month Select Buttons */}
+                        <div className="flex flex-wrap gap-1 bg-slate-100 dark:bg-zinc-900/80 p-0.5 rounded-lg border border-slate-250/20 dark:border-zinc-800">
+                          {['Aug 2026', 'Sep 2026', 'Oct 2026', 'Nov 2026', 'Dec 2026'].map((m) => (
+                            <button
+                              key={m}
+                              type="button"
+                              onClick={() => handleSelectIndicatorPreset(m)}
+                              className={`px-2 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
+                                selectedIndicatorMonth === m
+                                  ? 'bg-white dark:bg-zinc-850 text-slate-900 dark:text-zinc-100 shadow-xs'
+                                  : 'text-zinc-400 hover:text-zinc-200'
+                              }`}
+                            >
+                              {m.split(' ')[0]}
+                            </button>
                           ))}
                         </div>
                       </div>
 
-                      <div className="space-y-3">
-                        <div>
-                          <label className={`block text-[11px] font-bold uppercase tracking-wider mb-1 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
-                            Fundamental & Sentiment Factors
-                          </label>
-                          <textarea
-                            value={macroFundamentalSentiment}
-                            onChange={(e) => setMacroFundamentalSentiment(e.target.value)}
-                            placeholder="သတင်းများ၊ FOMC, CPI, central bank sentiment သို့မဟုတ် ဈေးကွက်ခံစားချက်များ..."
-                            rows={2}
-                            className={`w-full p-2 rounded-xl text-xs border focus:outline-hidden transition-all ${
-                              isDarkMode 
-                                ? 'bg-zinc-900 border-zinc-800 focus:border-slate-500/50 focus:ring-2 focus:ring-slate-500/10 text-zinc-100' 
-                                : 'bg-slate-50 border-slate-200 focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 text-slate-800'
-                            }`}
-                          />
+                      {/* Info Note */}
+                      <div className={`mb-4 p-2.5 rounded-xl border text-[10px] flex items-start gap-2 leading-relaxed ${
+                        isDarkMode ? 'bg-zinc-900/30 border-zinc-800/50 text-zinc-400' : 'bg-slate-50 border-slate-150 text-slate-600'
+                      }`}>
+                        <HelpCircle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-sky-500" />
+                        <span>
+                          NFP သည် လဆန်းတွင်ထွက်ပြီး CPI (အဓိက Indicator ၄ ခု) သည် လလယ်တွင်ထွက်ရှိပါသည်။ ဤဒေတာနှစ်ခုလုံးသည် FOMC အတိုးနှုန်းတိုးမြှင့်ရန် (**Hike**), လျှော့ချရန် (**Cut**), သို့မဟုတ် ထိန်းသိမ်းရန် (**Pause**) ဆုံးဖြတ်ချက်ကို တိုက်ရိုက်သတ်မှတ်ပေးပါသည်။
+                        </span>
+                      </div>
+
+                      {/* Inputs Grid */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        
+                        {/* NFP Input Card */}
+                        <div className={`p-4 rounded-xl border ${isDarkMode ? 'bg-zinc-950/20 border-zinc-800/60' : 'bg-slate-50/40 border-slate-150'}`}>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-bold text-sky-500 flex items-center gap-1">
+                              🇺🇸 NFP Employment
+                            </span>
+                            <span className="text-[9px] text-zinc-500 font-medium">1st Friday • 8:30 AM ET</span>
+                          </div>
+                          
+                          <div className="space-y-3">
+                            <div>
+                              <div className="flex justify-between text-[10px] mb-1 font-medium">
+                                <span className="text-zinc-400">Actual (အမှန်ထွက်ရှိချက်)</span>
+                                <span className="font-mono font-bold text-sky-400">{nfpAct}k</span>
+                              </div>
+                              <input
+                                type="range"
+                                min="50"
+                                max="350"
+                                step="5"
+                                value={nfpAct}
+                                onChange={(e) => {
+                                  setNfpAct(Number(e.target.value));
+                                  setSelectedIndicatorMonth('Custom');
+                                }}
+                                className="w-full accent-sky-500 cursor-pointer h-1 bg-zinc-800 rounded-lg"
+                              />
+                            </div>
+
+                            <div>
+                              <div className="flex justify-between text-[10px] mb-1 font-medium">
+                                <span className="text-zinc-400">Forecast (ခန့်မှန်းချက်)</span>
+                                <span className="font-mono font-bold text-zinc-500">{nfpFc}k</span>
+                              </div>
+                              <input
+                                type="range"
+                                min="50"
+                                max="350"
+                                step="5"
+                                value={nfpFc}
+                                onChange={(e) => {
+                                  setNfpFc(Number(e.target.value));
+                                  setSelectedIndicatorMonth('Custom');
+                                }}
+                                className="w-full accent-zinc-500 cursor-pointer h-1 bg-zinc-800 rounded-lg"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="mt-3 pt-2 border-t border-zinc-200/10 flex justify-between text-[10px] text-zinc-500">
+                            <span>Effect:</span>
+                            <span className={nfpAct > nfpFc ? 'text-rose-400 font-bold' : 'text-emerald-400 font-bold'}>
+                              {nfpAct > nfpFc ? 'Actual > Forecast (Hawkish)' : 'Actual < Forecast (Dovish)'}
+                            </span>
+                          </div>
                         </div>
 
-                        <div>
-                          <label className={`block text-[11px] font-bold uppercase tracking-wider mb-1 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
-                            Intermarket Correlation Notes
-                          </label>
-                          <textarea
-                            value={macroCorrelationNotes}
-                            onChange={(e) => setMacroCorrelationNotes(e.target.value)}
-                            placeholder="DXY, Yields, Correlation details..."
-                            rows={2}
-                            className={`w-full p-2 rounded-xl text-xs border focus:outline-hidden transition-all ${
-                              isDarkMode 
-                                ? 'bg-zinc-900 border-zinc-800 focus:border-slate-500/50 focus:ring-2 focus:ring-slate-500/10 text-zinc-100' 
-                                : 'bg-slate-50 border-slate-200 focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 text-slate-800'
-                            }`}
-                          />
-                        </div>
+                        {/* CPI Inflation Input Card (4 Key Fields) */}
+                        <div className={`p-4 rounded-xl border ${isDarkMode ? 'bg-zinc-950/20 border-zinc-800/60' : 'bg-slate-50/40 border-slate-150'}`}>
+                          <div className="flex items-center justify-between mb-2.5">
+                            <span className="text-xs font-bold text-amber-500">
+                              🇺🇸 CPI Inflation (၄ ခု)
+                            </span>
+                            <span className="text-[9px] text-zinc-500 font-medium">Mid-Month • 8:30 AM ET</span>
+                          </div>
 
+                          <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-[10px]">
+                            {/* CPI y/y */}
+                            <div>
+                              <label className="text-zinc-500 block mb-0.5 font-bold">CPI y/y</label>
+                              <div className="flex gap-1">
+                                <input
+                                  type="number"
+                                  step="0.1"
+                                  value={cpiYyAct}
+                                  onChange={(e) => {
+                                    setCpiYyAct(Number(e.target.value));
+                                    setSelectedIndicatorMonth('Custom');
+                                  }}
+                                  placeholder="Act"
+                                  className={`w-full p-1 rounded-md text-center font-mono font-bold text-[10px] ${
+                                    isDarkMode ? 'bg-zinc-900 border-zinc-800 text-amber-400' : 'bg-white border-slate-200 text-amber-600'
+                                  }`}
+                                />
+                                <input
+                                  type="number"
+                                  step="0.1"
+                                  value={cpiYyFc}
+                                  onChange={(e) => {
+                                    setCpiYyFc(Number(e.target.value));
+                                    setSelectedIndicatorMonth('Custom');
+                                  }}
+                                  placeholder="Fc"
+                                  className={`w-full p-1 rounded-md text-center font-mono text-[10px] ${
+                                    isDarkMode ? 'bg-zinc-900 border-zinc-800 text-zinc-400' : 'bg-white border-slate-200 text-zinc-500'
+                                  }`}
+                                />
+                              </div>
+                            </div>
+
+                            {/* Core CPI y/y */}
+                            <div>
+                              <label className="text-zinc-500 block mb-0.5 font-bold">Core CPI y/y</label>
+                              <div className="flex gap-1">
+                                <input
+                                  type="number"
+                                  step="0.1"
+                                  value={coreCpiYyAct}
+                                  onChange={(e) => {
+                                    setCoreCpiYyAct(Number(e.target.value));
+                                    setSelectedIndicatorMonth('Custom');
+                                  }}
+                                  placeholder="Act"
+                                  className={`w-full p-1 rounded-md text-center font-mono font-bold text-[10px] ${
+                                    isDarkMode ? 'bg-zinc-900 border-zinc-800 text-amber-400' : 'bg-white border-slate-200 text-amber-600'
+                                  }`}
+                                />
+                                <input
+                                  type="number"
+                                  step="0.1"
+                                  value={coreCpiYyFc}
+                                  onChange={(e) => {
+                                    setCoreCpiYyFc(Number(e.target.value));
+                                    setSelectedIndicatorMonth('Custom');
+                                  }}
+                                  placeholder="Fc"
+                                  className={`w-full p-1 rounded-md text-center font-mono text-[10px] ${
+                                    isDarkMode ? 'bg-zinc-900 border-zinc-800 text-zinc-400' : 'bg-white border-slate-200 text-zinc-500'
+                                  }`}
+                                />
+                              </div>
+                            </div>
+
+                            {/* CPI m/m */}
+                            <div>
+                              <label className="text-zinc-500 block mb-0.5 font-bold">CPI m/m</label>
+                              <div className="flex gap-1">
+                                <input
+                                  type="number"
+                                  step="0.05"
+                                  value={cpiMmAct}
+                                  onChange={(e) => {
+                                    setCpiMmAct(Number(e.target.value));
+                                    setSelectedIndicatorMonth('Custom');
+                                  }}
+                                  placeholder="Act"
+                                  className={`w-full p-1 rounded-md text-center font-mono font-bold text-[10px] ${
+                                    isDarkMode ? 'bg-zinc-900 border-zinc-800 text-amber-400' : 'bg-white border-slate-200 text-amber-600'
+                                  }`}
+                                />
+                                <input
+                                  type="number"
+                                  step="0.05"
+                                  value={cpiMmFc}
+                                  onChange={(e) => {
+                                    setCpiMmFc(Number(e.target.value));
+                                    setSelectedIndicatorMonth('Custom');
+                                  }}
+                                  placeholder="Fc"
+                                  className={`w-full p-1 rounded-md text-center font-mono text-[10px] ${
+                                    isDarkMode ? 'bg-zinc-900 border-zinc-800 text-zinc-400' : 'bg-white border-slate-200 text-zinc-500'
+                                  }`}
+                                />
+                              </div>
+                            </div>
+
+                            {/* Core CPI m/m */}
+                            <div>
+                              <label className="text-zinc-500 block mb-0.5 font-bold">Core CPI m/m</label>
+                              <div className="flex gap-1">
+                                <input
+                                  type="number"
+                                  step="0.05"
+                                  value={coreCpiMmAct}
+                                  onChange={(e) => {
+                                    setCoreCpiMmAct(Number(e.target.value));
+                                    setSelectedIndicatorMonth('Custom');
+                                  }}
+                                  placeholder="Act"
+                                  className={`w-full p-1 rounded-md text-center font-mono font-bold text-[10px] ${
+                                    isDarkMode ? 'bg-zinc-900 border-zinc-800 text-amber-400' : 'bg-white border-slate-200 text-amber-600'
+                                  }`}
+                                />
+                                <input
+                                  type="number"
+                                  step="0.05"
+                                  value={coreCpiMmFc}
+                                  onChange={(e) => {
+                                    setCoreCpiMmFc(Number(e.target.value));
+                                    setSelectedIndicatorMonth('Custom');
+                                  }}
+                                  placeholder="Fc"
+                                  className={`w-full p-1 rounded-md text-center font-mono text-[10px] ${
+                                    isDarkMode ? 'bg-zinc-900 border-zinc-800 text-zinc-400' : 'bg-white border-slate-200 text-zinc-500'
+                                  }`}
+                                />
+                              </div>
+                            </div>
+
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Prediction Output Bias Meter */}
+                    <div className={`mt-4 p-4 rounded-xl border flex flex-col sm:flex-row items-center gap-4 ${ratePredictor.bgClass}`}>
+                      
+                      {/* Left circular or percentage widget */}
+                      <div className="shrink-0 flex flex-col items-center justify-center h-16 w-16 rounded-full border border-zinc-200/20 bg-zinc-950/40 font-mono text-center relative">
+                        <span className={`text-md font-black ${ratePredictor.colorClass}`}>
+                          {ratePredictor.percentage > 0 ? `+${ratePredictor.percentage}%` : `${ratePredictor.percentage}%`}
+                        </span>
+                        <span className="text-[8px] uppercase tracking-wider text-zinc-500 font-bold block mt-0.5">Bias</span>
+                      </div>
+
+                      {/* Right dynamic explanatory text */}
+                      <div className="space-y-1 text-center sm:text-left">
+                        <div className="flex items-center justify-center sm:justify-start gap-2">
+                          <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                            ratePredictor.result === 'Hike' ? 'bg-rose-500/20 text-rose-400' :
+                            ratePredictor.result === 'Cut' ? 'bg-emerald-500/20 text-emerald-400' :
+                            'bg-amber-500/20 text-amber-400'
+                          }`}>
+                            Fed Policy Rate Target
+                          </span>
+                          <span className="text-[9px] text-zinc-500 font-semibold">Calculated Live</span>
+                        </div>
+                        <h5 className={`text-xs font-black ${ratePredictor.colorClass}`}>
+                          {ratePredictor.label}
+                        </h5>
+                        <p className="text-[10px] leading-relaxed text-zinc-400 font-sans">
+                          {ratePredictor.desc}
+                        </p>
+                      </div>
+
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* 2. LOWER PANEL: Form & Logs History side-by-side */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                  
+                  {/* Left Column: Create Macro Analysis Form Card */}
+                  <div className="lg:col-span-1">
+                    <div className={`p-6 rounded-2xl border transition-all h-fit ${
+                      isDarkMode ? 'bg-zinc-900/40 border-zinc-800/80 text-zinc-100' : 'bg-white border-slate-200/80 shadow-xs text-slate-800'
+                    }`}>
+                      <div className="flex items-center space-x-3 mb-5 pb-4 border-b border-zinc-200/30 dark:border-zinc-800/80">
+                        <div className="bg-sky-500/10 p-2 rounded-xl text-sky-500">
+                          <Globe className="h-6 w-6" />
+                        </div>
                         <div>
-                          <label className={`block text-[11px] font-bold uppercase tracking-wider mb-1 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
-                            Key Demand & Supply Levels
-                          </label>
-                          <textarea
-                            value={macroKeyDemandSupply}
-                            onChange={(e) => setMacroKeyDemandSupply(e.target.value)}
-                            placeholder="အဓိက အဝယ်/အရောင်း ဇုန်များ (ဥပမာ- Supply 2540-2550)..."
-                            rows={2}
-                            className={`w-full p-2 rounded-xl text-xs border focus:outline-hidden transition-all ${
-                              isDarkMode 
-                                ? 'bg-zinc-900 border-zinc-800 focus:border-slate-500/50 focus:ring-2 focus:ring-slate-500/10 text-zinc-100' 
-                                : 'bg-slate-50 border-slate-200 focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 text-slate-800'
-                            }`}
-                          />
+                          <h4 className="text-md font-bold">New Macro Analysis</h4>
+                          <p className="text-xs text-zinc-500 mt-0.5">ဈေးကွက် Trend ကြီးများနှင့် bias သတ်မှတ်ရန်</p>
                         </div>
                       </div>
 
-                      <button
-                        type="submit"
-                        className="w-full inline-flex items-center justify-center space-x-2 bg-slate-900 hover:bg-slate-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 text-white dark:text-zinc-950 font-bold text-xs px-4 py-3 rounded-xl transition-all cursor-pointer shadow-xs"
-                      >
-                        <Plus className="h-4 w-4" />
-                        <span>Save Analysis Log (မှတ်တမ်းသိမ်းရန်)</span>
-                      </button>
-                    </form>
+                      <form onSubmit={handleAddMacroLog} className="space-y-4">
+                        <div>
+                          <label className={`block text-[11px] font-bold uppercase tracking-wider mb-1.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                            Weekly Market Bias
+                          </label>
+                          <div className="grid grid-cols-3 gap-2">
+                            {(['Bullish', 'Bearish', 'Ranging'] as const).map((bias) => (
+                              <button
+                                key={bias}
+                                type="button"
+                                onClick={() => setMacroWeeklyBias(bias)}
+                                className={`py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
+                                  macroWeeklyBias === bias 
+                                    ? (bias === 'Bullish' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' :
+                                       bias === 'Bearish' ? 'bg-rose-500/10 border-rose-500/30 text-rose-400' :
+                                       'bg-amber-500/10 border-amber-500/30 text-amber-400')
+                                    : (isDarkMode ? 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100')
+                                }`}
+                              >
+                                {bias}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Timeframe Structure Matrix Grid */}
+                        <div className="border-t border-b border-zinc-200/30 dark:border-zinc-800/80 py-3 my-2 space-y-2">
+                          <span className={`block text-[10px] font-bold uppercase tracking-wider ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                            Multi-Timeframe Structure Matrix
+                          </span>
+                          
+                          <div className="space-y-2">
+                            {([
+                              { key: 'm1', label: 'Monthly Trend (M1)' },
+                              { key: 'w1', label: 'Weekly Trend (W1)' },
+                              { key: 'd1', label: 'Daily Trend (D1)' },
+                              { key: 'h4', label: '4-Hour Trend (H4)' },
+                              { key: 'h1', label: '1-Hour Trend (H1)' }
+                            ] as const).map(({ key, label }) => (
+                              <div key={key} className="flex items-center justify-between">
+                                <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">{label}</span>
+                                <div className="flex gap-1">
+                                  {(['Bullish', 'Bearish', 'Ranging'] as const).map((bias) => (
+                                    <button
+                                      key={bias}
+                                      type="button"
+                                      onClick={() => setMacroTimeframeMatrix({
+                                        ...macroTimeframeMatrix,
+                                        [key]: bias
+                                      })}
+                                      className={`px-2 py-0.5 text-[10px] font-bold rounded-sm border transition-all cursor-pointer ${
+                                        macroTimeframeMatrix[key] === bias
+                                          ? (bias === 'Bullish' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' :
+                                             bias === 'Bearish' ? 'bg-rose-500/10 border-rose-500/30 text-rose-400' :
+                                             'bg-amber-500/10 border-amber-500/30 text-amber-400')
+                                          : (isDarkMode ? 'bg-zinc-900 border-zinc-800 text-zinc-500' : 'bg-slate-50 border-slate-200 text-slate-500')
+                                      }`}
+                                    >
+                                      {bias === 'Bullish' ? '▲' : bias === 'Bearish' ? '▼' : '■'}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="space-y-3">
+                          <div>
+                            <label className={`block text-[11px] font-bold uppercase tracking-wider mb-1 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                              Fundamental & Sentiment Factors
+                            </label>
+                            <textarea
+                              value={macroFundamentalSentiment}
+                              onChange={(e) => setMacroFundamentalSentiment(e.target.value)}
+                              placeholder="သတင်းများ၊ FOMC, CPI, central bank sentiment သို့မဟုတ် ဈေးကွက်ခံစားချက်များ..."
+                              rows={2}
+                              className={`w-full p-2 rounded-xl text-xs border focus:outline-hidden transition-all ${
+                                isDarkMode 
+                                  ? 'bg-zinc-900 border-zinc-800 focus:border-slate-500/50 focus:ring-2 focus:ring-slate-500/10 text-zinc-100' 
+                                  : 'bg-slate-50 border-slate-200 focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 text-slate-800'
+                              }`}
+                            />
+                          </div>
+
+                          <div>
+                            <label className={`block text-[11px] font-bold uppercase tracking-wider mb-1 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                              Intermarket Correlation Notes
+                            </label>
+                            <textarea
+                              value={macroCorrelationNotes}
+                              onChange={(e) => setMacroCorrelationNotes(e.target.value)}
+                              placeholder="DXY, Yields, Correlation details..."
+                              rows={2}
+                              className={`w-full p-2 rounded-xl text-xs border focus:outline-hidden transition-all ${
+                                isDarkMode 
+                                  ? 'bg-zinc-900 border-zinc-800 focus:border-slate-500/50 focus:ring-2 focus:ring-slate-500/10 text-zinc-100' 
+                                  : 'bg-slate-50 border-slate-200 focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 text-slate-800'
+                              }`}
+                            />
+                          </div>
+
+                          <div>
+                            <label className={`block text-[11px] font-bold uppercase tracking-wider mb-1 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                              Key Demand & Supply Levels
+                            </label>
+                            <textarea
+                              value={macroKeyDemandSupply}
+                              onChange={(e) => setMacroKeyDemandSupply(e.target.value)}
+                              placeholder="အဓိက အဝယ်/အရောင်း ဇုန်များ (ဥပမာ- Supply 2540-2550)..."
+                              rows={2}
+                              className={`w-full p-2 rounded-xl text-xs border focus:outline-hidden transition-all ${
+                                isDarkMode 
+                                  ? 'bg-zinc-900 border-zinc-800 focus:border-slate-500/50 focus:ring-2 focus:ring-slate-500/10 text-zinc-100' 
+                                  : 'bg-slate-50 border-slate-200 focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 text-slate-800'
+                              }`}
+                            />
+                          </div>
+                        </div>
+
+                        <button
+                          type="submit"
+                          className="w-full inline-flex items-center justify-center space-x-2 bg-slate-900 hover:bg-slate-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 text-white dark:text-zinc-950 font-bold text-xs px-4 py-3 rounded-xl transition-all cursor-pointer shadow-xs"
+                        >
+                          <Plus className="h-4 w-4" />
+                          <span>Save Analysis Log (မှတ်တမ်းသိမ်းရန်)</span>
+                        </button>
+                      </form>
+                    </div>
                   </div>
 
                   {/* Right Column: Macro Market Analysis Logs List */}
