@@ -2309,19 +2309,19 @@ export default function Home() {
             }`}>
               {/* Premium Ambient Background Glow */}
               <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-48 h-48 rounded-full blur-3xl opacity-20 pointer-events-none transition-colors ${
-                isDarkMode ? 'bg-indigo-500/20' : 'bg-blue-500/15'
+                isDarkMode ? 'bg-teal-500/20' : 'bg-teal-500/15'
               }`}></div>
 
               <div className="relative z-10 flex flex-col items-center">
                 {/* Visual Icon Header */}
                 <div className="relative mb-6">
                   <div className={`absolute inset-0 rounded-full animate-ping opacity-15 scale-125 ${
-                    isDarkMode ? 'bg-indigo-400' : 'bg-blue-400'
+                    isDarkMode ? 'bg-teal-400' : 'bg-teal-400'
                   }`}></div>
                   <div className={`relative p-4 rounded-2xl shadow-md border ${
                     isDarkMode 
-                      ? 'bg-zinc-800/80 border-zinc-700/80 text-indigo-400' 
-                      : 'bg-slate-50 border-slate-100 text-blue-600'
+                      ? 'bg-zinc-800/80 border-zinc-700/80 text-teal-400' 
+                      : 'bg-slate-50 border-slate-100 text-teal-600'
                   }`}>
                     {/* Cloud Drive Sync icon */}
                     <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -2344,7 +2344,7 @@ export default function Home() {
                   isDarkMode ? 'bg-zinc-800' : 'bg-slate-100'
                 }`}>
                   <div className={`absolute top-0 bottom-0 left-0 bg-gradient-to-r ${
-                    isDarkMode ? 'from-indigo-500 to-purple-500' : 'from-blue-500 to-indigo-500'
+                    isDarkMode ? 'from-teal-500 to-teal-500' : 'from-teal-500 to-teal-500'
                   } animate-drive-progress rounded-full`} style={{ width: '40%' }}></div>
                 </div>
 
@@ -2363,8 +2363,8 @@ export default function Home() {
                   </div>
                   <div className="flex items-center space-x-2.5 text-xs font-medium">
                     <span className="flex h-2 w-2 relative">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-teal-500"></span>
                     </span>
                     <span className={isDarkMode ? 'text-zinc-400' : 'text-slate-500'}>
                       Syncing Trading Journal Sheets...
@@ -2372,8 +2372,8 @@ export default function Home() {
                   </div>
                   <div className="flex items-center space-x-2.5 text-xs font-medium">
                     <span className="flex h-2 w-2 relative">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-500"></span>
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-teal-500"></span>
                     </span>
                     <span className={isDarkMode ? 'text-zinc-400' : 'text-slate-500'}>
                       Syncing Strategy Notes & Docs...
@@ -2946,7 +2946,7 @@ export default function Home() {
                                     </span>
                                   ) : trade.winLoss === 'Trailing Stop' ? (
                                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                      isDarkMode ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' : 'bg-purple-50 text-purple-700 border border-purple-100'
+                                      isDarkMode ? 'bg-teal-500/10 text-teal-400 border border-teal-500/20' : 'bg-teal-50 text-teal-700 border border-teal-100'
                                     }`}>
                                       Trailing Stop
                                     </span>
@@ -2995,7 +2995,7 @@ export default function Home() {
                                               }`}
                                               title="Before Trade SS"
                                             >
-                                              <ImageIcon className="h-2.5 w-2.5 text-blue-500" />
+                                              <ImageIcon className="h-2.5 w-2.5 text-teal-500" />
                                               <span>B</span>
                                             </a>
                                           )}
@@ -3108,7 +3108,7 @@ export default function Home() {
                                 </span>
                               ) : trade.winLoss === 'Trailing Stop' ? (
                                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                  isDarkMode ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' : 'bg-purple-50 text-purple-700 border border-purple-100'
+                                  isDarkMode ? 'bg-teal-500/10 text-teal-400 border border-teal-500/20' : 'bg-teal-50 text-teal-700 border border-teal-100'
                                 }`}>
                                   Trailing Stop
                                 </span>
@@ -3188,7 +3188,7 @@ export default function Home() {
                                         : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200 shadow-2xs'
                                     }`}
                                   >
-                                    <ImageIcon className="h-3 w-3 text-blue-500" />
+                                    <ImageIcon className="h-3 w-3 text-teal-500" />
                                     <span>View SS</span>
                                   </a>
                                 </div>
@@ -3420,7 +3420,7 @@ export default function Home() {
                         isDarkMode ? 'bg-zinc-950/40 border-zinc-800' : 'bg-slate-50/50 border-slate-100'
                       }`}>
                         <span className="text-[10px] uppercase font-bold text-slate-400">Target Total Reward</span>
-                        <div className="text-xl font-black mt-0.5 text-sky-500">
+                        <div className="text-xl font-black mt-0.5 text-teal-500">
                           {microLogs.reduce((acc, log) => acc + log.pnlR, 0).toFixed(1)}R
                         </div>
                       </div>
@@ -3605,7 +3605,7 @@ export default function Home() {
                                     ? 'bg-zinc-100 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-500'
                                     : m.originalDate === nextFomcMeeting?.originalDate && m.year === nextFomcMeeting?.year
                                       ? 'bg-amber-500/10 border-amber-500/30 text-amber-500'
-                                      : 'bg-sky-500/5 border-sky-500/20 text-sky-500'
+                                      : 'bg-teal-500/5 border-teal-500/20 text-teal-500'
                                 }`}>
                                   <span className="text-[8px] uppercase tracking-wider">{m.date.split(' ')[0]}</span>
                                   <span className="text-xs mt-0.5">{m.date.split(' ')[1]?.split('–')[0] || m.date.split(' ')[1]}</span>
@@ -3635,7 +3635,7 @@ export default function Home() {
                                     Next
                                   </span>
                                 ) : (
-                                  <span className="text-[9px] font-bold uppercase text-sky-500 px-1.5 py-0.5 rounded-md bg-sky-500/10 border border-sky-500/20">
+                                  <span className="text-[9px] font-bold uppercase text-teal-500 px-1.5 py-0.5 rounded-md bg-teal-500/10 border border-teal-500/20">
                                     Upcoming
                                   </span>
                                 )}
@@ -3662,7 +3662,7 @@ export default function Home() {
                       {/* Card Header */}
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 mb-4 border-b border-zinc-200/30 dark:border-zinc-800/80 gap-3">
                         <div className="flex items-center space-x-2.5">
-                          <div className="bg-sky-500/10 p-2 rounded-xl text-sky-500">
+                          <div className="bg-teal-500/10 p-2 rounded-xl text-teal-500">
                             <Activity className="h-5 w-5" />
                           </div>
                           <div>
@@ -3694,7 +3694,7 @@ export default function Home() {
                       <div className={`mb-4 p-2.5 rounded-xl border text-[10px] flex items-start gap-2 leading-relaxed ${
                         isDarkMode ? 'bg-zinc-900/30 border-zinc-800/50 text-zinc-400' : 'bg-slate-50 border-slate-150 text-slate-600'
                       }`}>
-                        <HelpCircle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-sky-500" />
+                        <HelpCircle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-teal-500" />
                         <span>
                           NFP သည် လဆန်းတွင်ထွက်ပြီး CPI (အဓိက Indicator ၄ ခု) သည် လလယ်တွင်ထွက်ရှိပါသည်။ ဤဒေတာနှစ်ခုလုံးသည် FOMC အတိုးနှုန်းတိုးမြှင့်ရန် (**Hike**), လျှော့ချရန် (**Cut**), သို့မဟုတ် ထိန်းသိမ်းရန် (**Pause**) ဆုံးဖြတ်ချက်ကို တိုက်ရိုက်သတ်မှတ်ပေးပါသည်။
                         </span>
@@ -3706,7 +3706,7 @@ export default function Home() {
                         {/* NFP Input Card */}
                         <div className={`p-4 rounded-xl border ${isDarkMode ? 'bg-zinc-950/20 border-zinc-800/60' : 'bg-slate-50/40 border-slate-150'}`}>
                           <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-bold text-sky-500 flex items-center gap-1">
+                            <span className="text-xs font-bold text-teal-500 flex items-center gap-1">
                               🇺🇸 NFP Employment
                             </span>
                             <span className="text-[9px] text-zinc-500 font-medium">1st Friday • 8:30 AM ET</span>
@@ -3716,7 +3716,7 @@ export default function Home() {
                             <div>
                               <div className="flex justify-between text-[10px] mb-1 font-medium">
                                 <span className="text-zinc-400">Actual (အမှန်ထွက်ရှိချက်)</span>
-                                <span className="font-mono font-bold text-sky-400">{nfpAct}k</span>
+                                <span className="font-mono font-bold text-teal-400">{nfpAct}k</span>
                               </div>
                               <input
                                 type="range"
@@ -3728,7 +3728,7 @@ export default function Home() {
                                   setNfpAct(Number(e.target.value));
                                   setSelectedIndicatorMonth('Custom');
                                 }}
-                                className="w-full accent-sky-500 cursor-pointer h-1 bg-zinc-800 rounded-lg"
+                                className="w-full accent-teal-500 cursor-pointer h-1 bg-zinc-800 rounded-lg"
                               />
                             </div>
 
@@ -3952,7 +3952,7 @@ export default function Home() {
                       isDarkMode ? 'bg-zinc-900/40 border-zinc-800/80 text-zinc-100' : 'bg-white border-slate-200/80 shadow-xs text-slate-800'
                     }`}>
                       <div className="flex items-center space-x-3 mb-5 pb-4 border-b border-zinc-200/30 dark:border-zinc-800/80">
-                        <div className="bg-sky-500/10 p-2 rounded-xl text-sky-500">
+                        <div className="bg-teal-500/10 p-2 rounded-xl text-teal-500">
                           <Globe className="h-6 w-6" />
                         </div>
                         <div>
@@ -4099,7 +4099,7 @@ export default function Home() {
                     <div className="flex items-center justify-between mb-5 border-b pb-4 border-zinc-200/30 dark:border-zinc-800/80">
                       <div>
                         <h4 className="text-sm font-bold flex items-center gap-2">
-                          <BookOpen className="h-4 w-4 text-sky-500" />
+                          <BookOpen className="h-4 w-4 text-teal-500" />
                           Market Structure & Bias History ({macroLogs.length})
                         </h4>
                       </div>
@@ -4214,7 +4214,7 @@ export default function Home() {
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-5 border-b border-zinc-200/30 dark:border-zinc-800/80">
                     <div>
                       <h4 className={`text-xl font-bold flex items-center gap-2.5 ${isDarkMode ? 'text-zinc-100' : 'text-slate-900'}`}>
-                        <ImageIcon className="h-5.5 w-5.5 text-indigo-500" />
+                        <ImageIcon className="h-5.5 w-5.5 text-teal-500" />
                         Trading Learning Notes & Blog
                       </h4>
                       <p className="text-xs text-slate-400 mt-1">
@@ -4234,7 +4234,7 @@ export default function Home() {
                           setLearningError(null);
                           setShowLearningModal(true);
                         }}
-                        className="inline-flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-md hover:shadow-lg transition-all duration-150 cursor-pointer animate-fade-in"
+                        className="inline-flex items-center space-x-1.5 bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-md hover:shadow-lg transition-all duration-150 cursor-pointer animate-fade-in"
                       >
                         <Plus className="h-4 w-4" />
                         <span>သင်ခန်းစာသစ်ရေးရန်</span>
@@ -4245,12 +4245,12 @@ export default function Home() {
                   {/* Privacy Guard Notice banner */}
                   <div className={`mt-4 px-4 py-3 rounded-xl border flex items-center gap-3 text-xs font-medium leading-relaxed ${
                     isDarkMode 
-                      ? 'bg-indigo-950/10 border-indigo-900/40 text-indigo-300' 
-                      : 'bg-indigo-50/50 border-indigo-100 text-indigo-700'
+                      ? 'bg-teal-950/10 border-teal-900/40 text-teal-300' 
+                      : 'bg-teal-50/50 border-teal-100 text-teal-700'
                   }`}>
                     <span className="flex h-2 w-2 relative shrink-0">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-teal-500"></span>
                     </span>
                     <span>
                       🔒 <strong>လုံခြုံရေးအပြည့်ရှိပါသည် -</strong> ဤမှတ်စုများသည် သင်၏ Google Account ({user?.email}) ဖြင့်သာ တိုက်ရိုက်ချိတ်ဆက်ထားပြီး အခြားမည်သူမျှ လုံးဝကြည့်ရှု၍မရပါ။ Account ထွက်လိုက်ပါက အလိုအလျောက် ပိတ်သွားမည်ဖြစ်ပါသည်။
@@ -4266,7 +4266,7 @@ export default function Home() {
                           value={searchQuery}
                           onChange={(e) => setSearchQuery(e.target.value)}
                           placeholder="သင်ခန်းစာ ခေါင်းစဉ် သို့မဟုတ် အကြောင်းအရာ ရှာဖွေရန်..."
-                          className={`w-full pl-9 pr-4 py-2 border rounded-xl text-xs focus:outline-hidden focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 ${
+                          className={`w-full pl-9 pr-4 py-2 border rounded-xl text-xs focus:outline-hidden focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 ${
                             isDarkMode ? 'bg-zinc-900 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 text-slate-700'
                           }`}
                         />
@@ -4285,7 +4285,7 @@ export default function Home() {
                         onClick={() => setSelectedFilterTag(null)}
                         className={`px-3 py-1.5 rounded-xl font-semibold cursor-pointer transition-all duration-150 ${
                           selectedFilterTag === null
-                            ? 'bg-indigo-600 text-white shadow-xs'
+                            ? 'bg-teal-600 text-white shadow-xs'
                             : isDarkMode 
                               ? 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-850' 
                               : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -4302,7 +4302,7 @@ export default function Home() {
                             onClick={() => setSelectedFilterTag(tag)}
                             className={`px-3 py-1.5 rounded-xl font-semibold cursor-pointer transition-all duration-150 ${
                               selectedFilterTag === tag
-                                ? 'bg-indigo-600 text-white shadow-xs'
+                                ? 'bg-teal-600 text-white shadow-xs'
                                 : isDarkMode 
                                   ? 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-850' 
                                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -4320,7 +4320,7 @@ export default function Home() {
                   {/* Learning Notes Content Grid */}
                   {isLearningNotesLoading ? (
                     <div className="py-24 text-center">
-                      <RefreshCw className="h-8 w-8 text-indigo-600 animate-spin mx-auto mb-3" />
+                      <RefreshCw className="h-8 w-8 text-teal-600 animate-spin mx-auto mb-3" />
                       <p className="text-sm font-semibold text-slate-500">သင်ခန်းစာအချက်အလက်များ ဆွဲယူနေပါသည်...</p>
                     </div>
                   ) : (
@@ -4358,7 +4358,7 @@ export default function Home() {
                                     setLearningError(null);
                                     setShowLearningModal(true);
                                   }}
-                                  className="inline-flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 py-2.5 rounded-xl cursor-pointer"
+                                  className="inline-flex items-center space-x-1.5 bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs px-4 py-2.5 rounded-xl cursor-pointer"
                                 >
                                   <Plus className="h-3.5 w-3.5" />
                                   <span>သင်ခန်းစာမှတ်စုအသစ် စရေးရန်</span>
@@ -4409,7 +4409,7 @@ export default function Home() {
                                       {note.createdAt ? new Date(note.createdAt).toLocaleDateString('my-MM', { year: 'numeric', month: 'short', day: 'numeric' }) : 'မှတ်တမ်းမရှိ'}
                                     </span>
                                     <h5 
-                                      className="font-bold text-sm tracking-tight hover:text-indigo-500 dark:hover:text-indigo-400 cursor-pointer line-clamp-1 mb-1.5"
+                                      className="font-bold text-sm tracking-tight hover:text-teal-500 dark:hover:text-teal-400 cursor-pointer line-clamp-1 mb-1.5"
                                       onClick={() => setSelectedLearningNote(note)}
                                     >
                                       {note.title}
@@ -4427,8 +4427,8 @@ export default function Home() {
                                             }}
                                             className={`text-[10px] px-2 py-0.5 rounded-md font-semibold cursor-pointer transition-all hover:scale-105 duration-100 ${
                                               isDarkMode 
-                                                ? 'bg-indigo-950/40 text-indigo-300 border border-indigo-900/40 hover:bg-indigo-900/30' 
-                                                : 'bg-indigo-50 text-indigo-700 border border-indigo-100 hover:bg-indigo-100'
+                                                ? 'bg-teal-950/40 text-teal-300 border border-teal-900/40 hover:bg-teal-900/30' 
+                                                : 'bg-teal-50 text-teal-700 border border-teal-100 hover:bg-teal-100'
                                             }`}
                                           >
                                             #{tag}
@@ -4454,7 +4454,7 @@ export default function Home() {
                                 }`}>
                                   <button
                                     onClick={() => setSelectedLearningNote(note)}
-                                    className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                                    className="text-xs font-bold text-teal-600 dark:text-teal-400 hover:underline cursor-pointer"
                                   >
                                     အပြည့်အစုံဖတ်ရန် (View Details)
                                   </button>
@@ -4957,7 +4957,7 @@ export default function Home() {
                         Breakeven
                       </span>
                     ) : selectedTrade.winLoss === 'Trailing Stop' ? (
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-teal-500/10 dark:bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-200 dark:border-teal-500/20">
                         Trailing Stop
                       </span>
                     ) : (
@@ -5083,7 +5083,7 @@ export default function Home() {
                           <div className={`relative flex flex-col items-center p-3 rounded-xl border ${
                             isDarkMode ? 'bg-zinc-900/20 border-zinc-800/60' : 'bg-slate-50 border-slate-200/60'
                           }`}>
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-blue-500 mb-2">Before Trade</span>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-teal-500 mb-2">Before Trade</span>
                             <div className="relative w-full aspect-video rounded-lg overflow-hidden border dark:border-zinc-800 group">
                               <img 
                                 src={getDirectDriveImageUrl(beforePhoto)} 
@@ -5495,7 +5495,7 @@ export default function Home() {
                                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                               />
                               <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-zinc-500 dark:text-zinc-400">
-                                <Plus className="h-4 w-4 text-blue-500" />
+                                <Plus className="h-4 w-4 text-teal-500" />
                                 <span>B (Before) ပုံတင်ရန်</span>
                               </div>
                               <p className="text-[10px] text-zinc-400 mt-1 font-medium">နှိပ်ပါ သို့မဟုတ် ဆွဲထည့်ပါ (Drag & Drop)</p>
@@ -5632,7 +5632,7 @@ export default function Home() {
                   {isLearningModalFullPage && (
                     <>
                       <span>/</span>
-                      <span className="text-[10px] bg-indigo-500/10 text-indigo-400 px-1.5 py-0.5 rounded font-bold">Full Page</span>
+                      <span className="text-[10px] bg-teal-500/10 text-teal-400 px-1.5 py-0.5 rounded font-bold">Full Page</span>
                     </>
                   )}
                 </div>
@@ -5716,7 +5716,7 @@ export default function Home() {
                             learningNoteTags.map((tag, idx) => (
                               <span
                                 key={idx}
-                                className="inline-flex items-center gap-1.5 bg-indigo-500/10 text-indigo-400 px-2.5 py-0.5 rounded-md text-xs font-semibold border border-indigo-500/10"
+                                className="inline-flex items-center gap-1.5 bg-teal-500/10 text-teal-400 px-2.5 py-0.5 rounded-md text-xs font-semibold border border-teal-500/10"
                               >
                                 #{tag}
                                 <button
@@ -5753,7 +5753,7 @@ export default function Home() {
                                     }}
                                     className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
                                       isSelected 
-                                        ? 'bg-indigo-600 text-white font-bold' 
+                                        ? 'bg-teal-600 text-white font-bold' 
                                         : isDarkMode ? 'bg-zinc-800 text-zinc-400 hover:bg-zinc-750' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
                                     }`}
                                   >
@@ -5782,7 +5782,7 @@ export default function Home() {
                                 }
                               }
                             }}
-                            className={`px-2.5 py-1.5 border rounded-lg text-xs w-full focus:outline-hidden focus:border-indigo-500 ${
+                            className={`px-2.5 py-1.5 border rounded-lg text-xs w-full focus:outline-hidden focus:border-teal-500 ${
                               isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-800'
                             }`}
                           />
@@ -5880,7 +5880,7 @@ export default function Home() {
                   <button
                     type="submit"
                     disabled={isSavingLearningNote}
-                    className="inline-flex justify-center items-center bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-semibold text-sm px-5 py-2 rounded-xl transition-all duration-150 cursor-pointer shadow-xs"
+                    className="inline-flex justify-center items-center bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white font-semibold text-sm px-5 py-2 rounded-xl transition-all duration-150 cursor-pointer shadow-xs"
                   >
                     {isSavingLearningNote ? (
                       <>
@@ -5957,7 +5957,7 @@ export default function Home() {
                     />
                     <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-colors duration-250 flex items-center justify-center opacity-0 group-hover:opacity-100">
                       <span className="bg-black/75 text-zinc-100 text-xs font-bold px-3 py-2 rounded-xl flex items-center space-x-2 backdrop-blur-xs shadow-lg transform translate-y-2 group-hover:translate-y-0 transition-all duration-250">
-                        <ZoomIn className="h-4 w-4 text-indigo-400" />
+                        <ZoomIn className="h-4 w-4 text-teal-400" />
                         <span>အပြည့်ချဲ့ကြည့်ရန် နှိပ်ပါ</span>
                       </span>
                     </div>
@@ -5972,8 +5972,8 @@ export default function Home() {
                         key={idx} 
                         className={`text-xs px-2.5 py-1 rounded-lg font-bold border ${
                           isDarkMode 
-                            ? 'bg-indigo-950/40 text-indigo-300 border-indigo-900/30' 
-                            : 'bg-indigo-50 text-indigo-700 border-indigo-100'
+                            ? 'bg-teal-950/40 text-teal-300 border-teal-900/30' 
+                            : 'bg-teal-50 text-teal-700 border-teal-100'
                         }`}
                       >
                         #{tag}
@@ -6004,9 +6004,9 @@ export default function Home() {
                       href={selectedLearningNote.docUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center space-x-1.5 px-3 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer border border-sky-500/30 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 shadow-sm"
+                      className="inline-flex items-center space-x-1.5 px-3 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer border border-teal-500/30 bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 shadow-sm"
                     >
-                      <BookOpen className="h-3.5 w-3.5 text-sky-400" />
+                      <BookOpen className="h-3.5 w-3.5 text-teal-400" />
                       <span>Google Doc ဖြင့် ဖတ်ရှုရန်</span>
                     </a>
                   )}
@@ -6038,7 +6038,7 @@ export default function Home() {
                     onClick={() => {
                       setSelectedLearningNote(null);
                     }}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 py-2 rounded-lg transition-colors cursor-pointer shadow-xs"
+                    className="bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs px-4 py-2 rounded-lg transition-colors cursor-pointer shadow-xs"
                   >
                     Close
                   </button>
@@ -6097,7 +6097,7 @@ export default function Home() {
               />
               {/* Optional Caption */}
               <div className="mt-4 px-4 py-1.5 bg-zinc-950/85 backdrop-blur-xs border border-zinc-800/40 rounded-full flex items-center space-x-2 shadow-lg">
-                <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-ping" />
+                <span className="w-1.5 h-1.5 bg-teal-500 rounded-full animate-ping" />
                 <span className="text-[10px] sm:text-xs text-zinc-300 font-bold tracking-wider">
                   အပြည့်ချဲ့၍ ကြည့်ရှုနေသည် (Fullscreen View)
                 </span>

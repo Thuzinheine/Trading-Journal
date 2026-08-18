@@ -133,10 +133,16 @@ async function uploadImageToDrive(token: string, photoData: string, assetName: s
         'Authorization': `Bearer ${token}`,
         'Content-Type': mimeType,
       },
-      body: buffer,
+      body: new Uint8Array(buffer),
     });
 
-    if (uploadRes.ok) {
+    if (!uploadRes.ok) {
+      const errText = await uploadRes.text();
+      throw new Error(`Media upload failed (${uploadRes.status}): ${errText}`);
+    }
+
+    // Share the file publicly so anyone with the link can view it (required for rendering in standard browser image tags)
+    try {
       await driveFetch(token, `/drive/v3/files/${fileId}/permissions`, {
         method: 'POST',
         body: JSON.stringify({
@@ -144,9 +150,12 @@ async function uploadImageToDrive(token: string, photoData: string, assetName: s
           type: 'anyone',
         }),
       });
-      const fileMeta = await driveFetch(token, `/drive/v3/files/${fileId}?fields=webViewLink,webContentLink`);
-      return fileMeta.webViewLink || fileMeta.webContentLink || '';
+    } catch (permErr) {
+      console.error('Error sharing image file publicly (possibly restricted by Workspace admin):', permErr);
     }
+
+    const fileMeta = await driveFetch(token, `/drive/v3/files/${fileId}?fields=webViewLink,webContentLink`);
+    return fileMeta.webViewLink || fileMeta.webContentLink || '';
   } catch (err) {
     console.error('Error in uploadImageToDrive:', err);
   }
@@ -1053,7 +1062,7 @@ export async function POST(req: NextRequest) {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': mimeType,
               },
-              body: buffer,
+              body: new Uint8Array(buffer),
             });
 
             if (uploadRes.ok) {
@@ -1174,7 +1183,7 @@ export async function POST(req: NextRequest) {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': mimeType,
               },
-              body: buffer,
+              body: new Uint8Array(buffer),
             });
 
             if (uploadRes.ok) {
