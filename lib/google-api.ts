@@ -3,17 +3,24 @@
 export interface Trade {
   row: number; // 1-based index corresponding to sheet row (row 1 is headers, trades start at 2)
   id: string;
+  tradeNumber: string;
   date: string;
-  pair: string;
-  type: 'Buy' | 'Sell';
+  pair: string; // Pair / Asset
   entryPrice: number;
   sl: number;
   tp: number;
   rr: string;
-  strategy: string;
-  winLoss: 'Win' | 'Loss' | 'Pending';
+  watchlist: string; // Watchlist Details/ Setup
+  winLoss: 'TP' | 'SL' | 'Breakeven' | 'Trailing Stop' | 'Pending'; // Result (TP/SL)
   pnl: string;
-  notes: string;
+  notes: string; // Remarks/ Note
+  commitment: string;
+  tradePhoto?: string; // Trade SS (B&F)
+  tradePhotoBefore?: string;
+  tradePhotoAfter?: string;
+  type?: 'Buy' | 'Sell'; // Optional for fallback
+  strategy?: string; // Optional for fallback
+  emotion?: string; // Optional for fallback
 }
 
 // Global helper for calling the local API proxy
@@ -113,6 +120,14 @@ export async function deleteTradeRow(
   rowIndex: number // 1-based sheet row index (e.g. 2, 3...)
 ): Promise<void> {
   await callProxy(accessToken, 'deleteTrade', { spreadsheetId, rowIndex });
+}
+
+// Clear all trades and seed with a single correct sample row
+export async function clearAndSeedTrades(
+  accessToken: string,
+  spreadsheetId: string
+): Promise<void> {
+  await callProxy(accessToken, 'clearAndSeedTrades', { spreadsheetId });
 }
 
 // Fetch Google Doc content (extracted plain text)

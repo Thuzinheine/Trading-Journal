@@ -108,6 +108,51 @@ function getDriveFileIdFromUrl(url: string | undefined): string | null {
   return null;
 }
 
+async function uploadImageToDrive(token: string, photoData: string, assetName: string, folderId: string): Promise<string> {
+  if (!photoData) return '';
+  if (!photoData.startsWith('data:image')) return photoData; // Keep existing URL or non-base64 string
+
+  try {
+    const base64Data = photoData.replace(/^data:image\/\w+;base64,/, '');
+    const buffer = Buffer.from(base64Data, 'base64');
+    const mimeType = photoData.match(/data:(image\/\w+);base64/)?.[1] || 'image/png';
+
+    const metadataRes = await driveFetch(token, '/drive/v3/files', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: `iTrading Trade Photo - ${assetName || 'Asset'} - ${Date.now()}`,
+        mimeType,
+        parents: folderId ? [folderId] : undefined,
+      }),
+    });
+    const fileId = metadataRes.id;
+
+    const uploadRes = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': mimeType,
+      },
+      body: buffer,
+    });
+
+    if (uploadRes.ok) {
+      await driveFetch(token, `/drive/v3/files/${fileId}/permissions`, {
+        method: 'POST',
+        body: JSON.stringify({
+          role: 'reader',
+          type: 'anyone',
+        }),
+      });
+      const fileMeta = await driveFetch(token, `/drive/v3/files/${fileId}?fields=webViewLink,webContentLink`);
+      return fileMeta.webViewLink || fileMeta.webContentLink || '';
+    }
+  } catch (err) {
+    console.error('Error in uploadImageToDrive:', err);
+  }
+  return '';
+}
+
 export async function POST(req: NextRequest) {
   try {
     const authHeader = req.headers.get('Authorization') || '';
@@ -161,29 +206,31 @@ export async function POST(req: NextRequest) {
         try {
           const headersCheck = await sheetsFetch(
             token,
-            `/v4/spreadsheets/${spreadsheetId}/values/Sheet1!A1:K1`
+            `/v4/spreadsheets/${spreadsheetId}/values/Sheet1!A1:L1`
           );
-          if (!headersCheck.values || headersCheck.values.length === 0) {
+          if (!headersCheck.values || headersCheck.values.length === 0 || headersCheck.values[0].length < 12) {
             await sheetsFetch(
               token,
-              `/v4/spreadsheets/${spreadsheetId}/values/Sheet1!A1:K1?valueInputOption=USER_ENTERED`,
+              `/v4/spreadsheets/${spreadsheetId}/values/Sheet1!A1:L1?valueInputOption=USER_ENTERED`,
               {
                 method: 'PUT',
                 body: JSON.stringify({
-                  range: 'Sheet1!A1:K1',
+                  range: 'Sheet1!A1:M1',
                   majorDimension: 'ROWS',
                   values: [[
+                    'Trade Number',
                     'Date',
-                    'Pair',
-                    'Buy/Sell',
+                    'Pair / Asset',
                     'Entry',
                     'SL',
                     'TP',
                     'R:R',
-                    'Strategy/Setup',
-                    'Win/Loss',
-                    'PnL ($/R)',
-                    'သင်ခန်းစာ / မှတ်ချက်'
+                    'Watchlist Details/ Setup',
+                    'Result (TP/SL)',
+                    'P&L in $',
+                    'Remarks/ Note',
+                    'Commitment',
+                    'Trade SS (B&F)'
                   ]],
                 }),
               }
@@ -411,25 +458,65 @@ export async function POST(req: NextRequest) {
 
         const data = await sheetsFetch(
           token,
-          `/v4/spreadsheets/${spreadsheetId}/values/Sheet1!A2:K2000`
+          `/v4/spreadsheets/${spreadsheetId}/values/Sheet1!A1:N2000`
         );
 
-        const trades = (data.values || []).map((row: any[], index: number) => {
+        if (!data.values || data.values.length === 0) {
+          return NextResponse.json({ trades: [] });
+        }
+
+        const headers = data.values[0] || [];
+        const normHeaders = headers.map((h: any) => (h || '').toString().toLowerCase().replace(/[^a-z0-9]/g, ''));
+
+        // Helper to find column index by match
+        const findCol = (keys: string[], defaultIdx: number) => {
+          for (const key of keys) {
+            const idx = normHeaders.indexOf(key);
+            if (idx !== -1) return idx;
+          }
+          // Try loose matching only on non-empty headers
+          for (let i = 0; i < normHeaders.length; i++) {
+            const nh = normHeaders[i];
+            if (!nh) continue; // Skip empty/null headers to prevent key.includes("") matching everything
+            for (const key of keys) {
+              if (nh.includes(key) || key.includes(nh)) return i;
+            }
+          }
+          return defaultIdx;
+        };
+
+        const colTradeNumber = findCol(['tradenumber', 'tradeno', 'trade#', 'tradenum'], -1);
+        const colDate = findCol(['date'], 1);
+        const colPair = findCol(['pair', 'asset', 'pairasset'], 2);
+        const colEntry = findCol(['entry', 'entryprice'], 3);
+        const colSL = findCol(['sl'], 4);
+        const colTP = findCol(['tp'], 5);
+        const colRR = findCol(['rr', 'r/r', 'r:r'], 6);
+        const colWatchlist = findCol(['watchlist', 'watchlistdetailssetup', 'details', 'setup', 'watchlistdetails'], 7);
+        const colResult = findCol(['result', 'resulttpsl', 'winloss', 'status'], 8);
+        const colPnL = findCol(['pnl', 'plin', 'pl', 'profit', 'loss'], 9);
+        const colRemarks = findCol(['remarks', 'remarksnote', 'note', 'notes'], 10);
+        const colCommitment = findCol(['commitment'], 11);
+        const colPhoto = findCol(['tradessbf', 'photourl', 'photo', 'tradephoto', 'image'], 12);
+
+        const trades = data.values.slice(1).map((row: any[], index: number) => {
           const rowIndex = index + 2; // Rows start at 2 (Row 1 is header)
           return {
             row: rowIndex,
             id: `trade-${rowIndex}`,
-            date: row[0] || '',
-            pair: row[1] || '',
-            type: row[2] || 'Buy',
-            entryPrice: parseFloat(row[3]) || 0,
-            sl: parseFloat(row[4]) || 0,
-            tp: parseFloat(row[5]) || 0,
-            rr: row[6] || '',
-            strategy: row[7] || '',
-            winLoss: row[8] || 'Pending',
-            pnl: row[9] || '',
-            notes: row[10] || '',
+            tradeNumber: (colTradeNumber !== -1 && row[colTradeNumber] !== undefined) ? row[colTradeNumber] : `${rowIndex - 1}`,
+            date: row[colDate] || '',
+            pair: row[colPair] || '', // Pair / Asset
+            entryPrice: (row[colEntry] !== undefined && row[colEntry] !== '') ? (parseFloat(row[colEntry]) || 0) : 0,
+            sl: (row[colSL] !== undefined && row[colSL] !== '') ? (parseFloat(row[colSL]) || 0) : 0,
+            tp: (row[colTP] !== undefined && row[colTP] !== '') ? (parseFloat(row[colTP]) || 0) : 0,
+            rr: row[colRR] || '',
+            watchlist: row[colWatchlist] || '', // Watchlist Details/ Setup
+            winLoss: row[colResult] || 'Pending', // Result (TP/SL)
+            pnl: row[colPnL] || '', // P&L in $
+            notes: row[colRemarks] || '', // Remarks/ Note
+            commitment: row[colCommitment] || '', // Commitment
+            tradePhoto: row[colPhoto] || '', // Trade SS (B&F)
           };
         });
 
@@ -442,27 +529,117 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: 'Missing spreadsheetId or trade' }, { status: 400 });
         }
 
+        let beforeUrl = trade.tradePhotoBefore || '';
+        let afterUrl = trade.tradePhotoAfter || '';
+
+        // Fallback for older code if only tradePhoto is passed
+        if (!beforeUrl && !afterUrl && trade.tradePhoto) {
+          const parts = trade.tradePhoto.split(',');
+          beforeUrl = parts[0] || '';
+          afterUrl = parts[1] || '';
+        }
+
+        try {
+          const folderId = await getOrCreateFolderId(token);
+          if (beforeUrl && beforeUrl.startsWith('data:image')) {
+            beforeUrl = await uploadImageToDrive(token, beforeUrl, trade.pair || 'Asset', folderId);
+          }
+          if (afterUrl && afterUrl.startsWith('data:image')) {
+            afterUrl = await uploadImageToDrive(token, afterUrl, trade.pair || 'Asset', folderId);
+          }
+        } catch (err) {
+          console.error('Error uploading trade images to Drive:', err);
+        }
+
+        const driveImageUrl = `${beforeUrl},${afterUrl}`;
+
+        // Fetch current headers to map indices dynamically
+        let colTradeNumber = 0;
+        let colDate = 1;
+        let colPair = 2;
+        let colEntry = 3;
+        let colSL = 4;
+        let colTP = 5;
+        let colRR = 6;
+        let colWatchlist = 7;
+        let colResult = 8;
+        let colPnL = 9;
+        let colRemarks = 10;
+        let colCommitment = 11;
+        let colPhoto = 12;
+        let maxIndex = 12;
+
+        try {
+          const sheetData = await sheetsFetch(
+            token,
+            `/v4/spreadsheets/${spreadsheetId}/values/Sheet1!A1:N1`
+          );
+          if (sheetData && sheetData.values && sheetData.values[0]) {
+            const headers = sheetData.values[0];
+            const normHeaders = headers.map((h: any) => (h || '').toString().toLowerCase().replace(/[^a-z0-9]/g, ''));
+            const findCol = (keys: string[], defaultIdx: number) => {
+              for (const key of keys) {
+                const idx = normHeaders.indexOf(key);
+                if (idx !== -1) return idx;
+              }
+              // Try loose matching only on non-empty headers
+              for (let i = 0; i < normHeaders.length; i++) {
+                const nh = normHeaders[i];
+                if (!nh) continue; // Skip empty/null headers to prevent key.includes("") matching everything
+                for (const key of keys) {
+                  if (nh.includes(key) || key.includes(nh)) return i;
+                }
+              }
+              return defaultIdx;
+            };
+
+            colTradeNumber = findCol(['tradenumber', 'tradeno', 'trade#', 'tradenum'], -1);
+            colDate = findCol(['date'], 1);
+            colPair = findCol(['pair', 'asset', 'pairasset'], 2);
+            colEntry = findCol(['entry', 'entryprice'], 3);
+            colSL = findCol(['sl'], 4);
+            colTP = findCol(['tp'], 5);
+            colRR = findCol(['rr', 'r/r', 'r:r'], 6);
+            colWatchlist = findCol(['watchlist', 'watchlistdetailssetup', 'details', 'setup', 'watchlistdetails'], 7);
+            colResult = findCol(['result', 'resulttpsl', 'winloss', 'status'], 8);
+            colPnL = findCol(['pnl', 'plin', 'pl', 'profit', 'loss'], 9);
+            colRemarks = findCol(['remarks', 'remarksnote', 'note', 'notes'], 10);
+            colCommitment = findCol(['commitment'], 11);
+            colPhoto = findCol(['tradessbf', 'photourl', 'photo', 'tradephoto', 'image'], 12);
+            maxIndex = Math.max(12, headers.length - 1);
+          }
+        } catch (e) {
+          console.error('Failed to fetch headers for dynamic index mapping in addTrade:', e);
+        }
+
+        const values = new Array(maxIndex + 1).fill('');
+        if (colTradeNumber !== -1) {
+          values[colTradeNumber] = trade.tradeNumber || '';
+        }
+        values[colDate] = trade.date || '';
+        values[colPair] = trade.pair || ''; // Pair / Asset
+        values[colEntry] = trade.entryPrice !== undefined ? trade.entryPrice : '';
+        values[colSL] = trade.sl !== undefined ? trade.sl : '';
+        values[colTP] = trade.tp !== undefined ? trade.tp : '';
+        values[colRR] = trade.rr || '';
+        values[colWatchlist] = trade.watchlist || ''; // Watchlist Details/ Setup
+        values[colResult] = trade.winLoss || 'Pending';
+        values[colPnL] = trade.pnl || '';
+        values[colRemarks] = trade.notes || '';
+        values[colCommitment] = trade.commitment || '';
+        values[colPhoto] = driveImageUrl || '';
+
+        const colLetter = String.fromCharCode(65 + Math.min(25, maxIndex));
+
         await sheetsFetch(
           token,
-          `/v4/spreadsheets/${spreadsheetId}/values/Sheet1!A2:K2:append?valueInputOption=USER_ENTERED`,
+          `/v4/spreadsheets/${spreadsheetId}/values/Sheet1!A2:${colLetter}2:append?valueInputOption=USER_ENTERED`,
           {
             method: 'POST',
             body: JSON.stringify({
-              range: 'Sheet1!A2:K2',
+              range: `Sheet1!A2:${colLetter}2`,
               majorDimension: 'ROWS',
-              values: [[
-                trade.date,
-                trade.pair,
-                trade.type,
-                trade.entryPrice,
-                trade.sl,
-                trade.tp,
-                trade.rr,
-                trade.strategy,
-                trade.winLoss,
-                trade.pnl,
-                trade.notes
-              ]],
+              values: [values],
             }),
           }
         );
@@ -476,27 +653,117 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: 'Missing spreadsheetId, trade, or row index' }, { status: 400 });
         }
 
+        let beforeUrl = trade.tradePhotoBefore || '';
+        let afterUrl = trade.tradePhotoAfter || '';
+
+        // Fallback for older code if only tradePhoto is passed
+        if (!beforeUrl && !afterUrl && trade.tradePhoto) {
+          const parts = trade.tradePhoto.split(',');
+          beforeUrl = parts[0] || '';
+          afterUrl = parts[1] || '';
+        }
+
+        try {
+          const folderId = await getOrCreateFolderId(token);
+          if (beforeUrl && beforeUrl.startsWith('data:image')) {
+            beforeUrl = await uploadImageToDrive(token, beforeUrl, trade.pair || 'Asset', folderId);
+          }
+          if (afterUrl && afterUrl.startsWith('data:image')) {
+            afterUrl = await uploadImageToDrive(token, afterUrl, trade.pair || 'Asset', folderId);
+          }
+        } catch (err) {
+          console.error('Error uploading trade images to Drive:', err);
+        }
+
+        const driveImageUrl = `${beforeUrl},${afterUrl}`;
+
+        // Fetch current headers to map indices dynamically
+        let colTradeNumber = 0;
+        let colDate = 1;
+        let colPair = 2;
+        let colEntry = 3;
+        let colSL = 4;
+        let colTP = 5;
+        let colRR = 6;
+        let colWatchlist = 7;
+        let colResult = 8;
+        let colPnL = 9;
+        let colRemarks = 10;
+        let colCommitment = 11;
+        let colPhoto = 12;
+        let maxIndex = 12;
+
+        try {
+          const sheetData = await sheetsFetch(
+            token,
+            `/v4/spreadsheets/${spreadsheetId}/values/Sheet1!A1:N1`
+          );
+          if (sheetData && sheetData.values && sheetData.values[0]) {
+            const headers = sheetData.values[0];
+            const normHeaders = headers.map((h: any) => (h || '').toString().toLowerCase().replace(/[^a-z0-9]/g, ''));
+            const findCol = (keys: string[], defaultIdx: number) => {
+              for (const key of keys) {
+                const idx = normHeaders.indexOf(key);
+                if (idx !== -1) return idx;
+              }
+              // Try loose matching only on non-empty headers
+              for (let i = 0; i < normHeaders.length; i++) {
+                const nh = normHeaders[i];
+                if (!nh) continue; // Skip empty/null headers to prevent key.includes("") matching everything
+                for (const key of keys) {
+                  if (nh.includes(key) || key.includes(nh)) return i;
+                }
+              }
+              return defaultIdx;
+            };
+
+            colTradeNumber = findCol(['tradenumber', 'tradeno', 'trade#', 'tradenum'], -1);
+            colDate = findCol(['date'], 1);
+            colPair = findCol(['pair', 'asset', 'pairasset'], 2);
+            colEntry = findCol(['entry', 'entryprice'], 3);
+            colSL = findCol(['sl'], 4);
+            colTP = findCol(['tp'], 5);
+            colRR = findCol(['rr', 'r/r', 'r:r'], 6);
+            colWatchlist = findCol(['watchlist', 'watchlistdetailssetup', 'details', 'setup', 'watchlistdetails'], 7);
+            colResult = findCol(['result', 'resulttpsl', 'winloss', 'status'], 8);
+            colPnL = findCol(['pnl', 'plin', 'pl', 'profit', 'loss'], 9);
+            colRemarks = findCol(['remarks', 'remarksnote', 'note', 'notes'], 10);
+            colCommitment = findCol(['commitment'], 11);
+            colPhoto = findCol(['tradessbf', 'photourl', 'photo', 'tradephoto', 'image'], 12);
+            maxIndex = Math.max(12, headers.length - 1);
+          }
+        } catch (e) {
+          console.error('Failed to fetch headers for dynamic index mapping in updateTrade:', e);
+        }
+
+        const values = new Array(maxIndex + 1).fill('');
+        if (colTradeNumber !== -1) {
+          values[colTradeNumber] = trade.tradeNumber || '';
+        }
+        values[colDate] = trade.date || '';
+        values[colPair] = trade.pair || ''; // Pair / Asset
+        values[colEntry] = trade.entryPrice !== undefined ? trade.entryPrice : '';
+        values[colSL] = trade.sl !== undefined ? trade.sl : '';
+        values[colTP] = trade.tp !== undefined ? trade.tp : '';
+        values[colRR] = trade.rr || '';
+        values[colWatchlist] = trade.watchlist || ''; // Watchlist Details/ Setup
+        values[colResult] = trade.winLoss || 'Pending';
+        values[colPnL] = trade.pnl || '';
+        values[colRemarks] = trade.notes || '';
+        values[colCommitment] = trade.commitment || '';
+        values[colPhoto] = driveImageUrl || '';
+
+        const colLetter = String.fromCharCode(65 + Math.min(25, maxIndex));
+
         await sheetsFetch(
           token,
-          `/v4/spreadsheets/${spreadsheetId}/values/Sheet1!A${trade.row}:K${trade.row}?valueInputOption=USER_ENTERED`,
+          `/v4/spreadsheets/${spreadsheetId}/values/Sheet1!A${trade.row}:${colLetter}${trade.row}?valueInputOption=USER_ENTERED`,
           {
             method: 'PUT',
             body: JSON.stringify({
-              range: `Sheet1!A${trade.row}:K${trade.row}`,
+              range: `Sheet1!A${trade.row}:${colLetter}${trade.row}`,
               majorDimension: 'ROWS',
-              values: [[
-                trade.date,
-                trade.pair,
-                trade.type,
-                trade.entryPrice,
-                trade.sl,
-                trade.tp,
-                trade.rr,
-                trade.strategy,
-                trade.winLoss,
-                trade.pnl,
-                trade.notes
-              ]],
+              values: [values],
             }),
           }
         );
@@ -510,16 +777,81 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: 'Missing spreadsheetId or rowIndex' }, { status: 400 });
         }
 
-        // To keep layout beautiful, clear the row contents instead of hard deleting (which requires specific sheet metadata lookup)
+        let maxIndex = 11;
+        try {
+          const sheetData = await sheetsFetch(
+            token,
+            `/v4/spreadsheets/${spreadsheetId}/values/Sheet1!A1:N1`
+          );
+          if (sheetData && sheetData.values && sheetData.values[0]) {
+            maxIndex = Math.max(11, sheetData.values[0].length - 1);
+          }
+        } catch (e) {
+          console.error('Failed to fetch headers for deleteTrade:', e);
+        }
+
+        const colLetter = String.fromCharCode(65 + Math.min(25, maxIndex));
+        const emptyValues = new Array(maxIndex + 1).fill('');
+
         await sheetsFetch(
           token,
-          `/v4/spreadsheets/${spreadsheetId}/values/Sheet1!A${rowIndex}:K${rowIndex}?valueInputOption=USER_ENTERED`,
+          `/v4/spreadsheets/${spreadsheetId}/values/Sheet1!A${rowIndex}:${colLetter}${rowIndex}?valueInputOption=USER_ENTERED`,
           {
             method: 'PUT',
             body: JSON.stringify({
-              range: `Sheet1!A${rowIndex}:K${rowIndex}`,
+              range: `Sheet1!A${rowIndex}:${colLetter}${rowIndex}`,
               majorDimension: 'ROWS',
-              values: [['', '', '', '', '', '', '', '', '', '', '']],
+              values: [emptyValues],
+            }),
+          }
+        );
+
+        return NextResponse.json({ success: true });
+      }
+
+      case 'clearAndSeedTrades': {
+        const { spreadsheetId } = args;
+        if (!spreadsheetId) {
+          return NextResponse.json({ error: 'Missing spreadsheetId' }, { status: 400 });
+        }
+
+        // 1. Clear Sheet1 values from A2 to Z2000
+        try {
+          await sheetsFetch(
+            token,
+            `/v4/spreadsheets/${spreadsheetId}/values/Sheet1!A2:Z2000:clear`,
+            { method: 'POST' }
+          );
+        } catch (clearErr) {
+          console.error('Failed to clear Sheet1 values:', clearErr);
+        }
+
+        // 2. Write the single seed row at Sheet1!A2
+        const values = [
+          '001', // Trade Number
+          '2026-08-13', // Date
+          'TAO', // Pair / Asset
+          '204.2', // Entry
+          '190.6', // SL
+          '279.7', // TP
+          '1:5.6', // R:R
+          'Pre CPI Data Day entry', // Watchlist Details/ Setup
+          'Pending', // Result (TP/SL)
+          '-', // P&L in $
+          'Pre CPI Data Day မှာ Entry ဝင်ခဲ့တယ်။', // Remarks/ Note
+          '-', // Commitment
+          '-' // Trade SS (B&F)
+        ];
+
+        await sheetsFetch(
+          token,
+          `/v4/spreadsheets/${spreadsheetId}/values/Sheet1!A2:M2?valueInputOption=USER_ENTERED`,
+          {
+            method: 'PUT',
+            body: JSON.stringify({
+              range: 'Sheet1!A2:M2',
+              majorDimension: 'ROWS',
+              values: [values],
             }),
           }
         );

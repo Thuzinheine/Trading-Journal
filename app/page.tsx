@@ -16,6 +16,7 @@ import {
   addTrade, 
   updateTradeRow, 
   deleteTradeRow, 
+  clearAndSeedTrades, 
   fetchDocContent, 
   saveDocContent,
   listDocs,
@@ -486,25 +487,31 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'ALL' | 'BUY' | 'SELL'>('ALL');
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'OPEN' | 'CLOSED'>('ALL');
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   // Trade form state
   const [showFormModal, setShowFormModal] = useState(false);
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
+  const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [isFormSubmitting, setIsFormSubmitting] = useState(false);
 
    const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
-    pair: '',
-    type: 'Buy' as 'Buy' | 'Sell',
+    tradeNumber: '',
+    pair: '', // Pair / Asset
     entryPrice: '',
     sl: '',
     tp: '',
     rr: '',
-    strategy: '',
-    winLoss: 'Pending' as 'Win' | 'Loss' | 'Pending',
+    watchlist: '', // Watchlist Details/ Setup
+    winLoss: 'Pending' as 'TP' | 'SL' | 'Breakeven' | 'Trailing Stop' | 'Pending', // Result (TP/SL)
     pnl: '',
-    notes: '',
+    notes: '', // Remarks/ Note
+    commitment: '', // Commitment
+    tradePhoto: '', // Trade SS (B&F)
+    tradePhotoBefore: '',
+    tradePhotoAfter: '',
   });
 
   // Next.js hydration safety & load cached Google data instantly
@@ -1378,6 +1385,126 @@ export default function Home() {
     reader.readAsDataURL(file);
   };
 
+  const handlePhotoBeforeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new window.Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 1200;
+        const MAX_HEIGHT = 900;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+          setFormData(prev => ({ ...prev, tradePhotoBefore: dataUrl }));
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handlePhotoAfterChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new window.Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 1200;
+        const MAX_HEIGHT = 900;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+          setFormData(prev => ({ ...prev, tradePhotoAfter: dataUrl }));
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleTradePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new window.Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 1200;
+        const MAX_HEIGHT = 900;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+          setFormData(prev => ({ ...prev, tradePhoto: dataUrl }));
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
   const triggerRefresh = async () => {
     if (!token) return;
     if (spreadsheetId) await loadTrades(token, spreadsheetId);
@@ -1395,16 +1522,8 @@ export default function Home() {
       return { rr: '', suggestedPnlWin: '', suggestedPnlLoss: '' };
     }
 
-    let risk = 0;
-    let reward = 0;
-
-    if (formData.type === 'Buy') {
-      risk = entry - sl;
-      reward = tp - entry;
-    } else {
-      risk = sl - entry;
-      reward = entry - tp;
-    }
+    const risk = Math.abs(entry - sl);
+    const reward = Math.abs(tp - entry);
 
     if (risk <= 0 || reward <= 0) {
       return { rr: '', suggestedPnlWin: '', suggestedPnlLoss: '' };
@@ -1416,23 +1535,31 @@ export default function Home() {
     const suggestedPnlLoss = `-1R`;
 
     return { rr: rrStr, suggestedPnlWin, suggestedPnlLoss };
-  }, [formData.entryPrice, formData.sl, formData.tp, formData.type]);
+  }, [formData.entryPrice, formData.sl, formData.tp]);
 
   // Handle Edit click
   const handleEditClick = (trade: Trade) => {
+    const photos = (trade.tradePhoto || '').split(',');
+    const beforePhoto = photos[0] || '';
+    const afterPhoto = photos[1] || '';
+
     setEditingTrade(trade);
     setFormData({
       date: trade.date,
-      pair: trade.pair,
-      type: trade.type,
+      tradeNumber: trade.tradeNumber || '',
+      pair: trade.pair || '', // Pair / Asset
       entryPrice: trade.entryPrice ? trade.entryPrice.toString() : '',
       sl: trade.sl ? trade.sl.toString() : '',
       tp: trade.tp ? trade.tp.toString() : '',
       rr: trade.rr || '',
-      strategy: trade.strategy || '',
-      winLoss: trade.winLoss || 'Pending',
+      watchlist: trade.watchlist || '', // Watchlist Details/ Setup
+      winLoss: trade.winLoss || 'Pending', // Result (TP/SL)
       pnl: trade.pnl || '',
-      notes: trade.notes || '',
+      notes: trade.notes || '', // Remarks/ Note
+      commitment: trade.commitment || '', // Commitment
+      tradePhoto: trade.tradePhoto || '', // Trade SS (B&F)
+      tradePhotoBefore: beforePhoto,
+      tradePhotoAfter: afterPhoto,
     });
     setFormError(null);
     setShowFormModal(true);
@@ -1440,19 +1567,37 @@ export default function Home() {
 
   // Open Add Trade Modal
   const handleAddClick = () => {
+    // Determine the next trade number
+    let nextNum = 1;
+    if (trades && trades.length > 0) {
+      const nums = trades
+        .map(t => parseInt(t.tradeNumber, 10))
+        .filter(n => !isNaN(n));
+      if (nums.length > 0) {
+        nextNum = Math.max(...nums) + 1;
+      } else {
+        nextNum = trades.length + 1;
+      }
+    }
+    const paddedNum = nextNum.toString().padStart(3, '0');
+
     setEditingTrade(null);
     setFormData({
       date: new Date().toISOString().split('T')[0],
+      tradeNumber: paddedNum,
       pair: '',
-      type: 'Buy',
       entryPrice: '',
       sl: '',
       tp: '',
       rr: '',
-      strategy: '',
+      watchlist: '',
       winLoss: 'Pending',
       pnl: '',
       notes: '',
+      commitment: '',
+      tradePhoto: '',
+      tradePhotoBefore: '',
+      tradePhotoAfter: '',
     });
     setFormError(null);
     setShowFormModal(true);
@@ -1464,7 +1609,11 @@ export default function Home() {
     if (!token || !spreadsheetId) return;
 
     if (!formData.pair.trim()) {
-      setFormError('Asset Pair အမည် ထည့်သွင်းပေးရန် လိုအပ်ပါသည်။');
+      setFormError('Pair / Asset ထည့်သွင်းပေးရန် လိုအပ်ပါသည်။');
+      return;
+    }
+    if (!formData.watchlist.trim()) {
+      setFormError('Watchlist Details / Setup ထည့်သွင်းပေးရန် လိုအပ်ပါသည်။');
       return;
     }
     const entry = parseFloat(formData.entryPrice);
@@ -1476,6 +1625,20 @@ export default function Home() {
     const slVal = parseFloat(formData.sl) || 0;
     const tpVal = parseFloat(formData.tp) || 0;
 
+    let processedPnl = formData.pnl.trim();
+    if (formData.winLoss === 'SL' && processedPnl) {
+      if (!processedPnl.startsWith('-')) {
+        processedPnl = '-' + processedPnl;
+      }
+    } else if (formData.winLoss === 'TP' && processedPnl) {
+      if (processedPnl.startsWith('-')) {
+        processedPnl = processedPnl.substring(1).trim();
+      }
+      if (!processedPnl.startsWith('+')) {
+        processedPnl = '+' + processedPnl;
+      }
+    }
+
     setIsFormSubmitting(true);
     try {
       if (editingTrade) {
@@ -1483,32 +1646,38 @@ export default function Home() {
           row: editingTrade.row,
           id: editingTrade.id,
           date: formData.date,
-          pair: formData.pair.toUpperCase(),
-          type: formData.type,
+          tradeNumber: formData.tradeNumber.trim(),
           entryPrice: entry,
           sl: slVal,
           tp: tpVal,
           rr: formData.rr || calculatedSuggestions.rr || '',
-          strategy: formData.strategy,
+          pair: formData.pair.toUpperCase(),
+          watchlist: formData.watchlist,
           winLoss: formData.winLoss,
-          pnl: formData.pnl,
+          pnl: processedPnl,
           notes: formData.notes,
+          commitment: formData.commitment,
+          tradePhotoBefore: formData.tradePhotoBefore,
+          tradePhotoAfter: formData.tradePhotoAfter,
         };
         await updateTradeRow(token, spreadsheetId, updated);
       } else {
         const newTrade: Omit<Trade, 'row'> = {
           id: `trade-${Date.now()}`,
           date: formData.date,
-          pair: formData.pair.toUpperCase(),
-          type: formData.type,
+          tradeNumber: formData.tradeNumber.trim(),
           entryPrice: entry,
           sl: slVal,
           tp: tpVal,
           rr: formData.rr || calculatedSuggestions.rr || '',
-          strategy: formData.strategy,
+          pair: formData.pair.toUpperCase(),
+          watchlist: formData.watchlist,
           winLoss: formData.winLoss,
-          pnl: formData.pnl,
+          pnl: processedPnl,
           notes: formData.notes,
+          commitment: formData.commitment,
+          tradePhotoBefore: formData.tradePhotoBefore,
+          tradePhotoAfter: formData.tradePhotoAfter,
         };
         await addTrade(token, spreadsheetId, newTrade);
       }
@@ -1538,31 +1707,49 @@ export default function Home() {
     }
   };
 
+  // Clear all trades and seed with the requested sample row
+  const handleClearAndSeedClick = async () => {
+    if (!token || !spreadsheetId) return;
+    setIsLoadingTrades(true);
+    try {
+      await clearAndSeedTrades(token, spreadsheetId);
+      await loadTrades(token, spreadsheetId);
+      setShowResetConfirm(false);
+    } catch (err) {
+      console.error('Error clearing and seeding trades:', err);
+    } finally {
+      setIsLoadingTrades(false);
+    }
+  };
+
   // Filtered & Searched Trades
   const filteredTrades = useMemo(() => {
     return trades.filter(t => {
       const matchSearch = t.pair.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          (t.watchlist && t.watchlist.toLowerCase().includes(searchQuery.toLowerCase())) ||
                           t.notes.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          (t.strategy && t.strategy.toLowerCase().includes(searchQuery.toLowerCase()));
+                          (t.tradeNumber && t.tradeNumber.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                          (t.commitment && t.commitment.toLowerCase().includes(searchQuery.toLowerCase()));
       
-      const matchType = filterType === 'ALL' || 
-                        (filterType === 'BUY' && t.type === 'Buy') || 
-                        (filterType === 'SELL' && t.type === 'Sell');
-
       const matchStatus = filterStatus === 'ALL' || 
                           (filterStatus === 'OPEN' && t.winLoss === 'Pending') || 
                           (filterStatus === 'CLOSED' && t.winLoss !== 'Pending');
 
-      return matchSearch && matchType && matchStatus;
+      return matchSearch && matchStatus;
     });
-  }, [trades, searchQuery, filterType, filterStatus]);
+  }, [trades, searchQuery, filterStatus]);
 
   // Helper to parse string PnL fields to numeric values for charts & stats
-  const parsePnLValue = (pnlStr: string | null): number => {
+  const parsePnLValue = (pnlStr: string | null, winLoss?: string): number => {
     if (!pnlStr) return 0;
     const clean = pnlStr.replace(/[\s\$\+R]/gi, '');
     const parsed = parseFloat(clean);
     if (isNaN(parsed)) return 0;
+    if (winLoss === 'SL') {
+      return -Math.abs(parsed);
+    } else if (winLoss === 'TP') {
+      return Math.abs(parsed);
+    }
     return pnlStr.includes('-') ? -Math.abs(parsed) : Math.abs(parsed);
   };
 
@@ -1573,25 +1760,25 @@ export default function Home() {
     let closedTrades = trades.filter(t => t.winLoss !== 'Pending');
     let totalClosed = closedTrades.length;
     
-    let netPnL = trades.reduce((sum, t) => sum + parsePnLValue(t.pnl), 0);
+    let netPnL = trades.reduce((sum, t) => sum + parsePnLValue(t.pnl, t.winLoss), 0);
     
-    let winTrades = closedTrades.filter(t => t.winLoss === 'Win').length;
-    let lossTrades = closedTrades.filter(t => t.winLoss === 'Loss').length;
+    let winTrades = closedTrades.filter(t => t.winLoss === 'TP' || (t.winLoss === 'Trailing Stop' && parsePnLValue(t.pnl, t.winLoss) > 0)).length;
+    let lossTrades = closedTrades.filter(t => t.winLoss === 'SL' || (t.winLoss === 'Trailing Stop' && parsePnLValue(t.pnl, t.winLoss) < 0)).length;
     let winRate = totalClosed > 0 ? (winTrades / totalClosed) * 100 : 0;
     
-    let totalWins = closedTrades.filter(t => t.winLoss === 'Win').reduce((sum, t) => sum + parsePnLValue(t.pnl), 0);
-    let totalLosses = closedTrades.filter(t => t.winLoss === 'Loss').reduce((sum, t) => sum + parsePnLValue(t.pnl), 0);
+    let totalWins = closedTrades.filter(t => t.winLoss === 'TP' || (t.winLoss === 'Trailing Stop' && parsePnLValue(t.pnl, t.winLoss) > 0)).reduce((sum, t) => sum + Math.max(0, parsePnLValue(t.pnl, t.winLoss)), 0);
+    let totalLosses = closedTrades.filter(t => t.winLoss === 'SL' || (t.winLoss === 'Trailing Stop' && parsePnLValue(t.pnl, t.winLoss) < 0)).reduce((sum, t) => sum + Math.min(0, parsePnLValue(t.pnl, t.winLoss)), 0);
     
     let avgWin = winTrades > 0 ? totalWins / winTrades : 0;
     let avgLoss = lossTrades > 0 ? totalLosses / lossTrades : 0;
 
     let bestTrade = trades.reduce((best, t) => {
-      const val = parsePnLValue(t.pnl);
+      const val = parsePnLValue(t.pnl, t.winLoss);
       return val > best ? val : best;
     }, -Infinity);
 
     let worstTrade = trades.reduce((worst, t) => {
-      const val = parsePnLValue(t.pnl);
+      const val = parsePnLValue(t.pnl, t.winLoss);
       return val < worst ? val : worst;
     }, Infinity);
 
@@ -1618,7 +1805,7 @@ export default function Home() {
     const result = [];
     let runningTotal = 0;
     for (const t of sorted) {
-      const pnlVal = parsePnLValue(t.pnl);
+      const pnlVal = parsePnLValue(t.pnl, t.winLoss);
       runningTotal += pnlVal;
       result.push({
         name: t.date,
@@ -1637,7 +1824,7 @@ export default function Home() {
       .slice(-10) // Show last 10 closed trades
       .map(t => ({
         name: `${t.pair} (${t.date.slice(5)})`,
-        pnl: parsePnLValue(t.pnl),
+        pnl: parsePnLValue(t.pnl, t.winLoss),
       }));
   }, [trades]);
 
@@ -1860,84 +2047,141 @@ export default function Home() {
           
           <AnimatePresence>
             {isMobileMenuOpen && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className={`border-b ${isDarkMode ? 'bg-zinc-900 border-zinc-800/80' : 'bg-slate-50 border-slate-200'}`}
-              >
-                <div className="px-4 py-3 space-y-1">
-                  <button
-                    onClick={() => { setActiveTab('overview'); setIsMobileMenuOpen(false); }}
-                    className={`flex items-center space-x-3 w-full px-3 py-3 rounded-xl text-xs sm:text-sm font-semibold cursor-pointer ${
-                      activeTab === 'overview' ? 'bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-950' : isDarkMode ? 'text-zinc-400 hover:bg-zinc-800' : 'text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    <Activity className="h-4.5 w-4.5" />
-                    <span>Dashboard</span>
-                  </button>
-                  
-                  <button
-                    onClick={() => { setActiveTab('alignment'); setIsMobileMenuOpen(false); }}
-                    className={`flex items-center space-x-3 w-full px-3 py-3 rounded-xl text-xs sm:text-sm font-semibold cursor-pointer ${
-                      activeTab === 'alignment' ? 'bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-950' : isDarkMode ? 'text-zinc-400 hover:bg-zinc-800' : 'text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    <Percent className="h-4.5 w-4.5" />
-                    <span>Alignment Calculator</span>
-                  </button>
+              <>
+                {/* Backdrop Overlay */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 0.5 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="fixed inset-0 bg-black/60 z-50 md:hidden"
+                />
 
-                  <button
-                    onClick={() => { setActiveTab('journal'); setIsMobileMenuOpen(false); }}
-                    className={`flex items-center space-x-3 w-full px-3 py-3 rounded-xl text-xs sm:text-sm font-semibold cursor-pointer ${
-                      activeTab === 'journal' ? 'bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-950' : isDarkMode ? 'text-zinc-400 hover:bg-zinc-800' : 'text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    <BookOpen className="h-4.5 w-4.5" />
-                    <span>Trading Journal ({trades.length})</span>
-                  </button>
-                  
-                  <button
-                    onClick={() => { setActiveTab('micro'); setIsMobileMenuOpen(false); }}
-                    className={`flex items-center space-x-3 w-full px-3 py-3 rounded-xl text-xs sm:text-sm font-semibold cursor-pointer ${
-                      activeTab === 'micro' ? 'bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-950' : isDarkMode ? 'text-zinc-400 hover:bg-zinc-800' : 'text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    <Target className="h-4.5 w-4.5" />
-                    <span>Micro Analysis</span>
-                  </button>
-                  
-                  <button
-                    onClick={() => { setActiveTab('macro'); setIsMobileMenuOpen(false); }}
-                    className={`flex items-center space-x-3 w-full px-3 py-3 rounded-xl text-xs sm:text-sm font-semibold cursor-pointer ${
-                      activeTab === 'macro' ? 'bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-950' : isDarkMode ? 'text-zinc-400 hover:bg-zinc-800' : 'text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    <Globe className="h-4.5 w-4.5" />
-                    <span>Macro Analysis</span>
-                  </button>
-
-                  <button
-                    onClick={() => { setActiveTab('learning'); setIsMobileMenuOpen(false); }}
-                    className={`flex items-center space-x-3 w-full px-3 py-3 rounded-xl text-xs sm:text-sm font-semibold cursor-pointer ${
-                      activeTab === 'learning' ? 'bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-950' : isDarkMode ? 'text-zinc-400 hover:bg-zinc-800' : 'text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    <ImageIcon className="h-4.5 w-4.5" />
-                    <span>Learning Notes</span>
-                  </button>
-
-                  {user && (
+                {/* Sidebar Drawer */}
+                <motion.div
+                  initial={{ x: '-100%' }}
+                  animate={{ x: 0 }}
+                  exit={{ x: '-100%' }}
+                  transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                  className={`fixed left-0 top-0 bottom-0 h-full w-[280px] max-w-[85vw] z-50 flex flex-col shadow-2xl overflow-hidden md:hidden ${
+                    isDarkMode ? 'bg-zinc-950 text-zinc-100 border-r border-zinc-800' : 'bg-white text-slate-800 border-r border-slate-200'
+                  }`}
+                >
+                  {/* Drawer Header */}
+                  <div className={`px-5 py-4 flex items-center justify-between border-b shrink-0 ${
+                    isDarkMode ? 'border-zinc-900 bg-zinc-900/30' : 'border-slate-100 bg-slate-50/50'
+                  }`}>
+                    <div className="flex items-center space-x-2">
+                      <div className={`p-1.5 rounded-lg ${isDarkMode ? 'bg-zinc-800 text-emerald-400' : 'bg-slate-100 text-slate-800'}`}>
+                        <Activity className="h-4 w-4" />
+                      </div>
+                      <span className="font-extrabold tracking-tight text-sm">Trading Journal</span>
+                    </div>
                     <button
-                      onClick={handleLogout}
-                      className="flex items-center space-x-3 w-full px-3 py-3 rounded-xl text-xs sm:text-sm font-semibold text-rose-500 hover:bg-rose-500/10 cursor-pointer"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className={`p-1.5 rounded-lg cursor-pointer ${
+                        isDarkMode ? 'hover:bg-zinc-850 text-zinc-400 hover:text-zinc-100' : 'hover:bg-slate-100 text-slate-500 hover:text-slate-800'
+                      }`}
                     >
-                      <LogOut className="h-4.5 w-4.5" />
-                      <span>Sign Out</span>
+                      <X className="h-4.5 w-4.5" />
                     </button>
-                  )}
-                </div>
-              </motion.div>
+                  </div>
+
+                  {/* Drawer Content */}
+                  <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1.5">
+                    <button
+                      onClick={() => { setActiveTab('overview'); setIsMobileMenuOpen(false); }}
+                      className={`flex items-center space-x-3 w-full px-3 py-3 rounded-xl text-xs sm:text-sm font-semibold cursor-pointer transition-all duration-150 ${
+                        activeTab === 'overview' ? 'bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-950' : isDarkMode ? 'text-zinc-400 hover:bg-zinc-900' : 'text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <Activity className="h-4 w-4" />
+                      <span>Dashboard</span>
+                    </button>
+                    
+                    <button
+                      onClick={() => { setActiveTab('alignment'); setIsMobileMenuOpen(false); }}
+                      className={`flex items-center space-x-3 w-full px-3 py-3 rounded-xl text-xs sm:text-sm font-semibold cursor-pointer transition-all duration-150 ${
+                        activeTab === 'alignment' ? 'bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-950' : isDarkMode ? 'text-zinc-400 hover:bg-zinc-900' : 'text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <Percent className="h-4 w-4" />
+                      <span>Alignment Calculator</span>
+                    </button>
+
+                    <button
+                      onClick={() => { setActiveTab('journal'); setIsMobileMenuOpen(false); }}
+                      className={`flex items-center space-x-3 w-full px-3 py-3 rounded-xl text-xs sm:text-sm font-semibold cursor-pointer transition-all duration-150 ${
+                        activeTab === 'journal' ? 'bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-950' : isDarkMode ? 'text-zinc-400 hover:bg-zinc-900' : 'text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <BookOpen className="h-4 w-4" />
+                      <span>Trading Journal ({trades.length})</span>
+                    </button>
+                    
+                    <button
+                      onClick={() => { setActiveTab('micro'); setIsMobileMenuOpen(false); }}
+                      className={`flex items-center space-x-3 w-full px-3 py-3 rounded-xl text-xs sm:text-sm font-semibold cursor-pointer transition-all duration-150 ${
+                        activeTab === 'micro' ? 'bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-950' : isDarkMode ? 'text-zinc-400 hover:bg-zinc-900' : 'text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <Target className="h-4 w-4" />
+                      <span>Micro Analysis</span>
+                    </button>
+                    
+                    <button
+                      onClick={() => { setActiveTab('macro'); setIsMobileMenuOpen(false); }}
+                      className={`flex items-center space-x-3 w-full px-3 py-3 rounded-xl text-xs sm:text-sm font-semibold cursor-pointer transition-all duration-150 ${
+                        activeTab === 'macro' ? 'bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-950' : isDarkMode ? 'text-zinc-400 hover:bg-zinc-900' : 'text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <Globe className="h-4 w-4" />
+                      <span>Macro Analysis</span>
+                    </button>
+
+                    <button
+                      onClick={() => { setActiveTab('learning'); setIsMobileMenuOpen(false); }}
+                      className={`flex items-center space-x-3 w-full px-3 py-3 rounded-xl text-xs sm:text-sm font-semibold cursor-pointer transition-all duration-150 ${
+                        activeTab === 'learning' ? 'bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-950' : isDarkMode ? 'text-zinc-400 hover:bg-zinc-900' : 'text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <ImageIcon className="h-4 w-4" />
+                      <span>Learning Notes</span>
+                    </button>
+                  </div>
+
+                  {/* Drawer Footer */}
+                  <div className={`p-4 border-t shrink-0 ${
+                    isDarkMode ? 'border-zinc-900 bg-zinc-900/10' : 'border-slate-100 bg-slate-50/20'
+                  }`}>
+                    {user && (
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2.5">
+                          <img 
+                            src={user.photoURL || ''} 
+                            alt="Profile" 
+                            className="h-8 w-8 rounded-full border border-slate-200 dark:border-zinc-800"
+                            referrerPolicy="no-referrer"
+                          />
+                          <div className="flex flex-col">
+                            <span className="text-[11px] font-bold truncate max-w-[120px]">{user.displayName}</span>
+                            <span className="text-[9px] text-slate-400 dark:text-zinc-500 truncate max-w-[120px]">{user.email}</span>
+                          </div>
+                        </div>
+                        <button
+                          onClick={handleLogout}
+                          className={`p-2 rounded-xl transition-all duration-150 cursor-pointer ${
+                            isDarkMode ? 'text-zinc-500 hover:text-red-400 hover:bg-red-500/10' : 'text-slate-400 hover:text-red-500 hover:bg-red-50'
+                          }`}
+                          title="Sign Out"
+                        >
+                          <LogOut className="h-4 w-4" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              </>
             )}
           </AnimatePresence>
         </header>
@@ -1945,7 +2189,9 @@ export default function Home() {
 
       {/* Main Body content area */}
       <div className={`flex-1 flex flex-col ${needsAuth ? '' : 'md:pl-64'}`}>
-        <main className="flex-1 w-full px-4 sm:px-8 lg:px-10 py-6 sm:py-8">
+        <main className={`flex-1 w-full py-6 sm:py-8 transition-all ${
+          activeTab === 'journal' ? 'px-2 sm:px-4 lg:px-5' : 'px-4 sm:px-8 lg:px-10'
+        }`}>
         
         {/* If user needs authentication, display gorgeous onboarding page */}
         {needsAuth ? (
@@ -2002,6 +2248,24 @@ export default function Home() {
                   </div>
                 </button>
               )}
+
+              {/* Google Sign-in Troubleshooting Tips */}
+              <div className="mt-8 pt-6 border-t border-slate-200/40 text-left max-w-sm sm:max-w-md mx-auto">
+                <details className="group">
+                  <summary className="text-xs text-slate-500 font-semibold cursor-pointer hover:text-slate-800 transition-colors flex items-center justify-between list-none">
+                    <span>⚠️ Google Sign-In ဝင်မရပါက ဖြေရှင်းနည်းကြည့်ရန်</span>
+                    <span className="transition-transform duration-200 group-open:rotate-180 text-[10px]">▼</span>
+                  </summary>
+                  <div className="mt-3 text-[11px] sm:text-xs text-slate-500 space-y-2.5 leading-relaxed bg-slate-50/80 p-3.5 sm:p-4 rounded-xl border border-slate-100">
+                    <p className="font-bold text-slate-800">ဖြေရှင်းနည်း အဆင့်ဆင့် -</p>
+                    <ul className="list-decimal pl-4 space-y-1.5 text-slate-600">
+                      <li><strong>Safari / Brave Browser:</strong> Browser ၏ Privacy settings တွင် &quot;Prevent Cross-Site Tracking&quot; နှင့် &quot;Block All Cookies&quot; ကို ပိတ်ပြီး ထပ်မံကြိုးစားပါ။</li>
+                      <li><strong>Incognito Mode:</strong> Chrome Incognito တွင် Google popups ကို block တတ်သောကြောင့် standard browser window ဖြင့် အသုံးပြုပါ။</li>
+                      <li><strong>Firebase Authorized Domains:</strong> အကယ်၍ Netlify custom domain ကို ပြောင်းလဲထားပါက Firebase Console ၏ <strong>Authentication &gt; Settings &gt; Authorized Domains</strong> တွင် Netlify domain ကို ထည့်သွင်းထားရန် လိုအပ်ပါသည်။</li>
+                    </ul>
+                  </div>
+                </details>
+              </div>
             </div>
 
             <div className="border-t border-slate-200/80 px-6 py-6 sm:px-12 bg-white text-left grid grid-cols-1 sm:grid-cols-3 gap-6">
@@ -2508,7 +2772,7 @@ export default function Home() {
                       <Search className="absolute left-3 top-2.5 h-4.5 w-4.5 text-slate-400" />
                       <input
                         type="text"
-                        placeholder="ရှာဖွေရန်... (Pair သို့မဟုတ် Notes)"
+                        placeholder="ရှာဖွေရန်... (Setup, Notes, Trade Number, Commitment)"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className={`w-full pl-10 pr-4 py-2 border rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 transition-all duration-150 ${
@@ -2517,51 +2781,72 @@ export default function Home() {
                       />
                     </div>
 
-                    {/* Filter Type */}
-                    <div className="flex items-center space-x-1.5">
-                      <Filter className="h-3.5 w-3.5 text-slate-400" />
-                      <div className="relative flex items-center">
+                    {/* Filter Status */}
+                    <div className="relative flex items-center w-full sm:w-auto">
+                      <Filter className="h-3.5 w-3.5 mr-1.5 text-slate-400 shrink-0" />
+                      <div className="relative flex-1 sm:flex-initial">
                         <select
-                          value={filterType}
-                          onChange={(e: any) => setFilterType(e.target.value)}
-                          className={`appearance-none border rounded-xl text-xs pl-3 pr-8 py-2 focus:outline-hidden focus:ring-2 focus:ring-slate-500/20 cursor-pointer ${
+                          value={filterStatus}
+                          onChange={(e: any) => setFilterStatus(e.target.value)}
+                          className={`appearance-none border rounded-xl text-xs pl-3 pr-8 py-2 w-full focus:outline-hidden focus:ring-2 focus:ring-slate-500/20 cursor-pointer ${
                             isDarkMode ? 'bg-zinc-900 border-zinc-800 text-zinc-200' : 'bg-slate-50 border-slate-200 text-slate-700'
                           }`}
                         >
-                          <option value="ALL">All Types</option>
-                          <option value="BUY">BUY</option>
-                          <option value="SELL">SELL</option>
+                          <option value="ALL">All Status</option>
+                          <option value="OPEN">OPEN Trades</option>
+                          <option value="CLOSED">CLOSED Trades</option>
                         </select>
-                        <ChevronDown className="h-3.5 w-3.5 absolute right-2.5 pointer-events-none text-slate-400 dark:text-zinc-500" />
+                        <ChevronDown className="h-3.5 w-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 dark:text-zinc-500" />
                       </div>
-                    </div>
-
-                    {/* Filter Status */}
-                    <div className="relative flex items-center">
-                      <select
-                        value={filterStatus}
-                        onChange={(e: any) => setFilterStatus(e.target.value)}
-                        className={`appearance-none border rounded-xl text-xs pl-3 pr-8 py-2 focus:outline-hidden focus:ring-2 focus:ring-slate-500/20 cursor-pointer ${
-                          isDarkMode ? 'bg-zinc-900 border-zinc-800 text-zinc-200' : 'bg-slate-50 border-slate-200 text-slate-700'
-                        }`}
-                      >
-                        <option value="ALL">All Status</option>
-                        <option value="OPEN">OPEN Trades</option>
-                        <option value="CLOSED">CLOSED Trades</option>
-                      </select>
-                      <ChevronDown className="h-3.5 w-3.5 absolute right-2.5 pointer-events-none text-slate-400 dark:text-zinc-500" />
                     </div>
                   </div>
 
-                  {/* Add Trade Button */}
-                  <div>
-                    <button
-                      onClick={handleAddClick}
-                      className="w-full lg:w-auto inline-flex items-center justify-center space-x-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 text-white dark:text-zinc-950 font-bold text-sm px-4 py-2.5 rounded-xl transition-all duration-200 cursor-pointer shadow-xs"
-                    >
-                      <Plus className="h-4.5 w-4.5" />
-                      <span>Trade အသစ်ထည့်ရန်</span>
-                    </button>
+                  {/* Action Buttons */}
+                  <div className="flex flex-col sm:flex-row items-center gap-2 w-full lg:w-auto">
+                    {/* Clear & Reset Button */}
+                    {token && spreadsheetId && (
+                      <div className="relative w-full sm:w-auto">
+                        {!showResetConfirm ? (
+                          <button
+                            onClick={() => setShowResetConfirm(true)}
+                            className="w-full sm:w-auto inline-flex items-center justify-center space-x-1.5 border border-rose-500 hover:bg-rose-500/10 text-rose-500 dark:text-rose-400 font-bold text-xs px-3 py-2.5 rounded-xl transition-all duration-200 cursor-pointer whitespace-nowrap"
+                            title="ဒေတာအဟောင်းများအားလုံးကို ဖျက်ရန်"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            <span>ဒေတာအဟောင်းများဖျက်ရန်</span>
+                          </button>
+                        ) : (
+                          <div className="flex items-center gap-1.5 bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/50 p-1 rounded-xl whitespace-nowrap">
+                            <span className="text-[10px] sm:text-xs text-rose-700 dark:text-rose-400 font-bold px-1.5">
+                              ဒေတာအဟောင်းအားလုံး ဖျက်မလား?
+                            </span>
+                            <button
+                              onClick={handleClearAndSeedClick}
+                              className="bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-[11px] px-2.5 py-1.5 rounded-lg transition-all cursor-pointer"
+                            >
+                              ဖျက်မည်
+                            </button>
+                            <button
+                              onClick={() => setShowResetConfirm(false)}
+                              className="text-slate-500 hover:text-slate-700 dark:text-zinc-400 dark:hover:text-zinc-200 font-bold text-[11px] px-2 py-1.5 cursor-pointer"
+                            >
+                              မလုပ်တော့ပါ
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Add Trade Button */}
+                    <div className="w-full sm:w-auto">
+                      <button
+                        onClick={handleAddClick}
+                        className="w-full sm:w-auto inline-flex items-center justify-center space-x-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 text-white dark:text-zinc-950 font-bold text-sm px-4 py-2.5 rounded-xl transition-all duration-200 cursor-pointer shadow-xs whitespace-nowrap"
+                      >
+                        <Plus className="h-4.5 w-4.5" />
+                        <span>Trade အသစ်ထည့်ရန်</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -2572,21 +2857,23 @@ export default function Home() {
                   <div className="hidden md:block overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                       <thead>
-                        <tr className={`border-b text-xs font-bold tracking-wider transition-colors ${
+                        <tr className={`border-b text-[11px] font-bold tracking-wider transition-colors ${
                           isDarkMode ? 'bg-zinc-900/60 border-zinc-800/80 text-zinc-400' : 'bg-slate-50 border-slate-200 text-slate-400'
                         }`}>
-                          <th className="px-5 py-4">Date</th>
-                          <th className="px-5 py-4">Pair / Asset</th>
-                          <th className="px-5 py-4">Buy/Sell</th>
-                          <th className="px-5 py-4 text-right">Entry</th>
-                          <th className="px-5 py-4 text-right">SL</th>
-                          <th className="px-5 py-4 text-right">TP</th>
-                          <th className="px-5 py-4 text-center">R:R</th>
-                          <th className="px-5 py-4">Strategy/Setup</th>
-                          <th className="px-5 py-4 text-center">Win/Loss</th>
-                          <th className="px-5 py-4 text-right">PnL ($/R)</th>
-                          <th className="px-5 py-4">remarks / Notes</th>
-                          <th className="px-5 py-4 text-center">Actions</th>
+                          <th className="px-1.5 py-2 text-center w-[50px] whitespace-nowrap">#</th>
+                          <th className="px-1.5 py-2 text-left w-[85px] whitespace-nowrap">Date</th>
+                          <th className="px-1.5 py-2 text-left w-[80px] whitespace-nowrap">Pair / Asset</th>
+                          <th className="px-1.5 py-2 text-right w-[75px] whitespace-nowrap">Entry</th>
+                          <th className="px-1.5 py-2 text-right w-[75px] whitespace-nowrap">SL</th>
+                          <th className="px-1.5 py-2 text-right w-[75px] whitespace-nowrap">TP</th>
+                          <th className="px-1.5 py-2 text-center w-[60px] whitespace-nowrap">R:R</th>
+                          <th className="px-1.5 py-2 text-left w-[120px] whitespace-nowrap max-w-[120px]">Watchlist / Setup</th>
+                          <th className="px-1.5 py-2 text-center w-[85px] whitespace-nowrap">Result</th>
+                          <th className="px-1.5 py-2 text-right w-[80px] whitespace-nowrap">P&L ($)</th>
+                          <th className="px-1.5 py-2 text-left w-[100px] whitespace-nowrap max-w-[100px]">Remarks</th>
+                          <th className="px-1.5 py-2 text-left w-[100px] whitespace-nowrap max-w-[100px]">Commitment</th>
+                          <th className="px-1.5 py-2 text-center w-[75px] whitespace-nowrap">SS (B&F)</th>
+                          <th className="px-1.5 py-2 text-center w-[65px] whitespace-nowrap">Actions</th>
                         </tr>
                       </thead>
                       <tbody className={`divide-y text-sm transition-colors ${
@@ -2594,7 +2881,7 @@ export default function Home() {
                       }`}>
                         {isLoadingTrades ? (
                           <tr>
-                            <td colSpan={12} className="text-center py-12">
+                            <td colSpan={14} className="text-center py-12">
                               <div className="flex flex-col items-center justify-center space-y-2">
                                 <RefreshCw className="h-8 w-8 text-slate-500 animate-spin" />
                                 <span className={`text-sm font-semibold ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Google Sheet မှ Trade Data များ ဆွဲယူနေပါသည်...</span>
@@ -2603,80 +2890,156 @@ export default function Home() {
                           </tr>
                         ) : filteredTrades.length > 0 ? (
                           filteredTrades.map((trade, idx) => {
-                            const isWin = trade.winLoss === 'Win';
-                            const isLoss = trade.winLoss === 'Loss';
-                            const isPending = trade.winLoss === 'Pending';
+                            const isWin = trade.winLoss === 'TP' || (trade.winLoss === 'Trailing Stop' && parsePnLValue(trade.pnl, trade.winLoss) > 0) || (trade.pnl && (trade.pnl.startsWith('+') || trade.pnl.startsWith('$+')));
+                            const isLoss = trade.winLoss === 'SL' || (trade.winLoss === 'Trailing Stop' && parsePnLValue(trade.pnl, trade.winLoss) < 0) || (trade.pnl && (trade.pnl.startsWith('-') || trade.pnl.includes('-')));
                             
                             return (
-                              <tr key={trade.id ? `trade-${trade.id}-${trade.row || idx}` : `trade-idx-${idx}`} className={`transition-colors duration-150 ${
-                                isDarkMode ? 'hover:bg-zinc-800/20' : 'hover:bg-slate-50/50'
-                              }`}>
-                                <td className={`px-5 py-4 whitespace-nowrap text-xs font-semibold ${isDarkMode ? 'text-zinc-500' : 'text-slate-500'}`}>{trade.date}</td>
-                                <td className={`px-5 py-4 whitespace-nowrap font-bold ${isDarkMode ? 'text-zinc-200' : 'text-slate-900'}`}>{trade.pair}</td>
-                                <td className="px-5 py-4 whitespace-nowrap">
-                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-bold ${
-                                    trade.type === 'Buy' 
-                                      ? (isDarkMode ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-emerald-50 text-emerald-700 border border-emerald-100') 
-                                      : (isDarkMode ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' : 'bg-rose-50 text-rose-700 border border-rose-100')
-                                  }`}>
-                                    {trade.type}
-                                  </span>
+                              <tr 
+                                key={trade.id ? `trade-${trade.id}-${trade.row || idx}` : `trade-idx-${idx}`} 
+                                className={`transition-colors duration-150 cursor-pointer text-xs ${
+                                  isDarkMode ? 'hover:bg-zinc-800/20' : 'hover:bg-slate-50/50'
+                                }`}
+                                onClick={() => setSelectedTrade(trade)}
+                              >
+                                <td className={`px-1.5 py-1.5 text-center w-[50px] whitespace-nowrap font-mono font-bold ${isDarkMode ? 'text-zinc-300' : 'text-slate-700'}`}>{trade.tradeNumber || '-'}</td>
+                                <td className={`px-1.5 py-1.5 text-left w-[85px] whitespace-nowrap font-semibold ${isDarkMode ? 'text-zinc-500' : 'text-slate-500'}`}>{trade.date}</td>
+                                <td className={`px-1.5 py-1.5 text-left w-[80px] whitespace-nowrap font-bold ${isDarkMode ? 'text-zinc-200' : 'text-slate-900'}`}>
+                                  {trade.pair || '-'}
                                 </td>
-                                <td className={`px-5 py-4 whitespace-nowrap text-right font-medium ${isDarkMode ? 'text-zinc-300' : 'text-slate-600'}`}>
+                                <td className={`px-1.5 py-1.5 text-right w-[75px] whitespace-nowrap font-medium ${isDarkMode ? 'text-zinc-300' : 'text-slate-600'}`}>
                                   {trade.entryPrice ? `${trade.entryPrice.toLocaleString()}` : '-'}
                                 </td>
-                                <td className={`px-5 py-4 whitespace-nowrap text-right text-xs font-medium ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                                <td className={`px-1.5 py-1.5 text-right w-[75px] whitespace-nowrap font-medium ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
                                   {trade.sl ? trade.sl.toLocaleString() : '-'}
                                 </td>
-                                <td className={`px-5 py-4 whitespace-nowrap text-right text-xs font-medium ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                                <td className={`px-1.5 py-1.5 text-right w-[75px] whitespace-nowrap font-medium ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
                                   {trade.tp ? trade.tp.toLocaleString() : '-'}
                                 </td>
-                                <td className="px-5 py-4 whitespace-nowrap text-center">
-                                  <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold ${
+                                <td className="px-1.5 py-1.5 text-center w-[60px] whitespace-nowrap">
+                                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold ${
                                     isDarkMode ? 'bg-zinc-800 text-zinc-300 border border-zinc-700' : 'bg-slate-100 text-slate-700 border border-slate-200'
                                   }`}>
                                     {trade.rr || '-'}
                                   </span>
                                 </td>
-                                <td className={`px-5 py-4 whitespace-nowrap text-xs font-medium ${isDarkMode ? 'text-zinc-300' : 'text-slate-600'}`}>
-                                  {trade.strategy || '-'}
+                                <td className={`px-1.5 py-1.5 text-left w-[120px] max-w-[120px] truncate font-medium ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`} title={trade.watchlist}>
+                                  {trade.watchlist || '-'}
                                 </td>
-                                <td className="px-5 py-4 whitespace-nowrap text-center">
-                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                                    isWin ? (isDarkMode ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-emerald-50 text-emerald-700 border border-emerald-100') :
-                                    isLoss ? (isDarkMode ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' : 'bg-rose-50 text-rose-700 border border-rose-100') :
-                                    (isDarkMode ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-amber-50 text-amber-700 border border-amber-100')
-                                  }`}>
-                                    {trade.winLoss}
-                                  </span>
+                                <td className="px-1.5 py-1.5 text-center w-[85px] whitespace-nowrap">
+                                  {trade.winLoss === 'TP' ? (
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                      isDarkMode ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                                    }`}>
+                                      TP
+                                    </span>
+                                  ) : trade.winLoss === 'SL' ? (
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                      isDarkMode ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' : 'bg-rose-50 text-rose-700 border border-rose-100'
+                                    }`}>
+                                      SL
+                                    </span>
+                                  ) : trade.winLoss === 'Breakeven' ? (
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                      isDarkMode ? 'bg-zinc-800 text-zinc-300 border border-zinc-700' : 'bg-slate-100 text-slate-700 border border-slate-200'
+                                    }`}>
+                                      Breakeven
+                                    </span>
+                                  ) : trade.winLoss === 'Trailing Stop' ? (
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                      isDarkMode ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' : 'bg-purple-50 text-purple-700 border border-purple-100'
+                                    }`}>
+                                      Trailing Stop
+                                    </span>
+                                  ) : (
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                      isDarkMode ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-amber-50 text-amber-700 border border-amber-100'
+                                    }`}>
+                                      Pending
+                                    </span>
+                                  )}
                                 </td>
-                                <td className={`px-5 py-4 whitespace-nowrap text-right font-extrabold ${
+                                <td className={`px-1.5 py-1.5 text-right w-[80px] whitespace-nowrap font-extrabold ${
                                   isWin ? 'text-emerald-500' : isLoss ? 'text-rose-500' : 'text-slate-400'
                                 }`}>
                                   {trade.pnl || '-'}
                                 </td>
-                                <td className={`px-5 py-4 max-w-xs truncate text-xs ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`} title={trade.notes}>
+                                <td className={`px-1.5 py-1.5 text-left w-[100px] max-w-[100px] truncate ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`} title={trade.notes}>
                                   {trade.notes || '-'}
                                 </td>
-                                <td className="px-5 py-4 whitespace-nowrap text-center text-xs">
-                                  <div className="flex justify-center items-center space-x-2">
+                                <td className={`px-1.5 py-1.5 text-left w-[100px] max-w-[100px] truncate font-medium ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`} title={trade.commitment}>
+                                  {trade.commitment || '-'}
+                                </td>
+                                <td className="px-1.5 py-1.5 text-center w-[75px] whitespace-nowrap text-xs">
+                                  <div className="flex justify-center gap-1">
+                                    {(() => {
+                                      const photos = (trade.tradePhoto || '').split(',');
+                                      const beforePhoto = photos[0] || '';
+                                      const afterPhoto = photos[1] || '';
+                                      
+                                      if (!beforePhoto && !afterPhoto) {
+                                        return <span className="text-slate-400 dark:text-zinc-600">-</span>;
+                                      }
+                                      
+                                      return (
+                                        <>
+                                          {beforePhoto && (
+                                            <a 
+                                              href={getDirectDriveImageUrl(beforePhoto)} 
+                                              target="_blank" 
+                                              rel="noopener noreferrer"
+                                              onClick={(e) => e.stopPropagation()}
+                                              className={`inline-flex items-center space-x-1 px-1 py-0.5 rounded text-[9px] font-semibold border transition-all ${
+                                                isDarkMode 
+                                                  ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border-zinc-700' 
+                                                  : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                                              }`}
+                                              title="Before Trade SS"
+                                            >
+                                              <ImageIcon className="h-2.5 w-2.5 text-blue-500" />
+                                              <span>B</span>
+                                            </a>
+                                          )}
+                                          {afterPhoto && (
+                                            <a 
+                                              href={getDirectDriveImageUrl(afterPhoto)} 
+                                              target="_blank" 
+                                              rel="noopener noreferrer"
+                                              onClick={(e) => e.stopPropagation()}
+                                              className={`inline-flex items-center space-x-1 px-1 py-0.5 rounded text-[9px] font-semibold border transition-all ${
+                                                isDarkMode 
+                                                  ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border-zinc-700' 
+                                                  : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                                              }`}
+                                              title="After Trade SS"
+                                            >
+                                              <ImageIcon className="h-2.5 w-2.5 text-emerald-500" />
+                                              <span>A</span>
+                                            </a>
+                                          )}
+                                        </>
+                                      );
+                                    })()}
+                                  </div>
+                                </td>
+                                <td className="px-1.5 py-1.5 text-center w-[65px] whitespace-nowrap">
+                                  <div className="flex justify-center items-center space-x-1.5">
                                     <button
-                                      onClick={() => handleEditClick(trade)}
-                                      className={`p-1.5 rounded-lg transition-colors duration-200 ${
+                                      onClick={(e) => { e.stopPropagation(); handleEditClick(trade); }}
+                                      className={`p-1 rounded transition-colors duration-200 ${
                                         isDarkMode ? 'text-zinc-500 hover:text-emerald-400 hover:bg-emerald-500/10' : 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50'
                                       }`}
                                       title="Edit Trade"
                                     >
-                                      <Edit2 className="h-4 w-4" />
+                                      <Edit2 className="h-3.5 w-3.5" />
                                     </button>
                                     <button
-                                      onClick={() => handleDeleteClick(trade)}
-                                      className={`p-1.5 rounded-lg transition-colors duration-200 ${
+                                      onClick={(e) => { e.stopPropagation(); handleDeleteClick(trade); }}
+                                      className={`p-1 rounded transition-colors duration-200 ${
                                         isDarkMode ? 'text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10' : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50'
                                       }`}
                                       title="Delete Trade"
                                     >
-                                      <Trash2 className="h-4 w-4" />
+                                      <Trash2 className="h-3.5 w-3.5" />
                                     </button>
                                   </div>
                                 </td>
@@ -2685,7 +3048,7 @@ export default function Home() {
                           })
                         ) : (
                           <tr>
-                            <td colSpan={12} className="text-center py-16">
+                            <td colSpan={14} className="text-center py-16">
                               <BookOpen className="h-12 w-12 mx-auto mb-3 stroke-1 text-zinc-400 dark:text-zinc-700" />
                               <p className={`font-bold ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>အရောင်းအဝယ်မှတ်တမ်းများ ရှာမတွေ့ပါ။</p>
                               <p className="text-xs text-slate-400">ရှာဖွေမှုစကားလုံး ပြောင်းကြည့်ပါ သို့မဟုတ် Trade အသစ်တစ်ခု ထည့်သွင်းကြည့်ပါ။</p>
@@ -2705,41 +3068,67 @@ export default function Home() {
                       </div>
                     ) : filteredTrades.length > 0 ? (
                       filteredTrades.map((trade, idx) => {
-                        const isWin = trade.winLoss === 'Win';
-                        const isLoss = trade.winLoss === 'Loss';
+                        const isWin = trade.winLoss === 'TP' || (trade.winLoss === 'Trailing Stop' && parsePnLValue(trade.pnl, trade.winLoss) > 0) || (trade.pnl && (trade.pnl.startsWith('+') || trade.pnl.startsWith('$+')));
+                        const isLoss = trade.winLoss === 'SL' || (trade.winLoss === 'Trailing Stop' && parsePnLValue(trade.pnl, trade.winLoss) < 0) || (trade.pnl && (trade.pnl.startsWith('-') || trade.pnl.includes('-')));
                         const isPending = trade.winLoss === 'Pending';
                         
                         return (
                           <div 
                             key={trade.id ? `trade-mob-${trade.id}-${trade.row || idx}` : `trade-mob-idx-${idx}`} 
-                            className={`p-4 space-y-3 transition-colors duration-150 ${
+                            className={`p-4 space-y-3 transition-colors duration-150 cursor-pointer ${
                               isDarkMode ? 'hover:bg-zinc-800/10' : 'hover:bg-slate-50/30'
                             }`}
+                            onClick={() => setSelectedTrade(trade)}
                           >
-                            <div className="flex justify-between items-center">
-                              <span className={`text-[10px] font-semibold ${isDarkMode ? 'text-zinc-500' : 'text-slate-400'}`}>
+                            <div className="flex justify-between items-center pb-2 border-b border-zinc-200/20 dark:border-zinc-800/40">
+                              <span className={`inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                                isDarkMode ? 'bg-zinc-800 text-zinc-400' : 'bg-slate-100 text-slate-500'
+                              }`}>
+                                <Calendar className="h-3 w-3 mr-1 shrink-0 text-slate-400 dark:text-zinc-500" />
                                 {trade.date}
                               </span>
-                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                isWin ? (isDarkMode ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-emerald-50 text-emerald-700 border border-emerald-100') :
-                                isLoss ? (isDarkMode ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' : 'bg-rose-50 text-rose-700 border border-rose-100') :
-                                (isDarkMode ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-amber-50 text-amber-700 border border-amber-100')
-                              }`}>
-                                {trade.winLoss}
-                              </span>
+                              
+                              {trade.winLoss === 'TP' ? (
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  isDarkMode ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                                }`}>
+                                  TP
+                                </span>
+                              ) : trade.winLoss === 'SL' ? (
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  isDarkMode ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' : 'bg-rose-50 text-rose-700 border border-rose-100'
+                                }`}>
+                                  SL
+                                </span>
+                              ) : trade.winLoss === 'Breakeven' ? (
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  isDarkMode ? 'bg-zinc-800 text-zinc-300 border border-zinc-700' : 'bg-slate-100 text-slate-700 border border-slate-200'
+                                }`}>
+                                  Breakeven
+                                </span>
+                              ) : trade.winLoss === 'Trailing Stop' ? (
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  isDarkMode ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' : 'bg-purple-50 text-purple-700 border border-purple-100'
+                                }`}>
+                                  Trailing Stop
+                                </span>
+                              ) : (
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  isDarkMode ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-amber-50 text-amber-700 border border-amber-100'
+                                }`}>
+                                  Pending
+                                </span>
+                              )}
                             </div>
 
-                            <div className="flex justify-between items-start">
+                            <div className="flex justify-between items-start pt-1">
                               <div>
-                                <h4 className={`font-bold text-sm ${isDarkMode ? 'text-zinc-200' : 'text-slate-900'}`}>
+                                <div className={`text-[10px] font-extrabold uppercase tracking-widest ${isDarkMode ? 'text-zinc-500' : 'text-slate-400'}`}>
+                                  Trade #{trade.tradeNumber || '-'}
+                                </div>
+                                <h4 className={`font-extrabold text-sm tracking-tight mt-0.5 ${isDarkMode ? 'text-zinc-100' : 'text-slate-900'}`}>
                                   {trade.pair}
                                 </h4>
-                                <p className={`text-xs mt-0.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
-                                  <span className={`font-bold ${trade.type === 'Buy' ? 'text-emerald-500' : 'text-rose-500'}`}>
-                                    {trade.type}
-                                  </span>
-                                  {' '}@ {trade.entryPrice ? trade.entryPrice.toLocaleString() : '-'}
-                                </p>
                               </div>
 
                               <div className="text-right">
@@ -2748,35 +3137,67 @@ export default function Home() {
                                 }`}>
                                   {trade.pnl || '-'}
                                 </span>
-                                <div className={`text-[10px] font-medium mt-0.5 ${isDarkMode ? 'text-zinc-500' : 'text-slate-400'}`}>
+                                <div className={`text-[10px] font-medium mt-1 ${isDarkMode ? 'text-zinc-500' : 'text-slate-400'}`}>
                                   R:R: {trade.rr || '-'}
                                 </div>
                               </div>
                             </div>
 
                             {/* Additional info for mobile card */}
-                            <div className={`text-xs p-2.5 rounded-xl space-y-1 ${
-                              isDarkMode ? 'bg-zinc-950/40 text-zinc-400' : 'bg-slate-50 text-slate-600'
+                            <div className={`text-xs py-2.5 space-y-3 ${
+                              isDarkMode ? 'text-zinc-400' : 'text-slate-600'
                             }`}>
-                              <div className="grid grid-cols-2 gap-1 text-[10px]">
-                                <div><span className="opacity-60">SL:</span> <span className="font-semibold">{trade.sl ? trade.sl.toLocaleString() : '-'}</span></div>
-                                <div><span className="opacity-60">TP:</span> <span className="font-semibold">{trade.tp ? trade.tp.toLocaleString() : '-'}</span></div>
+                              <div className="grid grid-cols-2 gap-2 text-xs">
+                                <div className="text-left"><span className="opacity-60 font-medium">Entry:</span> <span className="font-bold text-slate-900 dark:text-zinc-100">{trade.entryPrice ? trade.entryPrice.toLocaleString() : '-'}</span></div>
+                                <div className="text-right"><span className="opacity-60 font-medium">R:R:</span> <span className="font-bold text-slate-900 dark:text-zinc-100">{trade.rr || '-'}</span></div>
+                                <div className="text-left"><span className="opacity-60 font-medium">SL:</span> <span className="font-bold text-rose-500">{trade.sl ? trade.sl.toLocaleString() : '-'}</span></div>
+                                <div className="text-right"><span className="opacity-60 font-medium">TP:</span> <span className="font-bold text-emerald-500">{trade.tp ? trade.tp.toLocaleString() : '-'}</span></div>
                               </div>
-                              {trade.strategy && (
-                                <div className="text-[10px] mt-1">
-                                  <span className="font-bold opacity-60">Strategy:</span> {trade.strategy}
+                              
+                              {trade.watchlist && (
+                                <div className="text-[11px] border-t border-zinc-200/20 dark:border-zinc-800/40 pt-1.5">
+                                  <span className="font-bold opacity-70">Watchlist Details / Setup:</span>
+                                  <p className="mt-0.5">{trade.watchlist}</p>
                                 </div>
                               )}
+                              
                               {trade.notes && (
-                                <div className="text-[11px] italic mt-1 font-sans border-t border-zinc-200/20 dark:border-zinc-800/40 pt-1">
-                                  &quot;{trade.notes}&quot;
+                                <div className="text-[11px] border-t border-zinc-200/20 dark:border-zinc-800/40 pt-1.5">
+                                  <span className="font-bold opacity-70">Remarks / Note:</span>
+                                  <p className="mt-0.5 italic">&quot;{trade.notes}&quot;</p>
+                                </div>
+                              )}
+
+                              {trade.commitment && (
+                                <div className="text-[11px] border-t border-zinc-200/20 dark:border-zinc-800/40 pt-1.5">
+                                  <span className="font-bold opacity-70">Commitment:</span>
+                                  <p className="mt-0.5">{trade.commitment}</p>
+                                </div>
+                              )}
+
+                              {trade.tradePhoto && (
+                                <div className="border-t border-zinc-200/20 dark:border-zinc-800/40 pt-1.5 flex items-center justify-between">
+                                  <span className="font-bold opacity-70 text-[11px]">Trade SS (B&F):</span>
+                                  <a 
+                                    href={getDirectDriveImageUrl(trade.tradePhoto)} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className={`inline-flex items-center space-x-1 px-2 py-1 rounded-md text-[10px] font-semibold border transition-all ${
+                                      isDarkMode 
+                                        ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border-zinc-700' 
+                                        : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200 shadow-2xs'
+                                    }`}
+                                  >
+                                    <ImageIcon className="h-3 w-3 text-blue-500" />
+                                    <span>View SS</span>
+                                  </a>
                                 </div>
                               )}
                             </div>
 
                             <div className="flex justify-end items-center space-x-3 pt-1">
                               <button
-                                onClick={() => handleEditClick(trade)}
+                                onClick={(e) => { e.stopPropagation(); handleEditClick(trade); }}
                                 className={`inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all duration-150 cursor-pointer ${
                                   isDarkMode 
                                     ? 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-700' 
@@ -2787,7 +3208,7 @@ export default function Home() {
                                 <span>Edit</span>
                               </button>
                               <button
-                                onClick={() => handleDeleteClick(trade)}
+                                onClick={(e) => { e.stopPropagation(); handleDeleteClick(trade); }}
                                 className={`inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all duration-150 cursor-pointer ${
                                   isDarkMode 
                                     ? 'bg-zinc-800 text-rose-400 border-zinc-700 hover:bg-zinc-700' 
@@ -4450,8 +4871,256 @@ export default function Home() {
 
     {/* ADD / EDIT TRADE MODAL */}
       <AnimatePresence>
+        {/* NOTION-STYLE TRADE DETAIL POPUP MODAL */}
+        {selectedTrade && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+            {/* Overlay */}
+            <div 
+              className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity" 
+              onClick={() => setSelectedTrade(null)}
+            />
+
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className={`relative w-full max-w-4xl max-h-[92vh] flex flex-col rounded-2xl shadow-2xl overflow-hidden select-none cursor-default border ${
+                isDarkMode ? 'bg-zinc-950 border-zinc-900/50 text-zinc-100' : 'bg-white border-slate-200 text-slate-800'
+              }`}
+            >
+              {/* Modal Header */}
+              <div className={`px-6 py-4 flex items-center justify-between border-b ${
+                isDarkMode ? 'border-zinc-800 bg-zinc-900/30' : 'border-slate-200 bg-slate-50/50'
+              }`}>
+                <div className="flex items-center space-x-2">
+                  <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${
+                    isDarkMode ? 'bg-zinc-800 text-zinc-400' : 'bg-slate-100 text-slate-500'
+                  }`}>
+                    Trade Detail
+                  </span>
+                  <span className="text-xs text-slate-400 font-medium">Row #{selectedTrade.row}</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => {
+                      const tradeToEdit = selectedTrade;
+                      setSelectedTrade(null);
+                      handleEditClick(tradeToEdit);
+                    }}
+                    className={`p-1.5 rounded-lg border text-xs font-bold transition-all duration-200 cursor-pointer flex items-center space-x-1 ${
+                      isDarkMode 
+                        ? 'bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border-zinc-800' 
+                        : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200 shadow-2xs'
+                    }`}
+                  >
+                    <Edit2 className="h-3.5 w-3.5 text-emerald-500" />
+                    <span>ပြင်ဆင်ရန် (Edit)</span>
+                  </button>
+                  <button
+                    onClick={() => setSelectedTrade(null)}
+                    className={`p-1.5 rounded-lg border text-xs font-bold transition-all duration-200 cursor-pointer flex items-center justify-center ${
+                      isDarkMode 
+                        ? 'bg-zinc-900 hover:bg-zinc-800 text-zinc-400 border-zinc-800 hover:text-white' 
+                        : 'bg-white hover:bg-slate-50 text-slate-500 border-slate-200 shadow-2xs hover:text-slate-800'
+                    }`}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Modal Body */}
+              <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+                {/* Header Block */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-200/40 dark:border-zinc-800/60">
+                  <div>
+                    <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight flex items-center space-x-2">
+                      <span className={isDarkMode ? 'text-zinc-400' : 'text-slate-400'}>#{selectedTrade.tradeNumber}</span>
+                      <span>{selectedTrade.pair || 'Asset Name'}</span>
+                    </h2>
+                    <p className={`text-xs mt-1 font-medium ${isDarkMode ? 'text-zinc-500' : 'text-slate-500'}`}>
+                      Date: <span className="font-semibold">{selectedTrade.date}</span>
+                    </p>
+                  </div>
+                  <div className="flex items-center">
+                    {/* Status Badge */}
+                    {selectedTrade.winLoss === 'TP' ? (
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        TP
+                      </span>
+                    ) : selectedTrade.winLoss === 'SL' ? (
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                        SL
+                      </span>
+                    ) : selectedTrade.winLoss === 'Breakeven' ? (
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-zinc-800 text-zinc-300 border border-zinc-700">
+                        Breakeven
+                      </span>
+                    ) : selectedTrade.winLoss === 'Trailing Stop' ? (
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                        Trailing Stop
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                        Pending
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Properties Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                  <div className="space-y-3">
+                    <div className="flex items-center text-xs">
+                      <span className={`w-32 shrink-0 font-semibold ${isDarkMode ? 'text-zinc-500' : 'text-slate-400'}`}>Trade Number</span>
+                      <span className="font-mono font-bold text-sm">{selectedTrade.tradeNumber}</span>
+                    </div>
+                    <div className="flex items-center text-xs">
+                      <span className={`w-32 shrink-0 font-semibold ${isDarkMode ? 'text-zinc-500' : 'text-slate-400'}`}>Date</span>
+                      <span className="font-medium">{selectedTrade.date}</span>
+                    </div>
+                    <div className="flex items-center text-xs">
+                      <span className={`w-32 shrink-0 font-semibold ${isDarkMode ? 'text-zinc-500' : 'text-slate-400'}`}>Pair / Asset</span>
+                      <span className="font-bold">{selectedTrade.pair}</span>
+                    </div>
+                    <div className="flex items-center text-xs">
+                      <span className={`w-32 shrink-0 font-semibold ${isDarkMode ? 'text-zinc-500' : 'text-slate-400'}`}>Entry Price</span>
+                      <span className="font-mono font-semibold">{selectedTrade.entryPrice ? selectedTrade.entryPrice.toLocaleString() : '-'}</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center text-xs">
+                      <span className={`w-32 shrink-0 font-semibold ${isDarkMode ? 'text-zinc-500' : 'text-slate-400'}`}>Stop Loss (SL)</span>
+                      <span className="font-mono font-semibold text-rose-500">{selectedTrade.sl ? selectedTrade.sl.toLocaleString() : '-'}</span>
+                    </div>
+                    <div className="flex items-center text-xs">
+                      <span className={`w-32 shrink-0 font-semibold ${isDarkMode ? 'text-zinc-500' : 'text-slate-400'}`}>Take Profit (TP)</span>
+                      <span className="font-mono font-semibold text-emerald-500">{selectedTrade.tp ? selectedTrade.tp.toLocaleString() : '-'}</span>
+                    </div>
+                    <div className="flex items-center text-xs">
+                      <span className={`w-32 shrink-0 font-semibold ${isDarkMode ? 'text-zinc-500' : 'text-slate-400'}`}>Risk to Reward (R:R)</span>
+                      <span className={`inline-flex px-2 py-0.5 rounded-md text-xs font-semibold ${
+                        isDarkMode ? 'bg-zinc-800 text-zinc-300 border border-zinc-700' : 'bg-slate-100 text-slate-700 border border-slate-200'
+                      }`}>{selectedTrade.rr || '-'}</span>
+                    </div>
+                    <div className="flex items-center text-xs">
+                      <span className={`w-32 shrink-0 font-semibold ${isDarkMode ? 'text-zinc-500' : 'text-slate-400'}`}>P&L in $</span>
+                      <span className={`font-mono font-extrabold text-sm ${
+                        (selectedTrade.winLoss === 'TP' || (selectedTrade.winLoss === 'Trailing Stop' && parsePnLValue(selectedTrade.pnl, selectedTrade.winLoss) > 0) || (selectedTrade.pnl && (selectedTrade.pnl.startsWith('+') || selectedTrade.pnl.startsWith('$+'))))
+                          ? 'text-emerald-500' 
+                          : (selectedTrade.winLoss === 'SL' || (selectedTrade.winLoss === 'Trailing Stop' && parsePnLValue(selectedTrade.pnl, selectedTrade.winLoss) < 0) || (selectedTrade.pnl && (selectedTrade.pnl.startsWith('-') || selectedTrade.pnl.includes('-'))))
+                            ? 'text-rose-500' 
+                            : 'text-slate-400'
+                      }`}>{selectedTrade.pnl || '-'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <hr className="border-slate-250 dark:border-zinc-800" />
+
+                {/* Watchlist Setup, Commitment, Notes */}
+                <div className="space-y-4">
+                  <div>
+                    <h4 className={`text-xs font-bold uppercase tracking-wider mb-1.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                      Watchlist Details & Setup (ရှာဖွေမှု/ အစီအစဉ်)
+                    </h4>
+                    <div className={`p-4 rounded-xl text-sm leading-relaxed whitespace-pre-wrap font-medium border ${
+                      isDarkMode ? 'bg-zinc-900/20 border-zinc-800/50 text-zinc-300' : 'bg-slate-50 border-slate-200/60 text-slate-700'
+                    }`}>
+                      {selectedTrade.watchlist || 'အသေးစိတ်အချက်အလက် မရှိပါ။'}
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className={`text-xs font-bold uppercase tracking-wider mb-1.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                      Commitment (စိတ်ပိုင်းဆိုင်ရာ ကတိကဝတ်)
+                    </h4>
+                    <div className={`p-4 rounded-xl text-sm leading-relaxed whitespace-pre-wrap font-medium border ${
+                      isDarkMode ? 'bg-zinc-900/20 border-zinc-800/50 text-zinc-300' : 'bg-slate-50 border-slate-200/60 text-slate-700'
+                    }`}>
+                      {selectedTrade.commitment || 'အသေးစိတ်အချက်အလက် မရှိပါ။'}
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className={`text-xs font-bold uppercase tracking-wider mb-1.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                      Remarks / Note (မှတ်ချက်များ)
+                    </h4>
+                    <div className={`p-4 rounded-xl text-sm leading-relaxed whitespace-pre-wrap font-medium border ${
+                      isDarkMode ? 'bg-zinc-900/20 border-zinc-800/50 text-zinc-300' : 'bg-slate-50 border-slate-200/60 text-slate-700'
+                    }`}>
+                      {selectedTrade.notes || 'အသေးစိတ်အချက်အလက် မရှိပါ။'}
+                    </div>
+                  </div>
+                </div>
+
+                <hr className="border-slate-250 dark:border-zinc-800" />
+
+                {/* Screenshots Gallery Section */}
+                <div>
+                  <h4 className={`text-xs font-bold uppercase tracking-wider mb-3 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                    Trade Screenshots (SBF Before & After)
+                  </h4>
+                  {(() => {
+                    const photos = (selectedTrade.tradePhoto || '').split(',');
+                    const beforePhoto = photos[0] || '';
+                    const afterPhoto = photos[1] || '';
+
+                    if (!beforePhoto && !afterPhoto) {
+                      return (
+                        <div className={`text-center py-8 rounded-xl border border-dashed ${
+                          isDarkMode ? 'border-zinc-800 text-zinc-500' : 'border-slate-200 text-slate-400'
+                        }`}>
+                          ပုံများမရှိပါ။
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {beforePhoto && (
+                          <div className={`relative flex flex-col items-center p-3 rounded-xl border ${
+                            isDarkMode ? 'bg-zinc-900/20 border-zinc-800/60' : 'bg-slate-50 border-slate-200/60'
+                          }`}>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-blue-500 mb-2">Before Trade</span>
+                            <div className="relative w-full aspect-video rounded-lg overflow-hidden border dark:border-zinc-800 group">
+                              <img 
+                                src={getDirectDriveImageUrl(beforePhoto)} 
+                                alt="Before Trade" 
+                                className="w-full h-full object-cover cursor-zoom-in group-hover:scale-[1.02] transition-transform duration-350"
+                                onClick={() => setLightboxImage(beforePhoto)}
+                              />
+                            </div>
+                          </div>
+                        )}
+                        {afterPhoto && (
+                          <div className={`relative flex flex-col items-center p-3 rounded-xl border ${
+                            isDarkMode ? 'bg-zinc-900/20 border-zinc-800/60' : 'bg-slate-50 border-slate-200/60'
+                          }`}>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-500 mb-2">After Trade</span>
+                            <div className="relative w-full aspect-video rounded-lg overflow-hidden border dark:border-zinc-800 group">
+                              <img 
+                                src={getDirectDriveImageUrl(afterPhoto)} 
+                                alt="After Trade" 
+                                className="w-full h-full object-cover cursor-zoom-in group-hover:scale-[1.02] transition-transform duration-350"
+                                onClick={() => setLightboxImage(afterPhoto)}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* ADD / EDIT TRADE MODAL */}
         {showFormModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
             {/* Overlay */}
             <div 
               className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity" 
@@ -4463,282 +5132,456 @@ export default function Home() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               transition={{ duration: 0.2 }}
-              className={`relative z-10 w-full max-w-lg max-h-[90vh] flex flex-col rounded-2xl text-left shadow-xl overflow-hidden transition-all ${
-                isDarkMode ? 'bg-zinc-900 border border-zinc-800 text-zinc-100 shadow-black/40' : 'bg-white text-slate-800 shadow-slate-200/50'
+              className={`relative z-10 w-full max-w-2xl max-h-[92vh] flex flex-col rounded-2xl text-left shadow-2xl overflow-hidden select-none cursor-default border ${
+                isDarkMode ? 'bg-zinc-950 border-zinc-900/50 text-zinc-100 shadow-black/80' : 'bg-white border-slate-200 text-slate-800 shadow-slate-200/50'
               }`}
             >
-              {/* Header - Sticky */}
-              <div className="bg-slate-900 dark:bg-zinc-950 px-4 sm:px-6 py-4 flex justify-between items-center text-white shrink-0">
-                <h3 className="text-sm sm:text-base font-bold leading-6">
-                  {editingTrade ? 'Trading Record ပြင်ဆင်ရန်' : 'Trading Record အသစ်ထည့်ရန်'}
-                </h3>
+              {/* Header */}
+              <div className={`px-6 py-4 flex items-center justify-between border-b shrink-0 ${
+                isDarkMode ? 'bg-zinc-900/40 border-zinc-800' : 'bg-slate-50/50 border-slate-200'
+              }`}>
+                <div className="flex items-center space-x-2.5">
+                  <div className={`p-1.5 rounded-lg ${isDarkMode ? 'bg-zinc-800/80 text-emerald-400' : 'bg-slate-100 text-slate-700'}`}>
+                    <Plus className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm sm:text-base font-extrabold tracking-tight">
+                      {editingTrade ? 'Trading Record ပြင်ဆင်ရန် (Edit Trade)' : 'Trading Record အသစ်ထည့်ရန် (Add Trade)'}
+                    </h3>
+                    <p className={`text-[10px] mt-0.5 font-medium ${isDarkMode ? 'text-zinc-500' : 'text-slate-400'}`}>
+                      Google Sheets သို့ တိုက်ရိုက်သိမ်းဆည်းပေးမည်ဖြစ်ပါသည်။
+                    </p>
+                  </div>
+                </div>
                 <button 
+                  type="button"
                   onClick={() => setShowFormModal(false)}
-                  className="text-white/80 hover:text-white text-sm font-semibold transition-all cursor-pointer"
+                  className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                    isDarkMode ? 'text-zinc-400 hover:text-white hover:bg-zinc-800' : 'text-slate-400 hover:text-slate-800 hover:bg-slate-100'
+                  }`}
                 >
-                  ပိတ်ရန်
+                  <X className="h-4 w-4" />
                 </button>
               </div>
 
               <form onSubmit={handleFormSubmit} className="flex-1 flex flex-col overflow-hidden">
-                {/* Form fields - Scrollable body */}
-                <div className={`flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-6 space-y-3.5 ${isDarkMode ? 'bg-zinc-900' : 'bg-white'}`}>
+                {/* Scrollable content */}
+                <div className={`flex-1 overflow-y-auto px-6 py-5 space-y-5 ${isDarkMode ? 'bg-zinc-950/40' : 'bg-white'}`}>
                   {formError && (
-                    <div className="p-3 bg-rose-50 dark:bg-rose-950/20 text-rose-800 dark:text-rose-400 border border-rose-200 dark:border-rose-800 rounded-xl text-xs font-semibold">
-                      {formError}
+                    <div className="p-3 bg-rose-500/10 text-rose-500 dark:text-rose-400 border border-rose-500/20 rounded-xl text-xs font-bold leading-relaxed">
+                      ⚠️ {formError}
                     </div>
                   )}
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                    {/* Date */}
-                    <div>
-                      <label className={`block text-[11px] sm:text-xs font-bold uppercase tracking-wider mb-1 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Date</label>
-                      <div className="relative">
-                        {/* Custom visual container */}
-                        <div
-                          className={`w-full flex items-center justify-between px-3 py-1.5 sm:py-2 border rounded-xl text-sm transition-all ${
-                            isDarkMode 
-                              ? 'bg-zinc-950 border-zinc-800 text-zinc-100' 
-                              : 'bg-slate-50 border-slate-200 text-slate-800'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4 text-slate-400 dark:text-zinc-500 shrink-0" />
-                            <span className="font-medium text-slate-700 dark:text-zinc-200">
-                              {formData.date ? (() => {
-                                try {
-                                  const d = new Date(formData.date);
-                                  if (!isNaN(d.getTime())) {
-                                    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-                                  }
-                                } catch (e) {}
-                                return formData.date;
-                              })() : 'ရက်စွဲရွေးချယ်ပါ'}
-                            </span>
-                          </div>
-                          <ChevronDown className="h-4 w-4 text-slate-400 dark:text-zinc-500 shrink-0" />
-                        </div>
-                        
-                        {/* Native date input styled to be fully invisible but filling the container */}
+                  {/* Section 1: Core Trade Identifiers */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className={`text-[10px] font-bold uppercase tracking-wider ${isDarkMode ? 'text-zinc-500' : 'text-slate-400'}`}>
+                        ၁။ အခြေခံ အချက်အလက် (Core Identifiers)
+                      </h4>
+                      <hr className="flex-1 ml-4 border-dashed border-slate-300 dark:border-zinc-800" />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      {/* Pair / Asset */}
+                      <div>
+                        <label className={`block text-[11px] font-bold mb-1.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-600'}`}>Pair / Asset</label>
                         <input
-                          type="date"
+                          type="text"
                           required
-                          value={formData.date}
-                          onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                          placeholder="e.g. TAO, BTC/USD"
+                          value={formData.pair}
+                          onChange={(e) => setFormData({ ...formData, pair: e.target.value })}
+                          className={`w-full px-3 py-2 border border-transparent rounded-lg text-xs font-semibold tracking-wide transition-all duration-150 focus:outline-hidden ${
+                            isDarkMode 
+                              ? 'bg-zinc-900/60 hover:bg-zinc-900/80 focus:bg-zinc-950 text-zinc-100 focus:border-zinc-800' 
+                              : 'bg-slate-100/50 hover:bg-slate-100/80 focus:bg-white text-slate-800 focus:border-slate-200'
+                          }`}
+                        />
+                      </div>
+
+                      {/* Date */}
+                      <div>
+                        <label className={`block text-[11px] font-bold mb-1.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-600'}`}>Date</label>
+                        <div className="relative">
+                          <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 dark:text-zinc-500 pointer-events-none" />
+                          <input
+                            type="date"
+                            required
+                            value={formData.date}
+                            onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                            className={`w-full pl-9 pr-3 py-2 border border-transparent rounded-lg text-xs font-semibold transition-all duration-150 focus:outline-hidden cursor-pointer ${
+                              isDarkMode 
+                                ? 'bg-zinc-900/60 hover:bg-zinc-900/80 focus:bg-zinc-950 text-zinc-100 dark:[color-scheme:dark] focus:border-zinc-800' 
+                                : 'bg-slate-100/50 hover:bg-slate-100/80 focus:bg-white text-slate-800 focus:border-slate-200'
+                            }`}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Trade Number */}
+                      <div>
+                        <label className={`block text-[11px] font-bold mb-1.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-600'}`}>Trade Number</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. 001"
+                          value={formData.tradeNumber}
+                          onChange={(e) => setFormData({ ...formData, tradeNumber: e.target.value.replace(/[^0-9]/g, '') })}
+                          className={`w-full px-3 py-2 border border-transparent rounded-lg text-xs font-mono font-bold transition-all duration-150 focus:outline-hidden ${
+                            isDarkMode 
+                              ? 'bg-zinc-900/60 hover:bg-zinc-900/80 focus:bg-zinc-950 text-zinc-100 focus:border-zinc-800' 
+                              : 'bg-slate-100/50 hover:bg-slate-100/80 focus:bg-white text-slate-800 focus:border-slate-200'
+                          }`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Section 2: Setup Planning & Watchlist */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className={`text-[10px] font-bold uppercase tracking-wider ${isDarkMode ? 'text-zinc-500' : 'text-slate-400'}`}>
+                        ၂။ စနစ်နှင့် ရှာဖွေမှု အစီအစဉ် (Setup Planning)
+                      </h4>
+                      <hr className="flex-1 ml-4 border-dashed border-slate-300 dark:border-zinc-800" />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      {/* Watchlist Setup */}
+                      <div className="sm:col-span-2">
+                        <label className={`block text-[11px] font-bold mb-1.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-600'}`}>Watchlist Details / Setup</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Support zone, FVG, Trendline Bounce"
+                          value={formData.watchlist}
+                          onChange={(e) => setFormData({ ...formData, watchlist: e.target.value })}
+                          className={`w-full px-3 py-2 border border-transparent rounded-lg text-xs font-semibold transition-all duration-150 focus:outline-hidden ${
+                            isDarkMode 
+                              ? 'bg-zinc-900/60 hover:bg-zinc-900/80 focus:bg-zinc-950 text-zinc-100 focus:border-zinc-800' 
+                              : 'bg-slate-100/50 hover:bg-slate-100/80 focus:bg-white text-slate-800 focus:border-slate-200'
+                          }`}
+                        />
+                      </div>
+
+                      {/* Result */}
+                      <div>
+                        <label className={`block text-[11px] font-bold mb-1.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-600'}`}>Result (TP / SL)</label>
+                        <div className="relative">
+                          <select
+                            value={formData.winLoss}
+                            onChange={(e: any) => setFormData({ ...formData, winLoss: e.target.value })}
+                            className={`appearance-none w-full pl-3 pr-10 py-2 border border-transparent rounded-lg text-xs font-semibold cursor-pointer transition-all duration-150 focus:outline-hidden ${
+                              isDarkMode 
+                                ? 'bg-zinc-900/60 hover:bg-zinc-900/80 focus:bg-zinc-950 text-zinc-200 focus:border-zinc-800' 
+                                : 'bg-slate-100/50 hover:bg-slate-100/80 focus:bg-white text-slate-700 focus:border-slate-200'
+                            }`}
+                          >
+                            <option value="Pending">Pending</option>
+                            <option value="TP">TP</option>
+                            <option value="SL">SL</option>
+                            <option value="Breakeven">Breakeven</option>
+                            <option value="Trailing Stop">Trailing Stop</option>
+                          </select>
+                          <ChevronDown className="h-4 w-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 dark:text-zinc-500" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Section 3: Execution Pricing & Ratios */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className={`text-[10px] font-bold uppercase tracking-wider ${isDarkMode ? 'text-zinc-500' : 'text-slate-400'}`}>
+                        ၃။ ဈေးနှုန်းသတ်မှတ်ချက်များ (Pricing & Ratios)
+                      </h4>
+                      <hr className="flex-1 ml-4 border-dashed border-slate-300 dark:border-zinc-800" />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      {/* Entry Price */}
+                      <div>
+                        <label className={`block text-[11px] font-bold mb-1.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-600'}`}>Entry Price</label>
+                        <input
+                          type="number"
+                          step="any"
+                          required
+                          placeholder="e.g. 60000"
+                          value={formData.entryPrice}
+                          onChange={(e) => setFormData({ ...formData, entryPrice: e.target.value })}
+                          className={`w-full px-3 py-2 border border-transparent rounded-lg text-xs font-mono font-semibold transition-all duration-150 focus:outline-hidden ${
+                            isDarkMode 
+                              ? 'bg-zinc-900/60 hover:bg-zinc-900/80 focus:bg-zinc-950 text-zinc-100 focus:border-zinc-800' 
+                              : 'bg-slate-100/50 hover:bg-slate-100/80 focus:bg-white text-slate-800 focus:border-slate-200'
+                          }`}
+                        />
+                      </div>
+
+                      {/* SL */}
+                      <div>
+                        <label className={`block text-[11px] font-bold mb-1.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-600'}`}>Stop Loss (SL)</label>
+                        <input
+                          type="number"
+                          step="any"
+                          required
+                          placeholder="e.g. 59500"
+                          value={formData.sl}
+                          onChange={(e) => setFormData({ ...formData, sl: e.target.value })}
+                          className={`w-full px-3 py-2 border border-transparent rounded-lg text-xs font-mono font-semibold text-rose-500 transition-all duration-150 focus:outline-hidden ${
+                            isDarkMode 
+                              ? 'bg-zinc-900/60 hover:bg-zinc-900/80 focus:bg-zinc-950 text-zinc-100 focus:border-zinc-800' 
+                              : 'bg-slate-100/50 hover:bg-slate-100/80 focus:bg-white text-slate-800 focus:border-slate-200'
+                          }`}
+                        />
+                      </div>
+
+                      {/* TP */}
+                      <div>
+                        <label className={`block text-[11px] font-bold mb-1.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-600'}`}>Take Profit (TP)</label>
+                        <input
+                          type="number"
+                          step="any"
+                          required
+                          placeholder="e.g. 61500"
+                          value={formData.tp}
+                          onChange={(e) => setFormData({ ...formData, tp: e.target.value })}
+                          className={`w-full px-3 py-2 border border-transparent rounded-lg text-xs font-mono font-semibold text-emerald-500 transition-all duration-150 focus:outline-hidden ${
+                            isDarkMode 
+                              ? 'bg-zinc-900/60 hover:bg-zinc-900/80 focus:bg-zinc-950 text-zinc-100 focus:border-zinc-800' 
+                              : 'bg-slate-100/50 hover:bg-slate-100/80 focus:bg-white text-slate-800 focus:border-slate-200'
+                          }`}
                         />
                       </div>
                     </div>
 
-                    {/* Pair */}
-                    <div>
-                      <label className={`block text-[11px] sm:text-xs font-bold uppercase tracking-wider mb-1 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Pair / Asset</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="e.g. BTCUSD"
-                        value={formData.pair}
-                        onChange={(e) => setFormData({ ...formData, pair: e.target.value })}
-                        className={`w-full px-3 py-1.5 sm:py-2 border rounded-xl text-sm focus:outline-hidden focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 ${
-                          isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-800'
-                        }`}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                    {/* Buy/Sell Type */}
-                    <div>
-                      <label className={`block text-[11px] sm:text-xs font-bold uppercase tracking-wider mb-1 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Buy/Sell</label>
-                      <div className="relative flex items-center">
-                        <select
-                          value={formData.type}
-                          onChange={(e: any) => setFormData({ ...formData, type: e.target.value })}
-                          className={`appearance-none w-full pl-3 pr-10 py-1.5 sm:py-2 border rounded-xl text-sm focus:outline-hidden focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 cursor-pointer ${
-                            isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-200' : 'bg-slate-50 border-slate-200 text-slate-700'
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                      {/* R:R Ratio */}
+                      <div>
+                        <div className="flex justify-between items-center mb-1.5">
+                          <label className={`block text-[11px] font-bold ${isDarkMode ? 'text-zinc-400' : 'text-slate-600'}`}>Risk to Reward (R:R)</label>
+                          {calculatedSuggestions.rr && (
+                            <span className="text-[9px] text-emerald-500 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded-sm">Suggest: {calculatedSuggestions.rr}</span>
+                          )}
+                        </div>
+                        <input
+                          type="text"
+                          placeholder={calculatedSuggestions.rr || "e.g. 1:3"}
+                          value={formData.rr}
+                          onChange={(e) => setFormData({ ...formData, rr: e.target.value })}
+                          className={`w-full px-3 py-2 border border-transparent rounded-lg text-xs font-semibold transition-all duration-150 focus:outline-hidden ${
+                            isDarkMode 
+                              ? 'bg-zinc-900/60 hover:bg-zinc-900/80 focus:bg-zinc-950 text-zinc-100 focus:border-zinc-800' 
+                              : 'bg-slate-100/50 hover:bg-slate-100/80 focus:bg-white text-slate-800 focus:border-slate-200'
                           }`}
-                        >
-                          <option value="Buy">Buy</option>
-                          <option value="Sell">Sell</option>
-                        </select>
-                        <ChevronDown className="h-4 w-4 absolute right-3 pointer-events-none text-slate-400 dark:text-zinc-500" />
+                        />
                       </div>
-                    </div>
 
-                    {/* Win/Loss */}
-                    <div>
-                      <label className={`block text-[11px] sm:text-xs font-bold uppercase tracking-wider mb-1 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Win/Loss</label>
-                      <div className="relative flex items-center">
-                        <select
-                          value={formData.winLoss}
-                          onChange={(e: any) => setFormData({ ...formData, winLoss: e.target.value })}
-                          className={`appearance-none w-full pl-3 pr-10 py-1.5 sm:py-2 border rounded-xl text-sm focus:outline-hidden focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 cursor-pointer ${
-                            isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-200' : 'bg-slate-50 border-slate-200 text-slate-700'
+                      {/* PNL in $ */}
+                      <div>
+                        <div className="flex justify-between items-center mb-1.5">
+                          <label className={`block text-[11px] font-bold ${isDarkMode ? 'text-zinc-400' : 'text-slate-600'}`}>P&L in $</label>
+                          {formData.winLoss !== 'Pending' && (
+                            <button
+                              type="button"
+                              onClick={() => setFormData({ ...formData, pnl: formData.winLoss === 'TP' ? (calculatedSuggestions.suggestedPnlWin || '+$300') : formData.winLoss === 'SL' ? '-$100' : '$0' })}
+                              className="text-[9px] bg-emerald-500/15 hover:bg-emerald-500/25 px-2 py-0.5 rounded text-emerald-500 font-bold tracking-wide transition-all cursor-pointer"
+                            >
+                              Auto-Fill ⚡
+                            </button>
+                          )}
+                        </div>
+                        <input
+                          type="text"
+                          placeholder="e.g. +$300, -$100"
+                          value={formData.pnl}
+                          onChange={(e) => setFormData({ ...formData, pnl: e.target.value })}
+                          className={`w-full px-3 py-2 border border-transparent rounded-lg text-xs font-mono font-bold transition-all duration-150 focus:outline-hidden ${
+                            isDarkMode 
+                              ? 'bg-zinc-900/60 hover:bg-zinc-900/80 focus:bg-zinc-950 text-zinc-100 focus:border-zinc-800' 
+                              : 'bg-slate-100/50 hover:bg-slate-100/80 focus:bg-white text-slate-800 focus:border-slate-200'
                           }`}
-                        >
-                          <option value="Pending">Pending</option>
-                          <option value="Win">Win</option>
-                          <option value="Loss">Loss</option>
-                        </select>
-                        <ChevronDown className="h-4 w-4 absolute right-3 pointer-events-none text-slate-400 dark:text-zinc-500" />
+                        />
                       </div>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 sm:gap-3">
-                    {/* Entry Price */}
-                    <div>
-                      <label className={`block text-[11px] sm:text-xs font-bold uppercase tracking-wider mb-1 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Entry Price</label>
-                      <input
-                        type="number"
-                        step="any"
-                        required
-                        placeholder="60000"
-                        value={formData.entryPrice}
-                        onChange={(e) => setFormData({ ...formData, entryPrice: e.target.value })}
-                        className={`w-full px-2 sm:px-3 py-1.5 sm:py-2 border rounded-xl text-sm focus:outline-hidden focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 ${
-                          isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-800'
-                        }`}
-                      />
+                  {/* Section 4: Psychologies & Notes */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className={`text-[10px] font-bold uppercase tracking-wider ${isDarkMode ? 'text-zinc-500' : 'text-slate-400'}`}>
+                        ၄။ စိတ်ပိုင်းဆိုင်ရာ ကတိကဝတ်နှင့် မှတ်ချက် (Psychology & Notes)
+                      </h4>
+                      <hr className="flex-1 ml-4 border-dashed border-slate-300 dark:border-zinc-800" />
                     </div>
 
-                    {/* SL */}
-                    <div>
-                      <label className={`block text-[11px] sm:text-xs font-bold uppercase tracking-wider mb-1 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>SL</label>
-                      <input
-                        type="number"
-                        step="any"
-                        placeholder="59500"
-                        value={formData.sl}
-                        onChange={(e) => setFormData({ ...formData, sl: e.target.value })}
-                        className={`w-full px-2 sm:px-3 py-1.5 sm:py-2 border rounded-xl text-sm focus:outline-hidden focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 ${
-                          isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-800'
-                        }`}
-                      />
-                    </div>
-
-                    {/* TP */}
-                    <div>
-                      <label className={`block text-[11px] sm:text-xs font-bold uppercase tracking-wider mb-1 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>TP</label>
-                      <input
-                        type="number"
-                        step="any"
-                        placeholder="61500"
-                        value={formData.tp}
-                        onChange={(e) => setFormData({ ...formData, tp: e.target.value })}
-                        className={`w-full px-2 sm:px-3 py-1.5 sm:py-2 border rounded-xl text-sm focus:outline-hidden focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 ${
-                          isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-800'
-                        }`}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                    {/* R:R (Risk/Reward) */}
-                    <div>
-                      <div className="flex justify-between items-center mb-1">
-                        <label className={`block text-[11px] sm:text-xs font-bold uppercase tracking-wider ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>R:R Ratio</label>
-                        {calculatedSuggestions.rr && (
-                          <span className="text-[9px] text-emerald-500 font-semibold truncate max-w-[55px] sm:max-w-none">Sg: {calculatedSuggestions.rr}</span>
-                        )}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Remarks */}
+                      <div>
+                        <label className={`block text-[11px] font-bold mb-1.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-600'}`}>Remarks / Note (မှတ်ချက်များ)</label>
+                        <textarea
+                          placeholder="e.g. Plan အတိုင်း စိတ်ရှည်လက်ရှည် စောင့်ဝင်ခဲ့၍ အဆင်ပြေခဲ့သည်။"
+                          value={formData.notes}
+                          onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                          rows={2}
+                          className={`w-full px-3 py-2 border border-transparent rounded-lg text-xs font-semibold resize-none transition-all duration-150 focus:outline-hidden ${
+                            isDarkMode 
+                              ? 'bg-zinc-900/60 hover:bg-zinc-900/80 focus:bg-zinc-950 text-zinc-100 focus:border-zinc-800' 
+                              : 'bg-slate-100/50 hover:bg-slate-100/80 focus:bg-white text-slate-800 focus:border-slate-200'
+                          }`}
+                        />
                       </div>
-                      <input
-                        type="text"
-                        placeholder={calculatedSuggestions.rr || "e.g. 1:3"}
-                        value={formData.rr}
-                        onChange={(e) => setFormData({ ...formData, rr: e.target.value })}
-                        className={`w-full px-3 py-1.5 sm:py-2 border rounded-xl text-sm focus:outline-hidden focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 ${
-                          isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-800'
-                        }`}
-                      />
-                    </div>
 
-                    {/* PnL ($ / R) */}
-                    <div>
-                      <div className="flex justify-between items-center mb-1">
-                        <label className={`block text-[11px] sm:text-xs font-bold uppercase tracking-wider ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>PnL ($/R)</label>
-                        {formData.winLoss !== 'Pending' && (
-                          <button
-                            type="button"
-                            onClick={() => setFormData({ ...formData, pnl: formData.winLoss === 'Win' ? (calculatedSuggestions.suggestedPnlWin || '+3R') : '-1R' })}
-                            className="text-[9px] bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-750 px-1.5 py-0.5 rounded text-slate-500 dark:text-zinc-300 font-bold cursor-pointer"
-                          >
-                            Auto-Fill
-                          </button>
-                        )}
+                      {/* Commitment */}
+                      <div>
+                        <label className={`block text-[11px] font-bold mb-1.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-600'}`}>Commitment (စိတ်ပိုင်းဆိုင်ရာ ကတိကဝတ်)</label>
+                        <textarea
+                          placeholder="e.g. စိတ်လှုပ်ရှားမှု မရှိဘဲ စနစ်အတိုင်း လိုက်နာဆောင်ရွက်ခဲ့သည်။"
+                          value={formData.commitment}
+                          onChange={(e) => setFormData({ ...formData, commitment: e.target.value })}
+                          rows={2}
+                          className={`w-full px-3 py-2 border border-transparent rounded-lg text-xs font-semibold resize-none transition-all duration-150 focus:outline-hidden ${
+                            isDarkMode 
+                              ? 'bg-zinc-900/60 hover:bg-zinc-900/80 focus:bg-zinc-950 text-zinc-100 focus:border-zinc-800' 
+                              : 'bg-slate-100/50 hover:bg-slate-100/80 focus:bg-white text-slate-800 focus:border-slate-200'
+                          }`}
+                        />
                       </div>
-                      <input
-                        type="text"
-                        placeholder="e.g. +$300, +3R"
-                        value={formData.pnl}
-                        onChange={(e) => setFormData({ ...formData, pnl: e.target.value })}
-                        className={`w-full px-3 py-1.5 sm:py-2 border rounded-xl text-sm focus:outline-hidden focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 ${
-                          isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-800'
-                        }`}
-                      />
                     </div>
                   </div>
 
-                  {/* Strategy */}
-                  <div>
-                    <label className={`block text-[11px] sm:text-xs font-bold uppercase tracking-wider mb-1 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Strategy / Setup</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Liquidity Sweep, Order Block"
-                      value={formData.strategy}
-                      onChange={(e) => setFormData({ ...formData, strategy: e.target.value })}
-                      className={`w-full px-3 py-1.5 sm:py-2 border rounded-xl text-sm focus:outline-hidden focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 ${
-                        isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-800'
-                      }`}
-                    />
-                  </div>
+                  {/* Section 5: Screenshots upload */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className={`text-[10px] font-bold uppercase tracking-wider ${isDarkMode ? 'text-zinc-500' : 'text-slate-400'}`}>
+                        ၅။ အရောင်းအဝယ်ပုံများ တင်ရန် (Trade Screenshots - Before & After)
+                      </h4>
+                      <hr className="flex-1 ml-4 border-dashed border-slate-300 dark:border-zinc-800" />
+                    </div>
 
-                  {/* Notes */}
-                  <div>
-                    <label className={`block text-[11px] sm:text-xs font-bold uppercase tracking-wider mb-1 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Notes / Lessons Learned</label>
-                    <textarea
-                      placeholder="Setup အတိုင်း စိတ်ရှည်လက်ရှည် စောင့်ဝင်ခဲ့၍ အဆင်ပြေခဲ့သည်။"
-                      value={formData.notes}
-                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                      rows={2}
-                      className={`w-full px-3 py-1.5 sm:py-2 border rounded-xl text-sm focus:outline-hidden focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 resize-none ${
-                        isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-800'
-                      }`}
-                    />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Before Image */}
+                      <div>
+                        <span className={`block text-[11px] font-bold mb-1.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-600'}`}>Trade SS - Before (အဝင်ပုံ)</span>
+                        <div className="space-y-2">
+                          {formData.tradePhotoBefore ? (
+                            <div className={`relative rounded-xl overflow-hidden border max-h-40 flex items-center justify-center bg-zinc-900/60 group ${
+                              isDarkMode ? 'border-zinc-800' : 'border-slate-200'
+                            }`}>
+                              <img 
+                                src={getDirectDriveImageUrl(formData.tradePhotoBefore)} 
+                                alt="Before Trade Preview" 
+                                className="h-full w-full object-contain max-h-32 mx-auto"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setFormData({ ...formData, tradePhotoBefore: '' })}
+                                className="absolute top-2 right-2 bg-rose-600 hover:bg-rose-700 text-white p-1.5 rounded-lg shadow-lg transition-colors cursor-pointer"
+                                title="ပုံကို ဖယ်ရှားရန်"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className={`border border-dashed rounded-xl p-4 text-center transition-all relative group flex flex-col items-center justify-center min-h-[100px] ${
+                              isDarkMode 
+                                ? 'border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900/40 bg-zinc-900/20' 
+                                : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50 bg-slate-50/20'
+                            }`}>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={handlePhotoBeforeChange}
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                              />
+                              <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-zinc-500 dark:text-zinc-400">
+                                <Plus className="h-4 w-4 text-blue-500" />
+                                <span>B (Before) ပုံတင်ရန်</span>
+                              </div>
+                              <p className="text-[10px] text-zinc-400 mt-1 font-medium">နှိပ်ပါ သို့မဟုတ် ဆွဲထည့်ပါ (Drag & Drop)</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* After Image */}
+                      <div>
+                        <span className={`block text-[11px] font-bold mb-1.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-600'}`}>Trade SS - After (အထွက်ပုံ)</span>
+                        <div className="space-y-2">
+                          {formData.tradePhotoAfter ? (
+                            <div className={`relative rounded-xl overflow-hidden border max-h-40 flex items-center justify-center bg-zinc-900/60 group ${
+                              isDarkMode ? 'border-zinc-800' : 'border-slate-200'
+                            }`}>
+                              <img 
+                                src={getDirectDriveImageUrl(formData.tradePhotoAfter)} 
+                                alt="After Trade Preview" 
+                                className="h-full w-full object-contain max-h-32 mx-auto"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setFormData({ ...formData, tradePhotoAfter: '' })}
+                                className="absolute top-2 right-2 bg-rose-600 hover:bg-rose-700 text-white p-1.5 rounded-lg shadow-lg transition-colors cursor-pointer"
+                                title="ပုံကို ဖယ်ရှားရန်"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className={`border border-dashed rounded-xl p-4 text-center transition-all relative group flex flex-col items-center justify-center min-h-[100px] ${
+                              isDarkMode 
+                                ? 'border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900/40 bg-zinc-900/20' 
+                                : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50 bg-slate-50/20'
+                            }`}>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={handlePhotoAfterChange}
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                              />
+                              <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-zinc-500 dark:text-zinc-400">
+                                <Plus className="h-4 w-4 text-emerald-500" />
+                                <span>A (After) ပုံတင်ရန်</span>
+                              </div>
+                              <p className="text-[10px] text-zinc-400 mt-1 font-medium">နှိပ်ပါ သို့မဟုတ် ဆွဲထည့်ပါ (Drag & Drop)</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                {/* Actions - Sticky footer */}
-                <div className={`px-4 sm:px-6 py-4 flex justify-end space-x-3 border-t shrink-0 ${
-                  isDarkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-slate-50 border-slate-100'
+                {/* Footer buttons */}
+                <div className={`px-6 py-4 flex justify-end space-x-3 border-t shrink-0 ${
+                  isDarkMode ? 'bg-zinc-900/40 border-zinc-800' : 'bg-slate-50/50 border-slate-200'
                 }`}>
                   <button
                     type="button"
                     onClick={() => setShowFormModal(false)}
-                    className={`px-4 py-2 border rounded-xl text-sm font-semibold transition-colors duration-150 cursor-pointer ${
+                    className={`px-4 py-2 border rounded-xl text-xs font-bold transition-all cursor-pointer ${
                       isDarkMode 
-                        ? 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700' 
-                        : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
+                        ? 'bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800' 
+                        : 'bg-white border-slate-250 text-slate-700 hover:bg-slate-50'
                     }`}
                   >
-                    Cancel
+                    ပယ်ဖျက်မည် (Cancel)
                   </button>
                   <button
                     type="submit"
                     disabled={isFormSubmitting}
-                    className={`inline-flex justify-center items-center px-4 py-2 text-sm font-semibold rounded-xl shadow-sm transition-colors duration-150 cursor-pointer ${
+                    className={`inline-flex justify-center items-center px-5 py-2 text-xs font-extrabold rounded-xl shadow-md transition-all cursor-pointer ${
                       isDarkMode
-                        ? 'bg-zinc-100 text-zinc-950 hover:bg-zinc-200 disabled:bg-zinc-800 disabled:text-zinc-600'
-                        : 'bg-slate-900 text-white hover:bg-slate-800 disabled:bg-slate-100 disabled:text-slate-400'
+                        ? 'bg-emerald-500 hover:bg-emerald-600 text-zinc-950 disabled:bg-zinc-800 disabled:text-zinc-600'
+                        : 'bg-slate-900 hover:bg-slate-800 text-white disabled:bg-slate-100 disabled:text-slate-400'
                     }`}
                   >
                     {isFormSubmitting ? (
                       <>
-                        <RefreshCw className="h-4 w-4 animate-spin mr-1.5" />
-                        <span>Saving...</span>
+                        <RefreshCw className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                        <span>သိမ်းဆည်းနေပါသည်...</span>
                       </>
                     ) : (
-                      <span>သိမ်းဆည်းမည်</span>
+                      <span>သိမ်းဆည်းမည် (Save)</span>
                     )}
                   </button>
                 </div>
