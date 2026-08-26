@@ -20,6 +20,14 @@ export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400..700;1,400..700&family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body suppressHydrationWarning className="bg-slate-900 text-slate-100 antialiased selection:bg-teal-500 selection:text-white min-h-screen font-sans">
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -51,8 +59,8 @@ export default function RootLayout({children}: {children: React.ReactNode}) {
             `
           }}
         />
-      </head>
-      <body suppressHydrationWarning>{children}</body>
+        {children}
+      </body>
     </html>
   );
 }

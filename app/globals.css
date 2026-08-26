@@ -1,21 +1,33 @@
 @import "tailwindcss";
 
-/* --- Notion-style Modern Custom Scrollbars (Global) --- */
 @layer base {
-  /* Set sleek scrollbar dimensions globally */
+  :root {
+    --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    letter-spacing: -0.01em;
+  }
+
+  code, pre, .font-mono {
+    font-family: var(--font-mono);
+  }
+
+  /* --- Notion-style Modern Custom Scrollbars (Global) --- */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
 
-  /* Keep scrollbar track transparent to eliminate layout noise */
   ::-webkit-scrollbar-track {
     background: transparent;
   }
 
-  /* Light Theme Scrollbar Thumb Styling */
+  /* Light Theme Scrollbar */
   ::-webkit-scrollbar-thumb {
-    background-color: #cbd5e1; /* slate-300 */
+    background-color: #cbd5e1;
     border-radius: 9999px;
     border: 1px solid transparent;
     background-clip: padding-box;
@@ -23,21 +35,20 @@
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background-color: #94a3b8; /* slate-400 */
+    background-color: #94a3b8;
   }
 
-  /* Dark Theme Scrollbar Thumb Styling */
+  /* Dark Theme Scrollbar */
   .dark ::-webkit-scrollbar-thumb,
   [class*="dark"] ::-webkit-scrollbar-thumb {
-    background-color: #3f3f46; /* zinc-700 */
+    background-color: #3f3f46;
   }
 
   .dark ::-webkit-scrollbar-thumb:hover,
   [class*="dark"] ::-webkit-scrollbar-thumb:hover {
-    background-color: #52525b; /* zinc-600 */
+    background-color: #52525b;
   }
 
-  /* Support Firefox globally */
   * {
     scrollbar-width: thin;
     scrollbar-color: #cbd5e1 transparent;
@@ -47,4 +58,15 @@
     scrollbar-color: #3f3f46 transparent;
   }
 }
+
+/* Glassmorphism & UI Accents */
+.glass-panel {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
 
