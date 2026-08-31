@@ -84,6 +84,31 @@ async function getOrCreateFolderId(token: string): Promise<string> {
   }
 }
 
+async function getOrCreateWatchlistFolderId(token: string): Promise<string> {
+  try {
+    const folderSearch = await driveFetch(
+      token,
+      `/drive/v3/files?q=name='Trading Watchlist Workspace (AI Studio)' and mimeType='application/vnd.google-apps.folder' and trashed=false`
+    );
+    let folderId = folderSearch.files?.[0]?.id;
+
+    if (!folderId) {
+      const createFolder = await driveFetch(token, '/drive/v3/files', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: 'Trading Watchlist Workspace (AI Studio)',
+          mimeType: 'application/vnd.google-apps.folder',
+        }),
+      });
+      folderId = createFolder.id;
+    }
+    return folderId;
+  } catch (err) {
+    console.error('Error in getOrCreateWatchlistFolderId:', err);
+    throw err;
+  }
+}
+
 function getDriveFileIdFromUrl(url: string | undefined): string | null {
   if (!url) return null;
   
@@ -315,11 +340,12 @@ export async function POST(req: NextRequest) {
           console.error('Failed to initialize LearningNotes sheet tab:', notesSheetErr);
         }
 
-        // Ensure "MicroLogs" and "MacroLogs" sheet tabs exist for storing analysis logs
+        // Ensure "MicroLogs", "MacroLogs", and "Watchlist" sheet tabs exist for storing analysis logs and watchlist
         try {
           const sheetMeta = await sheetsFetch(token, `/v4/spreadsheets/${spreadsheetId}`);
           const hasMicroLogsTab = sheetMeta.sheets?.some((s: any) => s.properties?.title === 'MicroLogs');
           const hasMacroLogsTab = sheetMeta.sheets?.some((s: any) => s.properties?.title === 'MacroLogs');
+          const hasWatchlistTab = sheetMeta.sheets?.some((s: any) => s.properties?.title === 'Watchlist');
           
           const requests: any[] = [];
           if (!hasMicroLogsTab) {
@@ -336,6 +362,15 @@ export async function POST(req: NextRequest) {
               addSheet: {
                 properties: {
                   title: 'MacroLogs',
+                },
+              },
+            });
+          }
+          if (!hasWatchlistTab) {
+            requests.push({
+              addSheet: {
+                properties: {
+                  title: 'Watchlist',
                 },
               },
             });
@@ -412,8 +447,40 @@ export async function POST(req: NextRequest) {
               }
             );
           }
+          // Initialize Watchlist headers if empty
+          const watchlistHeadersCheck = await sheetsFetch(
+            token,
+            `/v4/spreadsheets/${spreadsheetId}/values/Watchlist!A1:L1`
+          );
+          if (!watchlistHeadersCheck.values || watchlistHeadersCheck.values.length === 0) {
+            await sheetsFetch(
+              token,
+              `/v4/spreadsheets/${spreadsheetId}/values/Watchlist!A1:L1?valueInputOption=USER_ENTERED`,
+              {
+                method: 'PUT',
+                body: JSON.stringify({
+                  range: 'Watchlist!A1:L1',
+                  majorDimension: 'ROWS',
+                  values: [[
+                    'ID',
+                    'Pair',
+                    'Category',
+                    'Bias',
+                    'Status',
+                    'Timeframe',
+                    'KeyLevels',
+                    'Notes',
+                    'ImageUrl',
+                    'CreatedAt',
+                    'DocId',
+                    'DocUrl'
+                  ]],
+                }),
+              }
+            );
+          }
         } catch (logsSheetErr) {
-          console.error('Failed to initialize MicroLogs/MacroLogs sheet tabs:', logsSheetErr);
+          console.error('Failed to initialize MicroLogs/MacroLogs/Watchlist sheet tabs:', logsSheetErr);
         }
 
         // Find or create "Trading Notes (AI Studio)" Document
@@ -1611,6 +1678,281 @@ function resolveSheetColumnIndices(headers: any[]) {
             }),
           });
         }
+        return NextResponse.json({ success: true });
+      }
+
+      case 'fetchWatchlist': {
+        const { spreadsheetId } = args;
+        if (!spreadsheetId) {
+          return NextResponse.json({ error: 'Missing spreadsheetId' }, { status: 400 });
+        }
+        try {
+          const data = await sheetsFetch(
+            token,
+            `/v4/spreadsheets/${spreadsheetId}/values/Watchlist!A2:L2000`
+          );
+          const items = (data.values || []).map((row: any[]) => {
+            return {
+              id: row[0] || '',
+              pair: row[1] || '',
+              category: row[2] || 'Forex',
+              bias: row[3] || 'Bullish',
+              status: row[4] || 'Watching',
+              timeframe: row[5] || '4H',
+              keyLevels: row[6] || '',
+              notes: row[7] || '',
+              imageUrl: row[8] || '',
+              createdAt: row[9] || new Date().toISOString(),
+              docId: row[10] || '',
+              docUrl: row[11] || '',
+            };
+          }).filter((item: any) => item.id !== '' && item.pair !== '');
+          return NextResponse.json({ items });
+        } catch (err) {
+          console.error('Error fetching watchlist items:', err);
+          return NextResponse.json({ items: [] });
+        }
+      }
+
+      case 'addWatchlistItem': {
+        const { spreadsheetId, item } = args;
+        if (!spreadsheetId || !item) {
+          return NextResponse.json({ error: 'Missing spreadsheetId or item' }, { status: 400 });
+        }
+
+        const watchlistFolderId = await getOrCreateWatchlistFolderId(token);
+        let driveImageUrl = '';
+        if (item.imageUrl) {
+          try {
+            driveImageUrl = await uploadImageToDrive(token, item.imageUrl, `Watchlist_${item.pair || 'Asset'}`, watchlistFolderId);
+          } catch (err) {
+            console.error('Error uploading watchlist image to Drive:', err);
+            driveImageUrl = item.imageUrl;
+          }
+        }
+
+        let docId = '';
+        let docUrl = '';
+        try {
+          const newDoc = await driveFetch(token, '/drive/v3/files', {
+            method: 'POST',
+            body: JSON.stringify({
+              name: `iTrading Watchlist - ${item.pair || 'Setup'} (${item.bias || 'Bias'}) - ${item.createdAt ? item.createdAt.split('T')[0] : ''}`,
+              mimeType: 'application/vnd.google-apps.document',
+              parents: watchlistFolderId ? [watchlistFolderId] : undefined,
+            }),
+          });
+          docId = newDoc.id;
+          docUrl = `https://docs.google.com/document/d/${docId}/edit`;
+
+          try {
+            await driveFetch(token, `/drive/v3/files/${docId}/permissions`, {
+              method: 'POST',
+              body: JSON.stringify({
+                role: 'reader',
+                type: 'anyone',
+              }),
+            });
+          } catch (permErr) {
+            console.error('Error setting public doc permission for watchlist item:', permErr);
+          }
+
+          const docContentText = `iTrading Watchlist Setup\n\nPair / Asset: ${item.pair}\nCategory: ${item.category}\nBias: ${item.bias}\nStatus: ${item.status}\nTimeframe: ${item.timeframe}\nDate Created: ${item.createdAt}\n\nKey Levels & POI:\n${item.keyLevels || 'N/A'}\n\nAnalysis & Strategy Notes:\n${item.notes || 'N/A'}\n${driveImageUrl ? `\nChart Screenshot Link:\n${driveImageUrl}\n` : ''}`;
+
+          await docsFetch(token, `/v1/documents/${docId}:batchUpdate`, {
+            method: 'POST',
+            body: JSON.stringify({
+              requests: [{
+                insertText: {
+                  location: { index: 1 },
+                  text: docContentText,
+                },
+              }],
+            }),
+          });
+        } catch (docErr) {
+          console.error('Error creating Watchlist Google Doc:', docErr);
+        }
+
+        await sheetsFetch(
+          token,
+          `/v4/spreadsheets/${spreadsheetId}/values/Watchlist!A2:L2:append?valueInputOption=USER_ENTERED`,
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              range: 'Watchlist!A2:L2',
+              majorDimension: 'ROWS',
+              values: [[
+                item.id,
+                item.pair,
+                item.category,
+                item.bias,
+                item.status,
+                item.timeframe,
+                item.keyLevels || '',
+                item.notes || '',
+                driveImageUrl,
+                item.createdAt,
+                docId,
+                docUrl
+              ]],
+            }),
+          }
+        );
+
+        return NextResponse.json({ success: true, docId, docUrl, imageUrl: driveImageUrl });
+      }
+
+      case 'updateWatchlistItem': {
+        const { spreadsheetId, item, oldImageUrl } = args;
+        if (!spreadsheetId || !item || !item.id) {
+          return NextResponse.json({ error: 'Missing spreadsheetId or item' }, { status: 400 });
+        }
+
+        const watchlistFolderId = await getOrCreateWatchlistFolderId(token);
+        let driveImageUrl = item.imageUrl || '';
+
+        // If new base64 image provided
+        if (item.imageUrl && item.imageUrl.startsWith('data:image')) {
+          try {
+            driveImageUrl = await uploadImageToDrive(token, item.imageUrl, `Watchlist_${item.pair || 'Asset'}`, watchlistFolderId);
+            if (oldImageUrl) {
+              const oldFileId = getDriveFileIdFromUrl(oldImageUrl);
+              if (oldFileId) {
+                try {
+                  await driveFetch(token, `/drive/v3/files/${oldFileId}`, { method: 'DELETE' });
+                } catch (err) {
+                  console.error('Error deleting old watchlist image:', err);
+                }
+              }
+            }
+          } catch (err) {
+            console.error('Error updating watchlist image:', err);
+          }
+        }
+
+        // If image was removed
+        if (oldImageUrl && !item.imageUrl) {
+          const oldFileId = getDriveFileIdFromUrl(oldImageUrl);
+          if (oldFileId) {
+            try {
+              await driveFetch(token, `/drive/v3/files/${oldFileId}`, { method: 'DELETE' });
+            } catch (err) {
+              console.error('Error deleting cleared watchlist image:', err);
+            }
+          }
+        }
+
+        // Update Doc if exists
+        if (item.docId) {
+          try {
+            const currentDoc = await docsFetch(token, `/v1/documents/${item.docId}`);
+            let docLength = 1;
+            if (currentDoc.body && currentDoc.body.content) {
+              const lastElement = currentDoc.body.content[currentDoc.body.content.length - 1];
+              if (lastElement && lastElement.endIndex) {
+                docLength = lastElement.endIndex;
+              }
+            }
+
+            const requests: any[] = [];
+            if (docLength > 2) {
+              requests.push({
+                deleteContentRange: {
+                  range: {
+                    startIndex: 1,
+                    endIndex: docLength - 1,
+                  },
+                },
+              });
+            }
+
+            requests.push({
+              insertText: {
+                location: { index: 1 },
+                text: `iTrading Watchlist Setup\n\nPair / Asset: ${item.pair}\nCategory: ${item.category}\nBias: ${item.bias}\nStatus: ${item.status}\nTimeframe: ${item.timeframe}\nDate Created: ${item.createdAt}\n\nKey Levels & POI:\n${item.keyLevels || 'N/A'}\n\nAnalysis & Strategy Notes:\n${item.notes || 'N/A'}\n${driveImageUrl ? `\nChart Screenshot Link:\n${driveImageUrl}\n` : ''}`
+              }
+            });
+
+            await docsFetch(token, `/v1/documents/${item.docId}:batchUpdate`, {
+              method: 'POST',
+              body: JSON.stringify({ requests }),
+            });
+          } catch (docErr) {
+            console.error('Error updating Watchlist Google Doc:', docErr);
+          }
+        }
+
+        const currentSheetData = await sheetsFetch(token, `/v4/spreadsheets/${spreadsheetId}/values/Watchlist!A2:A2000`);
+        const ids = (currentSheetData.values || []).map((r: any[]) => r[0]);
+        const relativeIndex = ids.indexOf(item.id);
+        const rowIndex = relativeIndex > -1 ? relativeIndex + 2 : 2;
+
+        await sheetsFetch(token, `/v4/spreadsheets/${spreadsheetId}/values/Watchlist!A${rowIndex}:L${rowIndex}?valueInputOption=USER_ENTERED`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            range: `Watchlist!A${rowIndex}:L${rowIndex}`,
+            majorDimension: 'ROWS',
+            values: [[
+              item.id,
+              item.pair,
+              item.category,
+              item.bias,
+              item.status,
+              item.timeframe,
+              item.keyLevels || '',
+              item.notes || '',
+              driveImageUrl,
+              item.createdAt,
+              item.docId || '',
+              item.docUrl || ''
+            ]],
+          }),
+        });
+
+        return NextResponse.json({ success: true, imageUrl: driveImageUrl });
+      }
+
+      case 'deleteWatchlistItem': {
+        const { spreadsheetId, itemId, docId, imageUrl } = args;
+        if (!spreadsheetId || !itemId) {
+          return NextResponse.json({ error: 'Missing spreadsheetId or itemId' }, { status: 400 });
+        }
+
+        const currentSheetData = await sheetsFetch(token, `/v4/spreadsheets/${spreadsheetId}/values/Watchlist!A2:A2000`);
+        const ids = (currentSheetData.values || []).map((r: any[]) => r[0]);
+        const relativeIndex = ids.indexOf(itemId);
+        if (relativeIndex > -1) {
+          const rowIndex = relativeIndex + 2;
+          await sheetsFetch(token, `/v4/spreadsheets/${spreadsheetId}/values/Watchlist!A${rowIndex}:L${rowIndex}?valueInputOption=USER_ENTERED`, {
+            method: 'PUT',
+            body: JSON.stringify({
+              range: `Watchlist!A${rowIndex}:L${rowIndex}`,
+              majorDimension: 'ROWS',
+              values: [['', '', '', '', '', '', '', '', '', '', '', '']],
+            }),
+          });
+        }
+
+        if (docId) {
+          try {
+            await driveFetch(token, `/drive/v3/files/${docId}`, { method: 'DELETE' });
+          } catch (err) {
+            console.error('Error deleting watchlist doc:', err);
+          }
+        }
+
+        if (imageUrl) {
+          const imgFileId = getDriveFileIdFromUrl(imageUrl);
+          if (imgFileId) {
+            try {
+              await driveFetch(token, `/drive/v3/files/${imgFileId}`, { method: 'DELETE' });
+            } catch (err) {
+              console.error('Error deleting watchlist image file:', err);
+            }
+          }
+        }
+
         return NextResponse.json({ success: true });
       }
 

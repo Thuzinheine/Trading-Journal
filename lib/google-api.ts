@@ -328,4 +328,55 @@ export async function deleteGoogleMacroLog(
   await callProxy(accessToken, 'deleteMacroLog', { spreadsheetId, logId });
 }
 
+export interface WatchlistItem {
+  id: string;
+  pair: string;
+  category: 'Crypto' | 'Forex' | 'Commodity' | 'Index';
+  bias: 'Bullish' | 'Bearish' | 'Neutral' | 'Monitoring';
+  status: 'Watching' | 'Setup Forming' | 'Ready to Enter' | 'Triggered' | 'Invalidated';
+  timeframe: string;
+  keyLevels?: string;
+  notes: string;
+  imageUrl?: string;
+  createdAt: string;
+  docId?: string;
+  docUrl?: string;
+}
+
+export async function fetchGoogleWatchlist(
+  accessToken: string,
+  spreadsheetId: string
+): Promise<WatchlistItem[]> {
+  const data = await callProxy(accessToken, 'fetchWatchlist', { spreadsheetId });
+  return data.items || [];
+}
+
+export async function addGoogleWatchlistItem(
+  accessToken: string,
+  spreadsheetId: string,
+  item: WatchlistItem
+): Promise<{ success: boolean; docId: string; docUrl: string; imageUrl: string }> {
+  return await callProxy(accessToken, 'addWatchlistItem', { spreadsheetId, item });
+}
+
+export async function updateGoogleWatchlistItem(
+  accessToken: string,
+  spreadsheetId: string,
+  item: WatchlistItem,
+  oldImageUrl?: string
+): Promise<{ success: boolean; imageUrl: string }> {
+  return await callProxy(accessToken, 'updateWatchlistItem', { spreadsheetId, item, oldImageUrl });
+}
+
+export async function deleteGoogleWatchlistItem(
+  accessToken: string,
+  spreadsheetId: string,
+  itemId: string,
+  docId?: string,
+  imageUrl?: string
+): Promise<void> {
+  await callProxy(accessToken, 'deleteWatchlistItem', { spreadsheetId, itemId, docId, imageUrl });
+}
+
+
 

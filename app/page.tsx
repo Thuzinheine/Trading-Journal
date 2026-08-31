@@ -33,6 +33,11 @@ import {
   fetchGoogleMacroLogs,
   addGoogleMacroLog,
   deleteGoogleMacroLog,
+  WatchlistItem,
+  fetchGoogleWatchlist,
+  addGoogleWatchlistItem,
+  updateGoogleWatchlistItem,
+  deleteGoogleWatchlistItem,
 } from '@/lib/google-api';
 import { 
   LineChart, 
@@ -97,7 +102,13 @@ import {
   SlidersHorizontal,
   BarChart2,
   Sparkles,
-  Scale
+  Scale,
+  Eye,
+  Coins,
+  Compass,
+  BookmarkCheck,
+  Play,
+  Save
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -418,7 +429,85 @@ export default function Home() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Active view
-  const [activeTab, setActiveTab] = useState<'overview' | 'journal' | 'micro' | 'macro' | 'alignment' | 'learning'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'journal' | 'micro' | 'macro' | 'alignment' | 'learning' | 'watchlist'>('overview');
+
+  // Default Sample Watchlist Setups (Crypto & Forex)
+  const defaultWatchlistItems: WatchlistItem[] = [
+    {
+      id: 'wl-btc-1',
+      pair: 'BTC/USDT',
+      category: 'Crypto',
+      bias: 'Bullish',
+      status: 'Ready to Enter',
+      timeframe: '4H',
+      keyLevels: 'Key POI: $63,200 - $63,800 (Bullish Orderblock + 4H FVG) | Target: $66,000 | Invalidation: $62,400',
+      notes: 'Clean liquidity sweep below previous 4H swing low followed by bullish market structure shift on 15m. Waiting for tap into 4H Fair Value Gap with volume surge.',
+      imageUrl: '',
+      createdAt: '2026-08-30T10:00:00.000Z',
+    },
+    {
+      id: 'wl-eur-1',
+      pair: 'EUR/USD',
+      category: 'Forex',
+      bias: 'Bearish',
+      status: 'Setup Forming',
+      timeframe: '1H',
+      keyLevels: 'Supply Zone: 1.0880 - 1.0900 | Target: 1.0790 (Weekly Low) | Invalidation: 1.0930',
+      notes: 'Higher timeframe daily bias is bearish. Asian session liquidity swept, price testing London mitigation block. Looking for lower timeframe CHoCH during NY open session.',
+      imageUrl: '',
+      createdAt: '2026-08-30T09:30:00.000Z',
+    },
+    {
+      id: 'wl-sol-1',
+      pair: 'SOL/USDT',
+      category: 'Crypto',
+      bias: 'Bullish',
+      status: 'Watching',
+      timeframe: '1D',
+      keyLevels: 'Major Demand Zone: $138.50 - $142.00 | Targets: $155.00 / $170.00 | Invalidation: $134.00',
+      notes: 'Daily Bullish Breaker combined with Discount Golden Pocket Fibonacci 0.618. Accumulation phase forming with declining seller volume.',
+      imageUrl: '',
+      createdAt: '2026-08-29T18:00:00.000Z',
+    },
+    {
+      id: 'wl-gold-1',
+      pair: 'XAU/USD (Gold)',
+      category: 'Forex',
+      bias: 'Bullish',
+      status: 'Ready to Enter',
+      timeframe: '15M',
+      keyLevels: 'POI: $2,410 - $2,414 FVG | Target: $2,435 (NY High) | Stop: $2,402',
+      notes: 'Strong rejection candle from $2,400 psychological support. High volume displacement leaving clean imbalance on 15m.',
+      imageUrl: '',
+      createdAt: '2026-08-30T11:15:00.000Z',
+    }
+  ];
+
+  // Watchlist States
+  const [watchlistItems, setWatchlistItems] = useState<WatchlistItem[]>(defaultWatchlistItems);
+  const [isWatchlistLoading, setIsWatchlistLoading] = useState(false);
+  const [isSavingWatchlistItem, setIsSavingWatchlistItem] = useState(false);
+  const [showWatchlistModal, setShowWatchlistModal] = useState(false);
+  const [editingWatchlistItem, setEditingWatchlistItem] = useState<WatchlistItem | null>(null);
+  const [selectedWatchlistItem, setSelectedWatchlistItem] = useState<WatchlistItem | null>(null);
+  const [isWatchlistModalFullPage, setIsWatchlistModalFullPage] = useState(false);
+  const [watchlistError, setWatchlistError] = useState<string | null>(null);
+
+  // Watchlist Form Fields
+  const [watchlistPair, setWatchlistPair] = useState('');
+  const [watchlistCategory, setWatchlistCategory] = useState<'Crypto' | 'Forex' | 'Commodity' | 'Index'>('Crypto');
+  const [watchlistBias, setWatchlistBias] = useState<'Bullish' | 'Bearish' | 'Neutral' | 'Monitoring'>('Bullish');
+  const [watchlistStatus, setWatchlistStatus] = useState<'Watching' | 'Setup Forming' | 'Ready to Enter' | 'Triggered' | 'Invalidated'>('Watching');
+  const [watchlistTimeframe, setWatchlistTimeframe] = useState('4H');
+  const [watchlistKeyLevels, setWatchlistKeyLevels] = useState('');
+  const [watchlistNotes, setWatchlistNotes] = useState('');
+  const [watchlistImage, setWatchlistImage] = useState('');
+
+  // Watchlist Filters
+  const [watchlistFilterCategory, setWatchlistFilterCategory] = useState<'ALL' | 'Crypto' | 'Forex' | 'Commodity' | 'Index'>('ALL');
+  const [watchlistFilterBias, setWatchlistFilterBias] = useState<'ALL' | 'Bullish' | 'Bearish' | 'Neutral' | 'Monitoring'>('ALL');
+  const [watchlistFilterStatus, setWatchlistFilterStatus] = useState<'ALL' | 'Watching' | 'Setup Forming' | 'Ready to Enter' | 'Triggered' | 'Invalidated'>('ALL');
+  const [watchlistSearch, setWatchlistSearch] = useState('');
 
   // Learning Notes States
   const [learningNotes, setLearningNotes] = useState<LearningNote[]>([]);
@@ -1009,6 +1098,7 @@ export default function Home() {
       await loadAvailableDocs(accessToken);
       await loadGoogleMicroLogs(accessToken, sheetId);
       await loadGoogleMacroLogs(accessToken, sheetId);
+      await loadWatchlist(user?.uid || 'user', true, accessToken, sheetId);
       
     } catch (error) {
       console.error('Error bootstrapping Google Files:', error);
@@ -1384,6 +1474,360 @@ export default function Home() {
       alert('ဖျက်ရာတွင် အမှားအယွင်းရှိခဲ့ပါသည်');
     }
   };
+
+  // --- Watchlist Handlers & Data Sync Engine ---
+  const loadWatchlist = async (userId: string, isSilentRefresh = false, overrideToken?: string, overrideSpreadsheetId?: string) => {
+    const activeToken = overrideToken || token;
+    const activeSpreadsheetId = overrideSpreadsheetId || spreadsheetId;
+    const cachedKey = `trading_watchlist_items_${userId}`;
+    let hasLoadedFromCache = false;
+    let localCount = 0;
+
+    // 1. Load from cache first
+    if (!isSilentRefresh && typeof window !== 'undefined') {
+      const cached = localStorage.getItem(cachedKey);
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setWatchlistItems(parsed);
+            hasLoadedFromCache = true;
+            localCount = parsed.length;
+          }
+        } catch (e) {
+          console.error('Error loading cached watchlist:', e);
+        }
+      }
+    }
+
+    if (!activeToken || !activeSpreadsheetId) {
+      return;
+    }
+
+    if (!hasLoadedFromCache && localCount === 0 && !isSilentRefresh) {
+      setIsWatchlistLoading(true);
+    }
+
+    setWatchlistError(null);
+    try {
+      const items = await fetchGoogleWatchlist(activeToken, activeSpreadsheetId);
+      if (items && items.length > 0) {
+        // Sort: newest first
+        const sortedItems = items.sort((a, b) => {
+          const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return dateB - dateA;
+        });
+        setWatchlistItems(sortedItems);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(cachedKey, JSON.stringify(sortedItems));
+        }
+      }
+    } catch (err: any) {
+      console.error('Error fetching watchlist from Google:', err);
+      setWatchlistError('Watchlist ဒေတာများ ဆွဲယူရာတွင် အမှားအယွင်းရှိနေပါသည်။');
+    } finally {
+      setIsWatchlistLoading(false);
+    }
+  };
+
+  // Auto-load Watchlist on user/token availability
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (user?.uid) {
+        const cachedKey = `trading_watchlist_items_${user.uid}`;
+        if (typeof window !== 'undefined') {
+          const cached = localStorage.getItem(cachedKey);
+          if (cached) {
+            try {
+              const parsed = JSON.parse(cached);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                setWatchlistItems(parsed);
+              }
+            } catch (e) {
+              console.error('Error parsing initial watchlist cache:', e);
+            }
+          }
+        }
+        if (token && spreadsheetId) {
+          loadWatchlist(user.uid);
+        }
+      }
+    }, 0);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, token, spreadsheetId]);
+
+  // Save or Update Watchlist Item
+  const handleSaveWatchlistItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!watchlistPair.trim()) {
+      setWatchlistError('Asset Pair (ဥပမာ: BTC/USDT, EUR/USD) ထည့်သွင်းရန် လိုအပ်ပါသည်!');
+      return;
+    }
+
+    setIsSavingWatchlistItem(true);
+    setWatchlistError(null);
+
+    const itemId = editingWatchlistItem ? editingWatchlistItem.id : `wl-${Date.now()}`;
+    const itemToSave: WatchlistItem = {
+      id: itemId,
+      pair: watchlistPair.trim().toUpperCase(),
+      category: watchlistCategory,
+      bias: watchlistBias,
+      status: watchlistStatus,
+      timeframe: watchlistTimeframe,
+      keyLevels: watchlistKeyLevels.trim(),
+      notes: watchlistNotes.trim(),
+      imageUrl: watchlistImage,
+      createdAt: editingWatchlistItem ? editingWatchlistItem.createdAt : new Date().toISOString(),
+      docId: editingWatchlistItem?.docId || '',
+      docUrl: editingWatchlistItem?.docUrl || '',
+    };
+
+    let updatedItem: WatchlistItem = { ...itemToSave };
+
+    // 1. Instant Optimistic update in UI
+    setWatchlistItems(prev => {
+      const idx = prev.findIndex(item => item.id === itemId);
+      if (idx > -1) {
+        const next = [...prev];
+        next[idx] = updatedItem;
+        return next;
+      } else {
+        return [updatedItem, ...prev];
+      }
+    });
+
+    // 2. Instant LocalStorage update
+    const cachedKey = user ? `trading_watchlist_items_${user.uid}` : 'trading_watchlist_items_guest';
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem(cachedKey);
+        let list: WatchlistItem[] = cached ? JSON.parse(cached) : [...defaultWatchlistItems];
+        const idx = list.findIndex(i => i.id === itemId);
+        if (idx > -1) {
+          list[idx] = updatedItem;
+        } else {
+          list.unshift(updatedItem);
+        }
+        localStorage.setItem(cachedKey, JSON.stringify(list));
+      } catch (e) {
+        console.error('Error saving watchlist cache:', e);
+      }
+    }
+
+    // Reset inputs and close modal
+    setWatchlistPair('');
+    setWatchlistKeyLevels('');
+    setWatchlistNotes('');
+    setWatchlistImage('');
+    setEditingWatchlistItem(null);
+    setShowWatchlistModal(false);
+
+    // 3. Save to Google Sheet / Google Doc / Drive Folder in background
+    if (token && spreadsheetId) {
+      try {
+        if (editingWatchlistItem) {
+          const res = await updateGoogleWatchlistItem(token, spreadsheetId, itemToSave, editingWatchlistItem.imageUrl);
+          if (res.imageUrl) {
+            updatedItem.imageUrl = res.imageUrl;
+            setWatchlistItems(prev => prev.map(i => i.id === itemId ? { ...i, imageUrl: res.imageUrl } : i));
+          }
+        } else {
+          const res = await addGoogleWatchlistItem(token, spreadsheetId, itemToSave);
+          updatedItem = {
+            ...updatedItem,
+            docId: res.docId,
+            docUrl: res.docUrl,
+            imageUrl: res.imageUrl || updatedItem.imageUrl,
+          };
+          setWatchlistItems(prev => prev.map(i => i.id === itemId ? updatedItem : i));
+        }
+
+        // Silent sync
+        if (user?.uid) {
+          loadWatchlist(user.uid, true);
+        }
+      } catch (error: any) {
+        console.error('Error saving watchlist to Google:', error);
+      } finally {
+        setIsSavingWatchlistItem(false);
+      }
+    } else {
+      setIsSavingWatchlistItem(false);
+    }
+  };
+
+  // Delete Watchlist Item
+  const handleDeleteWatchlistItem = async (itemId: string) => {
+    const targetItem = watchlistItems.find(i => i.id === itemId);
+    const docId = targetItem?.docId;
+    const imageUrl = targetItem?.imageUrl;
+    const prevItems = [...watchlistItems];
+
+    // Optimistic delete
+    setWatchlistItems(prev => prev.filter(i => i.id !== itemId));
+    if (selectedWatchlistItem?.id === itemId) {
+      setSelectedWatchlistItem(null);
+    }
+
+    const cachedKey = user ? `trading_watchlist_items_${user.uid}` : 'trading_watchlist_items_guest';
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(cachedKey, JSON.stringify(prevItems.filter(i => i.id !== itemId)));
+      } catch (e) {
+        console.error('Error updating watchlist cache on delete:', e);
+      }
+    }
+
+    if (token && spreadsheetId) {
+      try {
+        await deleteGoogleWatchlistItem(token, spreadsheetId, itemId, docId, imageUrl);
+        if (user?.uid) {
+          await loadWatchlist(user.uid, true);
+        }
+      } catch (err) {
+        console.error('Error deleting watchlist item on Google:', err);
+      }
+    }
+  };
+
+  // Quick Status change for Watchlist item
+  const handleQuickWatchlistStatus = async (item: WatchlistItem, newStatus: 'Watching' | 'Setup Forming' | 'Ready to Enter' | 'Triggered' | 'Invalidated') => {
+    const updated: WatchlistItem = { ...item, status: newStatus };
+    setWatchlistItems(prev => prev.map(i => i.id === item.id ? updated : i));
+
+    const cachedKey = user ? `trading_watchlist_items_${user.uid}` : 'trading_watchlist_items_guest';
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem(cachedKey);
+        if (cached) {
+          const list = JSON.parse(cached);
+          const idx = list.findIndex((i: any) => i.id === item.id);
+          if (idx > -1) {
+            list[idx] = updated;
+            localStorage.setItem(cachedKey, JSON.stringify(list));
+          }
+        }
+      } catch (e) {
+        console.error('Error updating status in cache:', e);
+      }
+    }
+
+    if (token && spreadsheetId) {
+      try {
+        await updateGoogleWatchlistItem(token, spreadsheetId, updated);
+      } catch (err) {
+        console.error('Error updating watchlist status on Google:', err);
+      }
+    }
+  };
+
+  // Convert Watchlist item to Trade Journal Entry
+  const handleConvertWatchlistToTrade = (item: WatchlistItem) => {
+    let nextNum = 1;
+    if (trades && trades.length > 0) {
+      const nums = trades
+        .map(t => parseInt(t.tradeNumber, 10))
+        .filter(n => !isNaN(n));
+      if (nums.length > 0) {
+        nextNum = Math.max(...nums) + 1;
+      } else {
+        nextNum = trades.length + 1;
+      }
+    }
+    const paddedNum = nextNum.toString().padStart(3, '0');
+
+    setEditingTrade(null);
+    setFormData({
+      date: new Date().toISOString().split('T')[0],
+      tradeNumber: paddedNum,
+      pair: item.pair,
+      entryPrice: '',
+      sl: '',
+      tp: '',
+      rr: '',
+      watchlist: `[${item.category} ${item.timeframe}] ${item.bias} Bias - ${item.status}. Key Levels: ${item.keyLevels || 'N/A'}`,
+      winLoss: 'Pending',
+      pnl: '',
+      notes: item.notes || '',
+      commitment: `Setup identified from Watchlist (${item.timeframe})`,
+      tradePhoto: item.imageUrl || '',
+      tradePhotoBefore: item.imageUrl || '',
+      tradePhotoAfter: '',
+    });
+    setFormError(null);
+    setShowFormModal(true);
+  };
+
+  // Handle Watchlist Image Change
+  const handleImageChangeWatchlist = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new window.Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 1200;
+        const MAX_HEIGHT = 900;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+          setWatchlistImage(dataUrl);
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Filtered & Searched Watchlist items memo
+  const filteredWatchlistItems = useMemo(() => {
+    return watchlistItems.filter(item => {
+      const matchCat = watchlistFilterCategory === 'ALL' || item.category === watchlistFilterCategory;
+      const matchBias = watchlistFilterBias === 'ALL' || item.bias === watchlistFilterBias;
+      const matchStatus = watchlistFilterStatus === 'ALL' || item.status === watchlistFilterStatus;
+      const q = watchlistSearch.toLowerCase().trim();
+      const matchSearch = !q || 
+        item.pair.toLowerCase().includes(q) || 
+        item.category.toLowerCase().includes(q) || 
+        item.bias.toLowerCase().includes(q) || 
+        (item.keyLevels && item.keyLevels.toLowerCase().includes(q)) || 
+        (item.notes && item.notes.toLowerCase().includes(q));
+      return matchCat && matchBias && matchStatus && matchSearch;
+    });
+  }, [watchlistItems, watchlistFilterCategory, watchlistFilterBias, watchlistFilterStatus, watchlistSearch]);
+
+  const watchlistStats = useMemo(() => {
+    const total = watchlistItems.length;
+    const crypto = watchlistItems.filter(i => i.category === 'Crypto').length;
+    const forex = watchlistItems.filter(i => i.category === 'Forex').length;
+    const ready = watchlistItems.filter(i => i.status === 'Ready to Enter').length;
+    const bullish = watchlistItems.filter(i => i.bias === 'Bullish').length;
+    const bearish = watchlistItems.filter(i => i.bias === 'Bearish').length;
+    return { total, crypto, forex, ready, bullish, bearish };
+  }, [watchlistItems]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1972,12 +2416,12 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
     const profitFactor = Math.abs(totalLosses) > 0 ? totalWins / Math.abs(totalLosses) : totalWins > 0 ? totalWins : 0;
     const expectancy = totalClosed > 0 ? ((winRate / 100) * avgWin) + (((100 - winRate) / 100) * avgLoss) : 0;
 
-    let bestTrade = targetTrades.reduce((best, t) => {
+    const bestTrade = targetTrades.reduce((best, t) => {
       const val = parsePnLValue(t.pnl, t.winLoss);
       return val > best ? val : best;
     }, -Infinity);
 
-    let worstTrade = targetTrades.reduce((worst, t) => {
+    const worstTrade = targetTrades.reduce((worst, t) => {
       const val = parsePnLValue(t.pnl, t.winLoss);
       return val < worst ? val : worst;
     }, Infinity);
@@ -2200,6 +2644,27 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
               </button>
 
               <button
+                onClick={() => { setActiveTab('watchlist'); setIsMobileMenuOpen(false); }}
+                className={`flex items-center justify-between w-full px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150 cursor-pointer ${
+                  activeTab === 'watchlist'
+                    ? 'bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-950 shadow-sm'
+                    : isDarkMode ? 'hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200' : 'hover:bg-slate-50 text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <div className="flex items-center space-x-3">
+                  <Eye className="h-4 w-4 text-amber-500" />
+                  <span>Watchlist</span>
+                </div>
+                {watchlistItems.length > 0 && (
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                    activeTab === 'watchlist' ? 'bg-slate-800 dark:bg-zinc-200 text-white dark:text-zinc-950' : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+                  }`}>
+                    {watchlistItems.length}
+                  </span>
+                )}
+              </button>
+
+              <button
                 onClick={() => { setActiveTab('alignment'); setIsMobileMenuOpen(false); }}
                 className={`flex items-center space-x-3 w-full px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150 cursor-pointer ${
                   activeTab === 'alignment'
@@ -2405,6 +2870,25 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                       <Activity className="h-4 w-4" />
                       <span>Dashboard</span>
                     </button>
+
+                    <button
+                      onClick={() => { setActiveTab('watchlist'); setIsMobileMenuOpen(false); }}
+                      className={`flex items-center justify-between w-full px-3 py-3 rounded-xl text-xs sm:text-sm font-semibold cursor-pointer transition-all duration-150 ${
+                        activeTab === 'watchlist' ? 'bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-950' : isDarkMode ? 'text-zinc-400 hover:bg-zinc-900' : 'text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <Eye className="h-4 w-4 text-amber-500" />
+                        <span>Watchlist</span>
+                      </div>
+                      {watchlistItems.length > 0 && (
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                          activeTab === 'watchlist' ? 'bg-slate-800 dark:bg-zinc-200 text-white dark:text-zinc-950' : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+                        }`}>
+                          {watchlistItems.length}
+                        </span>
+                      )}
+                    </button>
                     
                     <button
                       onClick={() => { setActiveTab('alignment'); setIsMobileMenuOpen(false); }}
@@ -2506,18 +2990,24 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                 isDarkMode ? 'bg-zinc-900 text-emerald-400 border border-zinc-800' : 'bg-slate-100 text-slate-800 border border-slate-200'
               }`}>
                 {activeTab === 'overview' && <Activity className="h-4 w-4" />}
+                {activeTab === 'watchlist' && <Eye className="h-4 w-4 text-amber-500" />}
+                {activeTab === 'alignment' && <Percent className="h-4 w-4 text-amber-500" />}
                 {activeTab === 'journal' && <Layers className="h-4 w-4" />}
                 {activeTab === 'strategy' && <BookOpen className="h-4 w-4" />}
                 {activeTab === 'notes' && <StickyNote className="h-4 w-4" />}
-                {activeTab === 'micro' && <Zap className="h-4 w-4" />}
-                {activeTab === 'macro' && <Globe className="h-4 w-4" />}
+                {activeTab === 'learning' && <ImageIcon className="h-4 w-4 text-teal-400" />}
+                {activeTab === 'micro' && <Zap className="h-4 w-4 text-amber-400" />}
+                {activeTab === 'macro' && <Globe className="h-4 w-4 text-sky-400" />}
                 {activeTab === 'fomc' && <Calendar className="h-4 w-4" />}
               </div>
               <div>
                 <div className="flex items-center space-x-2">
                   <h1 className="text-sm font-extrabold tracking-tight">
                     {activeTab === 'overview' && 'Trading Analytics & Performance'}
+                    {activeTab === 'watchlist' && 'Crypto & Forex Watchlist'}
+                    {activeTab === 'alignment' && 'Position Alignment Calculator'}
                     {activeTab === 'journal' && 'Trading Journal'}
+                    {activeTab === 'learning' && 'Learning Notes & Strategy Vault'}
                     {activeTab === 'strategy' && 'Trading Playbook & Strategy'}
                     {activeTab === 'notes' && 'Learning Notes & Case Studies'}
                     {activeTab === 'micro' && 'Micro Framework (LTF Checklist)'}
@@ -2532,7 +3022,10 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                 </div>
                 <p className={`text-[11px] font-medium ${isDarkMode ? 'text-zinc-500' : 'text-slate-400'}`}>
                   {activeTab === 'overview' && 'Comprehensive statistics, PnL curve & execution metrics'}
+                  {activeTab === 'watchlist' && `${watchlistItems.length} Setups tracked • Synced with Google Sheets & Drive`}
+                  {activeTab === 'alignment' && 'Precision position sizing, isolated leverage alignment & SL distance engine'}
                   {activeTab === 'journal' && `${filteredTrades.length} Trades recorded • Synced with Google Sheets`}
+                  {activeTab === 'learning' && `${learningNotes.length} Lessons & Case Studies stored in Google Drive`}
                   {activeTab === 'strategy' && 'Document your setups, risk management rules & execution criteria'}
                   {activeTab === 'notes' && 'Visual chart breakdowns, lessons learned & market observations'}
                   {activeTab === 'micro' && 'Lower Timeframe execution triggers, FVG & liquidity sweeps'}
@@ -2631,99 +3124,99 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
           activeTab === 'journal' ? 'px-2 sm:px-4 lg:px-5' : 'px-4 sm:px-8 lg:px-10'
         }`}>
         
-        {/* If user needs authentication, display gorgeous onboarding page */}
+        {/* If user needs authentication, display sleek, modern, clutter-free login view */}
         {needsAuth ? (
-          <div className="max-w-3xl mx-auto mt-8 bg-white rounded-2xl border border-slate-200/80 shadow-lg overflow-hidden">
-            <div className="bg-slate-900 px-6 py-12 text-center text-white relative overflow-hidden">
-              <div className="absolute inset-0 bg-radial-gradient(ellipse_at_top,_var(--tw-gradient-stops)) from-slate-800 via-slate-900 to-slate-950 opacity-95"></div>
-              <div className="relative z-10 max-w-xl mx-auto">
-                <Activity className="h-16 w-16 mx-auto mb-6 text-slate-300 animate-pulse" />
-                <h2 className="text-3xl font-extrabold tracking-tight sm:text-4xl text-white">
-                  Trading Journal & Notes Dashboard
+          <div className="min-h-[75vh] flex flex-col items-center justify-center relative py-8 px-4">
+            {/* Ambient Lighting */}
+            <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 rounded-full blur-[100px] pointer-events-none opacity-20 ${
+              isDarkMode ? 'bg-emerald-500' : 'bg-emerald-600'
+            }`} />
+
+            {/* Main Auth Container */}
+            <div className={`w-full max-w-sm sm:max-w-md rounded-3xl border transition-all relative z-10 p-8 sm:p-10 shadow-2xl backdrop-blur-2xl ${
+              isDarkMode
+                ? 'bg-zinc-900/80 border-zinc-800 text-zinc-100 shadow-black/60'
+                : 'bg-white/90 border-slate-200/80 text-slate-800 shadow-slate-200/60'
+            }`}>
+              {/* Header & Logo */}
+              <div className="flex flex-col items-center text-center mb-8">
+                <div className="relative mb-5">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-zinc-950 shadow-lg shadow-emerald-500/25">
+                    <TrendingUp className="h-7 w-7 stroke-[2.2]" />
+                  </div>
+                  <div className="absolute -bottom-1 -right-1 p-1 bg-zinc-900 rounded-full border border-zinc-700">
+                    <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  </div>
+                </div>
+
+                <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+                  Trading Journal
                 </h2>
-                <p className="mt-4 text-base text-slate-300">
-                  Google Sheet ဖြင့် အရောင်းအဝယ်မှတ်တမ်းများသိမ်းဆည်းခြင်း၊ Profit/Loss များအလိုအလျောက်တွက်ချက်ပေးခြင်းနှင့် Google Doc တွင် ကိုယ်ပိုင် Trading Strategy Note များရေးမှတ်နိုင်သည့် အဆင့်မြင့်စနစ်။
+                <p className={`text-xs sm:text-sm mt-2 max-w-xs ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                  အရောင်းအဝယ်မှတ်တမ်းများနှင့် Performance အား စနစ်တကျ စောင့်ကြည့်မှတ်သားပါ
                 </p>
               </div>
-            </div>
 
-            <div className="px-6 py-10 sm:p-12 text-center bg-slate-50/50">
-              <h3 className="text-lg font-bold text-slate-900 mb-2">Google Account ဖြင့် စတင်ချိတ်ဆက်ပါ</h3>
-              <p className="text-slate-500 text-sm max-w-md mx-auto mb-8 leading-relaxed">
-                သင့်၏ Google Drive ပေါ်တွင် &quot;Trading Journal (AI Studio)&quot; Spreadsheet နှင့် &quot;Trading Notes (AI Studio)&quot; Document တို့ကို အလိုအလျောက် ဖန်တီးသိမ်းဆည်းပေးမည် ဖြစ်ပါသည်။
-              </p>
-
+              {/* Error Notice */}
               {authError && (
-                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-left max-w-md mx-auto flex items-start gap-3">
-                  <AlertTriangle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
-                  <div>
-                    <h4 className="font-semibold text-red-800 text-sm">အကောင့်ဝင်ရန် မအောင်မြင်ပါ</h4>
-                    <p className="text-xs text-red-600 mt-1 leading-relaxed">{authError}</p>
+                <div className="mb-6 p-3.5 bg-rose-500/10 border border-rose-500/30 rounded-2xl text-left flex items-start gap-3">
+                  <AlertTriangle className="h-4 w-4 text-rose-500 shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-xs font-bold text-rose-500">အကောင့်ဝင်ရန် မအောင်မြင်ပါ</p>
+                    <p className={`text-[11px] mt-0.5 leading-relaxed ${isDarkMode ? 'text-rose-300' : 'text-rose-700'}`}>{authError}</p>
                   </div>
                 </div>
               )}
 
-              {isAuthLoading ? (
-                <div className="flex flex-col items-center justify-center space-y-4">
-                  <RefreshCw className="h-10 w-10 text-slate-800 animate-spin" />
-                  <p className="text-sm font-semibold text-slate-800">Google Authentication စတင်နေပါသည်...</p>
+              {/* Action Button */}
+              <div className="space-y-4">
+                {isAuthLoading ? (
+                  <div className={`w-full py-3.5 px-4 rounded-2xl border flex items-center justify-center space-x-2.5 text-sm font-semibold ${
+                    isDarkMode ? 'bg-zinc-800/80 border-zinc-700 text-zinc-300' : 'bg-slate-100 border-slate-200 text-slate-700'
+                  }`}>
+                    <RefreshCw className="h-4 w-4 animate-spin text-emerald-500" />
+                    <span>Google Authentication စတင်နေပါသည်...</span>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleLogin}
+                    className={`w-full py-4 px-6 rounded-2xl font-bold text-sm sm:text-base flex items-center justify-center space-x-3 transition-all duration-200 cursor-pointer shadow-lg active:scale-[0.98] ${
+                      isDarkMode
+                        ? 'bg-white hover:bg-zinc-100 text-zinc-950 shadow-white/5 hover:shadow-xl hover:shadow-white/10'
+                        : 'bg-zinc-950 hover:bg-zinc-850 text-white shadow-zinc-950/20 hover:shadow-xl'
+                    }`}
+                  >
+                    <svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className="h-5 w-5 shrink-0">
+                      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path>
+                      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path>
+                      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path>
+                      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path>
+                    </svg>
+                    <span>Sign in with Google</span>
+                  </button>
+                )}
+
+                <p className={`text-[11px] text-center font-medium ${isDarkMode ? 'text-zinc-500' : 'text-slate-400'}`}>
+                  Google Drive ရှိ သင့်ကိုယ်ပိုင် Sheets & Docs ဖြင့်သာ သိမ်းဆည်းပါသည်
+                </p>
+              </div>
+
+              {/* Minimalist Feature List */}
+              <div className={`mt-8 pt-6 border-t space-y-2.5 ${
+                isDarkMode ? 'border-zinc-800/80 text-zinc-400' : 'border-slate-100 text-slate-500'
+              }`}>
+                <div className="flex items-center space-x-2.5 text-xs">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                  <span>Real-time Trade Analytics & Expectancy</span>
                 </div>
-              ) : (
-                <button
-                  onClick={handleLogin}
-                  className="gsi-material-button w-full sm:w-auto inline-flex justify-center items-center px-8 py-3.5 border border-slate-300 rounded-xl bg-white shadow-sm hover:shadow-md text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-all duration-200 cursor-pointer"
-                >
-                  <div className="gsi-material-button-content-wrapper flex items-center space-x-3">
-                    <div className="gsi-material-button-icon flex items-center justify-center">
-                      <svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className="h-5 w-5">
-                        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path>
-                        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path>
-                        <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path>
-                        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path>
-                      </svg>
-                    </div>
-                    <span className="gsi-material-button-contents text-slate-800 text-base">Sign in with Google</span>
-                  </div>
-                </button>
-              )}
-
-              {/* Google Sign-in Troubleshooting Tips */}
-              <div className="mt-8 pt-6 border-t border-slate-200/40 text-left max-w-sm sm:max-w-md mx-auto">
-                <details className="group">
-                  <summary className="text-xs text-slate-500 font-semibold cursor-pointer hover:text-slate-800 transition-colors flex items-center justify-between list-none">
-                    <span>⚠️ Google Sign-In ဝင်မရပါက ဖြေရှင်းနည်းကြည့်ရန်</span>
-                    <span className="transition-transform duration-200 group-open:rotate-180 text-[10px]">▼</span>
-                  </summary>
-                  <div className="mt-3 text-[11px] sm:text-xs text-slate-500 space-y-2.5 leading-relaxed bg-slate-50/80 p-3.5 sm:p-4 rounded-xl border border-slate-100">
-                    <p className="font-bold text-slate-800">ဖြေရှင်းနည်း အဆင့်ဆင့် -</p>
-                    <ul className="list-decimal pl-4 space-y-1.5 text-slate-600">
-                      <li><strong>Safari / Brave Browser:</strong> Browser ၏ Privacy settings တွင် &quot;Prevent Cross-Site Tracking&quot; နှင့် &quot;Block All Cookies&quot; ကို ပိတ်ပြီး ထပ်မံကြိုးစားပါ။</li>
-                      <li><strong>Incognito Mode:</strong> Chrome Incognito တွင် Google popups ကို block တတ်သောကြောင့် standard browser window ဖြင့် အသုံးပြုပါ။</li>
-                      <li><strong>Firebase Authorized Domains:</strong> အကယ်၍ Netlify custom domain ကို ပြောင်းလဲထားပါက Firebase Console ၏ <strong>Authentication &gt; Settings &gt; Authorized Domains</strong> တွင် Netlify domain ကို ထည့်သွင်းထားရန် လိုအပ်ပါသည်။</li>
-                    </ul>
-                  </div>
-                </details>
-              </div>
-            </div>
-
-            <div className="border-t border-slate-200/80 px-6 py-6 sm:px-12 bg-white text-left grid grid-cols-1 sm:grid-cols-3 gap-6">
-              <div>
-                <h4 className="font-semibold text-slate-800 flex items-center gap-1.5 text-sm">
-                  <DollarSign className="h-4 w-4 text-slate-800" /> Dynamic Auto-PnL
-                </h4>
-                <p className="text-xs text-slate-500 mt-1">Exit Price နှင့် Position size တို့အပေါ်မူတည်ပြီး PnL များကို Dynamic အလိုအလျောက် တွက်ချက်ပေးပါသည်။</p>
-              </div>
-              <div>
-                <h4 className="font-semibold text-slate-800 flex items-center gap-1.5 text-sm">
-                  <BookOpen className="h-4 w-4 text-slate-800" /> Google Sheets Sync
-                </h4>
-                <p className="text-xs text-slate-500 mt-1">Trade data တိုင်းကို သင်၏ ကိုယ်ပိုင် Google Account ရှိ Google Sheets ဇယားထဲသို့ တိုက်ရိုက် သိမ်းဆည်းပေးပါသည်။</p>
-              </div>
-              <div>
-                <h4 className="font-semibold text-slate-800 flex items-center gap-1.5 text-sm">
-                  <FileText className="h-4 w-4 text-slate-800" /> Strategic Notes
-                </h4>
-                <p className="text-xs text-slate-500 mt-1">မဟာဗျူဟာများနှင့် သင်ခန်းစာများကို Google Doc ဖြင့် ချိတ်ဆက်ပြီး လွယ်ကူလျင်မြန်စွာ ရေးသားမှတ်သားနိုင်ပါသည်။</p>
+                <div className="flex items-center space-x-2.5 text-xs">
+                  <div className="w-1.5 h-1.5 rounded-full bg-teal-400" />
+                  <span>Direct Google Sheets & Docs Cloud Sync</span>
+                </div>
+                <div className="flex items-center space-x-2.5 text-xs">
+                  <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                  <span>Private, Secure & Zero Server Storage</span>
+                </div>
               </div>
             </div>
           </div>
@@ -2850,663 +3343,420 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
               </div>
             )}
 
-            {/* OVERVIEW DASHBOARD VIEW */}
+            {/* OVERVIEW DASHBOARD VIEW - CLEAN, MODERN & UNCLUTTERED */}
             {activeTab === 'overview' && (
-              <div className="space-y-6 sm:space-y-8">
-                {/* 1. Dashboard Command & Filter Bar */}
-                <div className={`p-4 sm:p-5 rounded-2xl border flex flex-col md:flex-row md:items-center md:justify-between gap-4 transition-all ${
-                  isDarkMode ? 'bg-zinc-900/70 border-zinc-800/80 text-zinc-100 shadow-xl shadow-black/20' : 'bg-white border-slate-200/90 shadow-sm text-slate-800'
+              <div className="space-y-6">
+                {/* 1. Header Command & Filter Bar */}
+                <div className={`p-4 sm:p-5 rounded-2xl border transition-all ${
+                  isDarkMode 
+                    ? 'bg-zinc-900/60 border-zinc-800/80 text-zinc-100' 
+                    : 'bg-white border-slate-200/90 shadow-xs text-slate-900'
                 }`}>
-                  <div className="flex items-center space-x-3.5">
-                    <div className={`p-2.5 rounded-xl shrink-0 ${
-                      isDarkMode ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'
-                    }`}>
-                      <Activity className="h-5 w-5 stroke-[2.2]" />
-                    </div>
-                    <div>
-                      <div className="flex items-center space-x-2">
-                        <h2 className="text-base sm:text-lg font-extrabold tracking-tight">Portfolio Analytics & Performance</h2>
-                        <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                          <span>Live Edge</span>
-                        </span>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    {/* Title & Status */}
+                    <div className="flex items-center space-x-3">
+                      <div className={`p-2.5 rounded-xl border shrink-0 ${
+                        isDarkMode 
+                          ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
+                          : 'bg-emerald-50 border-emerald-200 text-emerald-600'
+                      }`}>
+                        <TrendingUp className="h-5 w-5" />
                       </div>
-                      <p className={`text-xs font-medium mt-0.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
-                        အရောင်းအဝယ်ရလဒ်များ၊ Equity Growth Curve နှင့် စွန့်စားမှုစီမံခန့်ခွဲမှု ဆန်းစစ်ချက်
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Filter Tabs */}
-                  <div className="flex items-center flex-wrap gap-2.5">
-                    <div className={`flex items-center p-1 rounded-xl border text-xs font-bold ${
-                      isDarkMode ? 'bg-zinc-950/80 border-zinc-800 text-zinc-400' : 'bg-slate-100 border-slate-200 text-slate-600'
-                    }`}>
-                      <button
-                        onClick={() => setDashboardTimeframe('all')}
-                        className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                          dashboardTimeframe === 'all'
-                            ? isDarkMode ? 'bg-zinc-800 text-emerald-400 shadow-sm' : 'bg-white text-slate-900 shadow-xs'
-                            : 'hover:text-zinc-200'
-                        }`}
-                      >
-                        All Trades ({trades.length})
-                      </button>
-                      <button
-                        onClick={() => setDashboardTimeframe('30d')}
-                        className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                          dashboardTimeframe === '30d'
-                            ? isDarkMode ? 'bg-zinc-800 text-emerald-400 shadow-sm' : 'bg-white text-slate-900 shadow-xs'
-                            : 'hover:text-zinc-200'
-                        }`}
-                      >
-                        Last 30D
-                      </button>
-                      <button
-                        onClick={() => setDashboardTimeframe('7d')}
-                        className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                          dashboardTimeframe === '7d'
-                            ? isDarkMode ? 'bg-zinc-800 text-emerald-400 shadow-sm' : 'bg-white text-slate-900 shadow-xs'
-                            : 'hover:text-zinc-200'
-                        }`}
-                      >
-                        Last 7D
-                      </button>
+                      <div>
+                        <div className="flex items-center space-x-2">
+                          <h2 className="text-lg sm:text-xl font-black tracking-tight">Performance Overview</h2>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-mono font-bold border ${
+                            metrics.netPnL >= 0 
+                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
+                              : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                          }`}>
+                            {metrics.netPnL >= 0 ? '● Profitable' : '● Drawdown'}
+                          </span>
+                        </div>
+                        <p className={`text-xs mt-0.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                          အရောင်းအဝယ်မှတ်တမ်းများနှင့် အမြတ်/အရှုံး တိုးတက်မှုမျဉ်းကွေး အကျဉ်းချုပ်
+                        </p>
+                      </div>
                     </div>
 
-                    {token && spreadsheetId && (
-                      <button
-                        onClick={() => loadTrades(token, spreadsheetId)}
-                        disabled={isLoadingTrades}
-                        className={`p-2 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center space-x-1.5 ${
-                          isDarkMode 
-                            ? 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800 text-zinc-300' 
-                            : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700'
-                        }`}
-                        title="Google Sheets မှ နောက်ဆုံးဒေတာကို ပြန်လည်ဆွဲယူရန်"
-                      >
-                        <RefreshCw className={`h-3.5 w-3.5 ${isLoadingTrades ? 'animate-spin text-emerald-400' : ''}`} />
-                        <span className="hidden sm:inline">Sync</span>
-                      </button>
-                    )}
+                    {/* Timeframe Selector & Sync */}
+                    <div className="flex items-center gap-2 self-start sm:self-auto">
+                      <div className={`flex items-center p-1 rounded-xl border text-xs font-semibold ${
+                        isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-400' : 'bg-slate-100 border-slate-200 text-slate-600'
+                      }`}>
+                        {(['all', '30d', '7d'] as const).map((tf) => (
+                          <button
+                            key={tf}
+                            type="button"
+                            onClick={() => setDashboardTimeframe(tf)}
+                            className={`px-3 py-1 rounded-lg transition-all cursor-pointer font-bold ${
+                              dashboardTimeframe === tf
+                                ? isDarkMode ? 'bg-zinc-800 text-emerald-400 shadow-xs' : 'bg-white text-slate-900 shadow-xs'
+                                : 'hover:text-zinc-200'
+                            }`}
+                          >
+                            {tf === 'all' ? `All (${trades.length})` : tf === '30d' ? '30 Days' : '7 Days'}
+                          </button>
+                        ))}
+                      </div>
+
+                      {token && spreadsheetId && (
+                        <button
+                          type="button"
+                          onClick={() => loadTrades(token, spreadsheetId)}
+                          disabled={isLoadingTrades}
+                          className={`p-2 rounded-xl border transition-all cursor-pointer flex items-center justify-center ${
+                            isDarkMode 
+                              ? 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800 text-zinc-300' 
+                              : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700 shadow-xs'
+                          }`}
+                          title="Google Sheets မှ ဒေတာ အသစ်ပြန်လည် ရယူရန်"
+                        >
+                          <RefreshCw className={`h-4 w-4 ${isLoadingTrades ? 'animate-spin text-emerald-400' : ''}`} />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                {/* 2. Top Tier Performance Matrix (6 Grid Cards) */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-                  {/* Card 1: Net PnL */}
-                  <div className={`p-4 sm:p-5 rounded-2xl border transition-all relative overflow-hidden flex flex-col justify-between ${
-                    isDarkMode ? 'bg-zinc-900/60 border-zinc-800/80 text-zinc-100 shadow-lg shadow-black/10' : 'bg-white border-slate-200 shadow-sm text-slate-800'
+                {/* 2. Executive 4-Card Balanced KPI Matrix */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Card 1: Net Profit / Loss */}
+                  <div className={`p-4.5 rounded-2xl border transition-all flex flex-col justify-between ${
+                    isDarkMode ? 'bg-zinc-900/60 border-zinc-800/80 text-zinc-100' : 'bg-white border-slate-200 text-slate-800 shadow-xs'
                   }`}>
                     <div className="flex items-center justify-between text-xs mb-2">
-                      <span className={`font-bold ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Net Profit / Loss</span>
-                      <span className={`p-1.5 rounded-lg ${metrics.netPnL >= 0 ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'}`}>
+                      <span className="font-bold text-zinc-400">Net Profit / Loss</span>
+                      <span className={`p-1.5 rounded-lg ${metrics.netPnL >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
                         {metrics.netPnL >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
                       </span>
                     </div>
-                    <div className="space-y-1">
-                      <h3 className={`text-xl sm:text-2xl font-black font-mono tracking-tight ${
+                    <div>
+                      <h3 className={`text-2xl sm:text-3xl font-black font-mono tracking-tight ${
                         metrics.netPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'
                       }`}>
                         {metrics.netPnL >= 0 ? '+' : ''}${metrics.netPnL.toFixed(2)}
                       </h3>
-                      <div className="flex items-center space-x-1.5 text-[11px] font-mono font-medium text-zinc-400">
-                        <span>{dashboardFilteredTrades.length} trades</span>
-                        <span>•</span>
-                        <span className={metrics.netPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
-                          {metrics.netPnL >= 0 ? 'Profitable' : 'Drawdown'}
-                        </span>
-                      </div>
+                      <p className="text-[11px] font-mono text-zinc-400 mt-1">
+                        {dashboardFilteredTrades.length} trades recorded
+                      </p>
                     </div>
                   </div>
 
                   {/* Card 2: Win Rate */}
-                  <div className={`p-4 sm:p-5 rounded-2xl border transition-all flex flex-col justify-between ${
-                    isDarkMode ? 'bg-zinc-900/60 border-zinc-800/80 text-zinc-100 shadow-lg shadow-black/10' : 'bg-white border-slate-200 shadow-sm text-slate-800'
+                  <div className={`p-4.5 rounded-2xl border transition-all flex flex-col justify-between ${
+                    isDarkMode ? 'bg-zinc-900/60 border-zinc-800/80 text-zinc-100' : 'bg-white border-slate-200 text-slate-800 shadow-xs'
                   }`}>
                     <div className="flex items-center justify-between text-xs mb-2">
-                      <span className={`font-bold ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Win Rate</span>
-                      <span className="p-1.5 rounded-lg bg-blue-500/15 text-blue-400">
+                      <span className="font-bold text-zinc-400">Win Rate</span>
+                      <span className="p-1.5 rounded-lg bg-sky-500/10 text-sky-400">
                         <Percent className="h-4 w-4" />
                       </span>
                     </div>
-                    <div className="space-y-1">
-                      <h3 className="text-xl sm:text-2xl font-black font-mono tracking-tight text-blue-400">
+                    <div>
+                      <h3 className="text-2xl sm:text-3xl font-black font-mono tracking-tight text-sky-400">
                         {metrics.winRate.toFixed(1)}%
                       </h3>
-                      <div className="flex items-center space-x-1.5 text-[11px] font-mono font-medium text-zinc-400">
-                        <span className="text-emerald-400 font-bold">{metrics.winTrades}W</span>
-                        <span>-</span>
-                        <span className="text-rose-400 font-bold">{metrics.lossTrades}L</span>
-                        {metrics.beTrades > 0 && <span>- {metrics.beTrades}BE</span>}
+                      <div className="flex items-center space-x-1.5 text-[11px] font-mono font-semibold text-zinc-400 mt-1">
+                        <span className="text-emerald-400">{metrics.winTrades} Won</span>
+                        <span>•</span>
+                        <span className="text-rose-400">{metrics.lossTrades} Lost</span>
+                        {metrics.beTrades > 0 && <span>• {metrics.beTrades} BE</span>}
                       </div>
                     </div>
                   </div>
 
-                  {/* Card 3: Profit Factor */}
-                  <div className={`p-4 sm:p-5 rounded-2xl border transition-all flex flex-col justify-between ${
-                    isDarkMode ? 'bg-zinc-900/60 border-zinc-800/80 text-zinc-100 shadow-lg shadow-black/10' : 'bg-white border-slate-200 shadow-sm text-slate-800'
+                  {/* Card 3: Profit Factor & Expectancy */}
+                  <div className={`p-4.5 rounded-2xl border transition-all flex flex-col justify-between ${
+                    isDarkMode ? 'bg-zinc-900/60 border-zinc-800/80 text-zinc-100' : 'bg-white border-slate-200 text-slate-800 shadow-xs'
                   }`}>
                     <div className="flex items-center justify-between text-xs mb-2">
-                      <span className={`font-bold ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Profit Factor</span>
-                      <span className="p-1.5 rounded-lg bg-purple-500/15 text-purple-400">
+                      <span className="font-bold text-zinc-400">Profit Factor / Edge</span>
+                      <span className="p-1.5 rounded-lg bg-purple-500/10 text-purple-400">
                         <Shield className="h-4 w-4" />
                       </span>
                     </div>
-                    <div className="space-y-1">
-                      <h3 className="text-xl sm:text-2xl font-black font-mono tracking-tight text-purple-400">
-                        {metrics.profitFactor === Infinity ? '∞' : metrics.profitFactor.toFixed(2)}
-                      </h3>
-                      <div className="text-[11px] font-medium text-zinc-400">
-                        {metrics.profitFactor >= 2 ? 'High Institutional Edge' : metrics.profitFactor >= 1.2 ? 'Healthy System' : 'Needs Optimization'}
+                    <div>
+                      <div className="flex items-baseline space-x-2">
+                        <h3 className="text-2xl sm:text-3xl font-black font-mono tracking-tight text-purple-400">
+                          {metrics.profitFactor === Infinity ? '∞' : metrics.profitFactor.toFixed(2)}
+                        </h3>
+                        <span className="text-xs font-mono text-zinc-400">
+                          (Exp: {metrics.expectancy >= 0 ? '+' : ''}${metrics.expectancy.toFixed(1)})
+                        </span>
                       </div>
+                      <p className="text-[11px] font-medium text-zinc-400 mt-1">
+                        {metrics.profitFactor >= 2.0 ? '🌟 High Edge System' : metrics.profitFactor >= 1.2 ? '✓ Positive Expectancy' : 'Analyzing Edge'}
+                      </p>
                     </div>
                   </div>
 
-                  {/* Card 4: Avg Win vs Loss */}
-                  <div className={`p-4 sm:p-5 rounded-2xl border transition-all flex flex-col justify-between ${
-                    isDarkMode ? 'bg-zinc-900/60 border-zinc-800/80 text-zinc-100 shadow-lg shadow-black/10' : 'bg-white border-slate-200 shadow-sm text-slate-800'
+                  {/* Card 4: Avg Win/Loss & Current Streak */}
+                  <div className={`p-4.5 rounded-2xl border transition-all flex flex-col justify-between ${
+                    isDarkMode ? 'bg-zinc-900/60 border-zinc-800/80 text-zinc-100' : 'bg-white border-slate-200 text-slate-800 shadow-xs'
                   }`}>
                     <div className="flex items-center justify-between text-xs mb-2">
-                      <span className={`font-bold ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Avg Win / Loss</span>
-                      <span className="p-1.5 rounded-lg bg-teal-500/15 text-teal-400">
+                      <span className="font-bold text-zinc-400">Streak & R:R Ratio</span>
+                      <span className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400">
                         <Scale className="h-4 w-4" />
                       </span>
                     </div>
-                    <div className="space-y-1 font-mono">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-emerald-400 font-bold">+${metrics.avgWin.toFixed(2)}</span>
-                        <span className="text-rose-400 font-bold">-${Math.abs(metrics.avgLoss).toFixed(2)}</span>
+                    <div>
+                      <div className="flex items-center justify-between text-xs font-mono mb-1">
+                        <span className="text-emerald-400 font-bold">+${metrics.avgWin.toFixed(0)} avg win</span>
+                        <span className="text-rose-400 font-bold">-${Math.abs(metrics.avgLoss).toFixed(0)} avg loss</span>
                       </div>
-                      <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden flex">
-                        <div 
-                          className="bg-emerald-400 h-full" 
-                          style={{ width: `${(metrics.avgWin / (metrics.avgWin + Math.abs(metrics.avgLoss || 1))) * 100}%` }} 
-                        />
-                        <div 
-                          className="bg-rose-400 h-full" 
-                          style={{ width: `${(Math.abs(metrics.avgLoss) / (metrics.avgWin + Math.abs(metrics.avgLoss || 1))) * 100}%` }} 
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Card 5: Best & Worst Trade */}
-                  <div className={`p-4 sm:p-5 rounded-2xl border transition-all flex flex-col justify-between ${
-                    isDarkMode ? 'bg-zinc-900/60 border-zinc-800/80 text-zinc-100 shadow-lg shadow-black/10' : 'bg-white border-slate-200 shadow-sm text-slate-800'
-                  }`}>
-                    <div className="flex items-center justify-between text-xs mb-2">
-                      <span className={`font-bold ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Peak Trades</span>
-                      <span className="p-1.5 rounded-lg bg-amber-500/15 text-amber-400">
-                        <Flame className="h-4 w-4" />
-                      </span>
-                    </div>
-                    <div className="space-y-1 font-mono">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-zinc-400">Best:</span>
-                        <span className="text-emerald-400 font-black">+${metrics.bestTrade.toFixed(2)}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-zinc-400">Worst:</span>
-                        <span className="text-rose-400 font-black">${metrics.worstTrade.toFixed(2)}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Card 6: Streaks & Open Trades */}
-                  <div className={`p-4 sm:p-5 rounded-2xl border transition-all flex flex-col justify-between ${
-                    isDarkMode ? 'bg-zinc-900/60 border-zinc-800/80 text-zinc-100 shadow-lg shadow-black/10' : 'bg-white border-slate-200 shadow-sm text-slate-800'
-                  }`}>
-                    <div className="flex items-center justify-between text-xs mb-2">
-                      <span className={`font-bold ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Active / Streaks</span>
-                      <span className="p-1.5 rounded-lg bg-indigo-500/15 text-indigo-400">
-                        <Sparkles className="h-4 w-4" />
-                      </span>
-                    </div>
-                    <div className="space-y-1 font-mono">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-zinc-400">Streak:</span>
-                        <span className={`font-bold ${metrics.currentStreak > 0 ? 'text-emerald-400' : metrics.currentStreak < 0 ? 'text-rose-400' : 'text-zinc-400'}`}>
+                      <div className="flex items-center justify-between text-[11px] font-mono text-zinc-400 mt-1 pt-1 border-t border-zinc-800/40">
+                        <span>Streak: <strong className={metrics.currentStreak > 0 ? 'text-emerald-400' : metrics.currentStreak < 0 ? 'text-rose-400' : 'text-zinc-400'}>
                           {metrics.currentStreak > 0 ? `+${metrics.currentStreak} Wins` : metrics.currentStreak < 0 ? `${Math.abs(metrics.currentStreak)} Losses` : '0'}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-zinc-400">Open Pos:</span>
-                        <span className="text-amber-400 font-bold">{metrics.openTrades} Active</span>
+                        </strong></span>
+                        <span>Max Streak: <strong className="text-emerald-400">{metrics.maxWinStreak}W</strong></span>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* 3. Primary Charts Section (2 Columns: Cumulative Area Growth & Recent Bar PnL) */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  {/* Left (2 Cols): Cumulative Performance Chart */}
-                  <div className={`lg:col-span-2 p-5 sm:p-6 rounded-2xl border transition-all flex flex-col justify-between ${
-                    isDarkMode ? 'bg-zinc-900/70 border-zinc-800/80 text-zinc-100 shadow-xl shadow-black/20' : 'bg-white border-slate-200 shadow-sm text-slate-800'
-                  }`}>
-                    {/* Header */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <h3 className="text-lg font-extrabold tracking-tight">Cumulative Performance</h3>
-                          <span className={`text-[10px] px-2 py-0.5 rounded-md font-mono font-bold ${
-                            cumulativeViewMode === 'pnl' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-blue-500/15 text-blue-400'
-                          }`}>
-                            {cumulativeViewMode === 'pnl' ? 'Dollar Growth ($)' : 'R-Multiple (R)'}
-                          </span>
-                        </div>
-                        <p className={`text-xs mt-0.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
-                          အရောင်းအဝယ်တစ်ခုချင်းစီ၏ စုစုပေါင်း အမြတ်/အရှုံး တိုးတက်မှုမျဉ်းကွေး (Cumulative Equity Curve)
-                        </p>
+                {/* 3. Cumulative Growth Performance Curve */}
+                <div className={`p-5 sm:p-6 rounded-2xl border transition-all ${
+                  isDarkMode ? 'bg-zinc-900/60 border-zinc-800/80 text-zinc-100' : 'bg-white border-slate-200 text-slate-800 shadow-xs'
+                }`}>
+                  {/* Chart Header */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <h3 className="text-base font-black tracking-tight">Cumulative Growth Curve</h3>
+                        <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold ${
+                          cumulativeViewMode === 'pnl' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-sky-500/15 text-sky-400'
+                        }`}>
+                          {cumulativeViewMode === 'pnl' ? 'Equity ($)' : 'R-Multiple (R)'}
+                        </span>
                       </div>
-
-                      {/* Chart Metric Switcher */}
-                      <div className={`flex items-center p-0.5 rounded-xl border text-xs font-bold ${
-                        isDarkMode ? 'bg-zinc-950 border-zinc-800' : 'bg-slate-100 border-slate-200'
-                      }`}>
-                        <button
-                          onClick={() => setCumulativeViewMode('pnl')}
-                          className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                            cumulativeViewMode === 'pnl'
-                              ? isDarkMode ? 'bg-zinc-800 text-emerald-400 shadow-sm' : 'bg-white text-slate-900 shadow-xs'
-                              : 'text-zinc-400 hover:text-zinc-200'
-                          }`}
-                        >
-                          Net PnL ($)
-                        </button>
-                        <button
-                          onClick={() => setCumulativeViewMode('rr')}
-                          className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                            cumulativeViewMode === 'rr'
-                              ? isDarkMode ? 'bg-zinc-800 text-blue-400 shadow-sm' : 'bg-white text-slate-900 shadow-xs'
-                              : 'text-zinc-400 hover:text-zinc-200'
-                          }`}
-                        >
-                          R-Multiple (R)
-                        </button>
-                      </div>
+                      <p className={`text-xs mt-0.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                        အရောင်းအဝယ်တစ်ခုချင်းစီ၏ စုစုပေါင်း အမြတ်/အရှုံး တိုးတက်မှုမျဉ်းကွေး
+                      </p>
                     </div>
 
-                    {/* Chart Canvas */}
-                    <div className="h-80 w-full relative">
-                      {cumulativeChartData.length > 0 ? (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart data={cumulativeChartData} margin={{ top: 15, right: 15, left: -15, bottom: 0 }}>
-                            <defs>
-                              <linearGradient id="pnlGlowGrad" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor={metrics.netPnL >= 0 ? '#10B981' : '#F43F5E'} stopOpacity={0.4} />
-                                <stop offset="95%" stopColor={metrics.netPnL >= 0 ? '#10B981' : '#F43F5E'} stopOpacity={0.0} />
-                              </linearGradient>
-                              <linearGradient id="rrGlowGrad" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.4} />
-                                <stop offset="95%" stopColor="#3B82F6" stopOpacity={0.0} />
-                              </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDarkMode ? '#27272a' : '#E2E8F0'} opacity={0.6} />
-                            <XAxis 
-                              dataKey="name" 
-                              stroke={isDarkMode ? '#71717a' : '#94A3B8'} 
-                              fontSize={11} 
-                              tickLine={false} 
-                              axisLine={{ stroke: isDarkMode ? '#27272a' : '#E2E8F0' }}
-                            />
-                            <YAxis 
-                              stroke={isDarkMode ? '#71717a' : '#94A3B8'} 
-                              fontSize={11} 
-                              tickLine={false} 
-                              axisLine={{ stroke: isDarkMode ? '#27272a' : '#E2E8F0' }}
-                              tickFormatter={(val) => cumulativeViewMode === 'pnl' ? `$${val}` : `${val}R`}
-                            />
-                            <ReferenceLine y={0} stroke={isDarkMode ? '#52525b' : '#cbd5e1'} strokeDasharray="4 4" />
-                            <Tooltip 
-                              content={({ active, payload }) => {
-                                if (active && payload && payload.length) {
-                                  const data = payload[0].payload;
-                                  return (
-                                    <div className={`p-3.5 rounded-xl border shadow-2xl text-xs backdrop-blur-md transition-all ${
-                                      isDarkMode ? 'bg-zinc-950/95 border-zinc-700 text-zinc-100' : 'bg-white/95 border-slate-200 text-slate-900'
-                                    }`}>
-                                      <div className="flex items-center justify-between gap-4 mb-2 pb-1.5 border-b border-zinc-700/50">
-                                        <div className="flex items-center space-x-1.5">
-                                          <span className="font-extrabold">{data.pair}</span>
-                                          <span className={`text-[10px] px-1.5 py-0.2 rounded font-bold ${
-                                            data.type === 'START' 
-                                              ? 'bg-zinc-500/20 text-zinc-400' 
-                                              : data.type === 'BUY' 
-                                                ? 'bg-emerald-500/20 text-emerald-400' 
-                                                : 'bg-rose-500/20 text-rose-400'
-                                          }`}>{data.type}</span>
-                                        </div>
-                                        <span className="text-[10px] text-zinc-400 font-mono">{data.fullDate}</span>
+                    {/* Chart Metric Switcher */}
+                    <div className={`flex items-center p-0.5 rounded-xl border text-xs font-bold self-start sm:self-auto ${
+                      isDarkMode ? 'bg-zinc-950 border-zinc-800' : 'bg-slate-100 border-slate-200'
+                    }`}>
+                      <button
+                        type="button"
+                        onClick={() => setCumulativeViewMode('pnl')}
+                        className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                          cumulativeViewMode === 'pnl'
+                            ? isDarkMode ? 'bg-zinc-800 text-emerald-400 font-extrabold shadow-xs' : 'bg-white text-slate-900 font-extrabold shadow-xs'
+                            : 'text-zinc-400 hover:text-zinc-200'
+                        }`}
+                      >
+                        Net PnL ($)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCumulativeViewMode('rr')}
+                        className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                          cumulativeViewMode === 'rr'
+                            ? isDarkMode ? 'bg-zinc-800 text-sky-400 font-extrabold shadow-xs' : 'bg-white text-slate-900 font-extrabold shadow-xs'
+                            : 'text-zinc-400 hover:text-zinc-200'
+                        }`}
+                      >
+                        R-Multiple (R)
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Chart Canvas */}
+                  <div className="h-64 sm:h-72 w-full relative">
+                    {cumulativeChartData.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={cumulativeChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                          <defs>
+                            <linearGradient id="pnlGlowGrad" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor={metrics.netPnL >= 0 ? '#10B981' : '#F43F5E'} stopOpacity={0.3} />
+                              <stop offset="95%" stopColor={metrics.netPnL >= 0 ? '#10B981' : '#F43F5E'} stopOpacity={0.0} />
+                            </linearGradient>
+                            <linearGradient id="rrGlowGrad" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#0EA5E9" stopOpacity={0.3} />
+                              <stop offset="95%" stopColor="#0EA5E9" stopOpacity={0.0} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDarkMode ? '#27272a' : '#E2E8F0'} opacity={0.6} />
+                          <XAxis 
+                            dataKey="name" 
+                            stroke={isDarkMode ? '#71717a' : '#94A3B8'} 
+                            fontSize={11} 
+                            tickLine={false} 
+                            axisLine={{ stroke: isDarkMode ? '#27272a' : '#E2E8F0' }}
+                          />
+                          <YAxis 
+                            stroke={isDarkMode ? '#71717a' : '#94A3B8'} 
+                            fontSize={11} 
+                            tickLine={false} 
+                            axisLine={{ stroke: isDarkMode ? '#27272a' : '#E2E8F0' }}
+                            tickFormatter={(val) => cumulativeViewMode === 'pnl' ? `$${val}` : `${val}R`}
+                          />
+                          <ReferenceLine y={0} stroke={isDarkMode ? '#52525b' : '#cbd5e1'} strokeDasharray="4 4" />
+                          <Tooltip 
+                            content={({ active, payload }) => {
+                              if (active && payload && payload.length) {
+                                const data = payload[0].payload;
+                                return (
+                                  <div className={`p-3 rounded-xl border shadow-xl text-xs backdrop-blur-md transition-all ${
+                                    isDarkMode ? 'bg-zinc-950/95 border-zinc-750 text-zinc-100' : 'bg-white/95 border-slate-200 text-slate-900'
+                                  }`}>
+                                    <div className="flex items-center justify-between gap-3 mb-1.5 pb-1 border-b border-zinc-700/50">
+                                      <span className="font-extrabold">{data.pair} ({data.type})</span>
+                                      <span className="text-[10px] text-zinc-400 font-mono">{data.fullDate}</span>
+                                    </div>
+                                    <div className="space-y-1 font-mono">
+                                      <div className="flex justify-between gap-3">
+                                        <span className="text-zinc-400">Trade PnL:</span>
+                                        <span className={`font-bold ${data.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                          {data.pnl >= 0 ? '+' : ''}${data.pnl.toFixed(2)}
+                                        </span>
                                       </div>
-                                      <div className="space-y-1 font-mono">
-                                        <div className="flex justify-between gap-4">
-                                          <span className="text-zinc-400 font-sans">{data.type === 'START' ? 'Initial PnL:' : 'Trade PnL:'}</span>
-                                          <span className={`font-bold ${data.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                            {data.pnl >= 0 ? '+' : ''}${data.pnl.toFixed(2)}
-                                          </span>
-                                        </div>
-                                        <div className="flex justify-between gap-4">
-                                          <span className="text-zinc-400 font-sans">Cumulative PnL:</span>
-                                          <span className={`font-black ${data.total >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                            ${data.total.toFixed(2)}
-                                          </span>
-                                        </div>
-                                        <div className="flex justify-between gap-4 text-[10px]">
-                                          <span className="text-zinc-400 font-sans">Realized R:</span>
-                                          <span className="text-blue-400 font-bold">{data.runningRR}R</span>
-                                        </div>
+                                      <div className="flex justify-between gap-3">
+                                        <span className="text-zinc-400">Cumulative:</span>
+                                        <span className={`font-black ${data.total >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                          ${data.total.toFixed(2)}
+                                        </span>
                                       </div>
                                     </div>
-                                  );
-                                }
-                                return null;
-                              }}
-                            />
-                            <Area 
-                              type="monotone" 
-                              dataKey={cumulativeViewMode === 'pnl' ? 'total' : 'runningRR'} 
-                              stroke={cumulativeViewMode === 'pnl' ? (metrics.netPnL >= 0 ? '#10B981' : '#F43F5E') : '#3B82F6'} 
-                              strokeWidth={2.5} 
-                              fillOpacity={1} 
-                              fill={cumulativeViewMode === 'pnl' ? 'url(#pnlGlowGrad)' : 'url(#rrGlowGrad)'} 
-                            />
-                          </AreaChart>
-                        </ResponsiveContainer>
-                      ) : (
-                        <div className="h-full flex flex-col items-center justify-center text-slate-400">
-                          <Activity className="h-10 w-10 mb-2 stroke-1.5 opacity-50" />
-                          <p className="text-xs font-semibold">ဇယားပြသရန် လုံလောက်သော အရောင်းအဝယ်အချက်အလက်မရှိပါ။</p>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Mini Stats Footer */}
-                    <div className={`mt-4 pt-3 border-t grid grid-cols-3 gap-2 text-center text-xs ${
-                      isDarkMode ? 'border-zinc-800/80 text-zinc-400' : 'border-slate-200 text-slate-500'
-                    }`}>
-                      <div>
-                        <span className="text-[10px] block">Peak Balance</span>
-                        <strong className="font-mono text-zinc-200 font-black">
-                          ${cumulativeChartData.length > 0 ? Math.max(...cumulativeChartData.map(d => d.total)).toFixed(2) : '0.00'}
-                        </strong>
-                      </div>
-                      <div>
-                        <span className="text-[10px] block">Total Realized R</span>
-                        <strong className="font-mono text-blue-400 font-black">
-                          {cumulativeChartData.length > 0 ? cumulativeChartData[cumulativeChartData.length - 1].runningRR : 0}R
-                        </strong>
-                      </div>
-                      <div>
-                        <span className="text-[10px] block">Win Streak</span>
-                        <strong className="font-mono text-emerald-400 font-black">
-                          {metrics.maxWinStreak} Max
-                        </strong>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Right (1 Col): Trading Edge & Risk Diagnostics */}
-                  <div className={`p-5 sm:p-6 rounded-2xl border transition-all flex flex-col justify-between ${
-                    isDarkMode ? 'bg-zinc-900/70 border-zinc-800/80 text-zinc-100 shadow-xl shadow-black/20' : 'bg-white border-slate-200 shadow-sm text-slate-800'
-                  }`}>
-                    <div>
-                      {/* Header */}
-                      <div className="flex justify-between items-start mb-4">
-                        <div>
-                          <div className="flex items-center space-x-2">
-                            <h4 className="text-base font-extrabold tracking-tight">Edge & Risk Diagnostics</h4>
-                            <span className="p-1 rounded-md bg-amber-500/10 text-amber-400">
-                              <Scale className="h-3.5 w-3.5" />
-                            </span>
-                          </div>
-                          <p className={`text-xs mt-0.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
-                            စနစ်၏ သင်္ချာဆိုင်ရာ အားသာချက်နှင့် စွန့်စားမှု ဆန်းစစ်ချက်
-                          </p>
-                        </div>
-
-                        <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold ${
-                          metrics.profitFactor >= 1.5 ? 'bg-emerald-500/15 text-emerald-400' : metrics.profitFactor >= 1.0 ? 'bg-amber-500/15 text-amber-400' : 'bg-rose-500/15 text-rose-400'
-                        }`}>
-                          {metrics.profitFactor >= 2.0 ? 'Elite Edge' : metrics.profitFactor >= 1.4 ? 'Profitable' : metrics.profitFactor >= 1.0 ? 'Breakeven' : 'Needs Review'}
-                        </span>
-                      </div>
-
-                      {/* Section 1: Expectancy & Profit Factor */}
-                      <div className="grid grid-cols-2 gap-2.5 mb-3.5">
-                        <div className={`p-3 rounded-xl border ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800/80' : 'bg-slate-50 border-slate-200'}`}>
-                          <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
-                            <span>Expectancy</span>
-                            <Target className="h-3.5 w-3.5 text-blue-400" />
-                          </div>
-                          <p className={`text-base font-extrabold font-mono ${metrics.expectancy >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                            {metrics.expectancy >= 0 ? '+' : ''}${metrics.expectancy.toFixed(2)}
-                          </p>
-                          <span className="text-[10px] text-zinc-400 font-sans block mt-0.5">
-                            Trade တိုင်း၏ ပျမ်းမျှအမြတ်
-                          </span>
-                        </div>
-
-                        <div className={`p-3 rounded-xl border ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800/80' : 'bg-slate-50 border-slate-200'}`}>
-                          <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
-                            <span>Profit Factor</span>
-                            <Award className="h-3.5 w-3.5 text-amber-400" />
-                          </div>
-                          <p className={`text-base font-extrabold font-mono ${metrics.profitFactor >= 1.5 ? 'text-emerald-400' : metrics.profitFactor >= 1.0 ? 'text-amber-400' : 'text-rose-400'}`}>
-                            {metrics.profitFactor.toFixed(2)}
-                          </p>
-                          <span className="text-[10px] text-zinc-400 font-sans block mt-0.5">
-                            Wins / Losses အချိုး
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Section 2: BUY (Long) vs SELL (Short) Directional Split */}
-                      <div className={`p-3.5 rounded-xl border mb-3.5 ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800/80' : 'bg-slate-50 border-slate-200'}`}>
-                        <div className="flex items-center justify-between text-xs font-bold mb-2">
-                          <span>Directional Split (BUY vs SELL)</span>
-                          <span className="text-[10px] text-zinc-400 font-normal">စွမ်းဆောင်ရည် နှိုင်းယှဉ်ချက်</span>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-2 text-xs font-mono mb-2">
-                          {/* BUY Box */}
-                          <div className={`p-2 rounded-lg border ${isDarkMode ? 'bg-emerald-950/20 border-emerald-800/40' : 'bg-emerald-50/60 border-emerald-200'}`}>
-                            <div className="flex items-center justify-between mb-0.5">
-                              <span className="text-[10px] font-bold text-emerald-400">BUY (Long)</span>
-                              <span className="text-[10px] text-zinc-400">{directionPerformance.buysCount} trades</span>
-                            </div>
-                            <div className="flex items-baseline justify-between">
-                              <span className="text-xs font-bold text-emerald-400">{directionPerformance.buyWinRate.toFixed(0)}% WR</span>
-                              <span className={`text-[11px] font-bold ${directionPerformance.buyPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                {directionPerformance.buyPnL >= 0 ? '+' : ''}${directionPerformance.buyPnL.toFixed(2)}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* SELL Box */}
-                          <div className={`p-2 rounded-lg border ${isDarkMode ? 'bg-rose-950/20 border-rose-800/40' : 'bg-rose-50/60 border-rose-200'}`}>
-                            <div className="flex items-center justify-between mb-0.5">
-                              <span className="text-[10px] font-bold text-rose-400">SELL (Short)</span>
-                              <span className="text-[10px] text-zinc-400">{directionPerformance.sellsCount} trades</span>
-                            </div>
-                            <div className="flex items-baseline justify-between">
-                              <span className="text-xs font-bold text-rose-400">{directionPerformance.sellWinRate.toFixed(0)}% WR</span>
-                              <span className={`text-[11px] font-bold ${directionPerformance.sellPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                {directionPerformance.sellPnL >= 0 ? '+' : ''}${directionPerformance.sellPnL.toFixed(2)}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Visual Balance Bar */}
-                        <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden flex">
-                          <div 
-                            className="bg-emerald-500 h-full transition-all" 
-                            style={{ width: `${directionPerformance.buysCount + directionPerformance.sellsCount > 0 ? (directionPerformance.buysCount / (directionPerformance.buysCount + directionPerformance.sellsCount)) * 100 : 50}%` }} 
+                                  </div>
+                                );
+                              }
+                              return null;
+                            }}
                           />
-                          <div 
-                            className="bg-rose-500 h-full transition-all" 
-                            style={{ width: `${directionPerformance.buysCount + directionPerformance.sellsCount > 0 ? (directionPerformance.sellsCount / (directionPerformance.buysCount + directionPerformance.sellsCount)) * 100 : 50}%` }} 
+                          <Area 
+                            type="monotone" 
+                            dataKey={cumulativeViewMode === 'pnl' ? 'total' : 'runningRR'} 
+                            stroke={cumulativeViewMode === 'pnl' ? (metrics.netPnL >= 0 ? '#10B981' : '#F43F5E') : '#0EA5E9'} 
+                            strokeWidth={2.5} 
+                            fillOpacity={1} 
+                            fill={cumulativeViewMode === 'pnl' ? 'url(#pnlGlowGrad)' : 'url(#rrGlowGrad)'} 
                           />
-                        </div>
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="h-full flex flex-col items-center justify-center text-zinc-500">
+                        <Activity className="h-8 w-8 mb-2 stroke-1.5 opacity-40" />
+                        <p className="text-xs">No trade history available yet.</p>
                       </div>
-
-                      {/* Section 3: Risk & Capital Preservation Metrics */}
-                      <div className="space-y-2 text-xs">
-                        <div className={`p-2.5 rounded-xl border flex items-center justify-between ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800/80' : 'bg-slate-50 border-slate-200'}`}>
-                          <div className="flex items-center space-x-2">
-                            <Shield className="h-3.5 w-3.5 text-rose-400" />
-                            <span className="text-zinc-400 text-[11px]">Max Peak Drawdown</span>
-                          </div>
-                          <span className="font-mono font-bold text-rose-400">
-                            -${Math.max(0, ...cumulativeChartData.map(d => d.drawdown || 0)).toFixed(2)}
-                          </span>
-                        </div>
-
-                        <div className={`p-2.5 rounded-xl border flex items-center justify-between ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800/80' : 'bg-slate-50 border-slate-200'}`}>
-                          <div className="flex items-center space-x-2">
-                            <Activity className="h-3.5 w-3.5 text-blue-400" />
-                            <span className="text-zinc-400 text-[11px]">Payoff Ratio (Avg Win : Loss)</span>
-                          </div>
-                          <span className="font-mono font-bold text-zinc-200">
-                            1 : {Math.abs(metrics.avgLoss) > 0 ? (metrics.avgWin / Math.abs(metrics.avgLoss)).toFixed(2) : metrics.avgWin > 0 ? '∞' : '0.00'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Footer */}
-                    <div className={`mt-4 pt-3 border-t text-[11px] font-semibold flex items-center justify-between ${
-                      isDarkMode ? 'border-zinc-800/80 text-zinc-400' : 'border-slate-200 text-slate-500'
-                    }`}>
-                      <span>Capital Protection (BE Exits)</span>
-                      <span className="text-blue-400 font-mono">
-                        {metrics.beTrades} BE ({metrics.totalClosed > 0 ? ((metrics.beTrades / metrics.totalClosed) * 100).toFixed(0) : 0}%)
-                      </span>
-                    </div>
+                    )}
                   </div>
                 </div>
 
-                {/* 4. Asset Performance & Outcome Breakdown (Bottom 2 Grid) */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  {/* Asset Performance Breakdown (2 Cols) */}
-                  <div className={`lg:col-span-2 p-5 sm:p-6 rounded-2xl border transition-all ${
-                    isDarkMode ? 'bg-zinc-900/70 border-zinc-800/80 text-zinc-100 shadow-xl shadow-black/20' : 'bg-white border-slate-200 shadow-sm text-slate-800'
+                {/* 4. Directional Breakdown & Top Asset Breakdown Grid */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Directional Performance (Long vs Short) */}
+                  <div className={`p-5 sm:p-6 rounded-2xl border transition-all ${
+                    isDarkMode ? 'bg-zinc-900/60 border-zinc-800/80 text-zinc-100' : 'bg-white border-slate-200 text-slate-800 shadow-xs'
                   }`}>
                     <div className="flex items-center justify-between mb-4">
                       <div>
-                        <h4 className="text-base font-extrabold tracking-tight">Asset Pair Performance</h4>
+                        <h4 className="text-base font-black tracking-tight">Directional Edge</h4>
                         <p className={`text-xs mt-0.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
-                          ငွေကြေးအတွဲတစ်ခုချင်းစီအလိုက် ရလဒ်များနှင့် အမြတ်/အရှုံး ဆန်းစစ်ချက်
+                          BUY (Long) vs SELL (Short) Analysis
                         </p>
                       </div>
-                      <span className={`text-xs font-mono font-bold px-2.5 py-1 rounded-lg ${
+                      <span className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400">
+                        <Scale className="h-4 w-4" />
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 mb-4">
+                      {/* BUY Box */}
+                      <div className={`p-3.5 rounded-xl border ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800' : 'bg-slate-50 border-slate-200'}`}>
+                        <div className="flex items-center justify-between text-xs mb-1">
+                          <span className="font-extrabold text-emerald-400">BUY (Long)</span>
+                          <span className="text-[10px] text-zinc-400 font-mono">{directionPerformance.buysCount} trades</span>
+                        </div>
+                        <p className="text-xs text-zinc-300 font-bold font-mono">{directionPerformance.buyWinRate.toFixed(0)}% Win Rate</p>
+                        <p className={`text-sm font-black font-mono mt-1 ${directionPerformance.buyPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {directionPerformance.buyPnL >= 0 ? '+' : ''}${directionPerformance.buyPnL.toFixed(2)}
+                        </p>
+                      </div>
+
+                      {/* SELL Box */}
+                      <div className={`p-3.5 rounded-xl border ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800' : 'bg-slate-50 border-slate-200'}`}>
+                        <div className="flex items-center justify-between text-xs mb-1">
+                          <span className="font-extrabold text-rose-400">SELL (Short)</span>
+                          <span className="text-[10px] text-zinc-400 font-mono">{directionPerformance.sellsCount} trades</span>
+                        </div>
+                        <p className="text-xs text-zinc-300 font-bold font-mono">{directionPerformance.sellWinRate.toFixed(0)}% Win Rate</p>
+                        <p className={`text-sm font-black font-mono mt-1 ${directionPerformance.sellPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {directionPerformance.sellPnL >= 0 ? '+' : ''}${directionPerformance.sellPnL.toFixed(2)}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Ratio Bar */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[11px] text-zinc-400 font-medium">
+                        <span>BUY ({directionPerformance.buysCount})</span>
+                        <span>SELL ({directionPerformance.sellsCount})</span>
+                      </div>
+                      <div className="h-2 w-full bg-zinc-800 rounded-full overflow-hidden flex">
+                        <div 
+                          className="bg-emerald-500 h-full transition-all" 
+                          style={{ width: `${directionPerformance.buysCount + directionPerformance.sellsCount > 0 ? (directionPerformance.buysCount / (directionPerformance.buysCount + directionPerformance.sellsCount)) * 100 : 50}%` }} 
+                        />
+                        <div 
+                          className="bg-rose-500 h-full transition-all" 
+                          style={{ width: `${directionPerformance.buysCount + directionPerformance.sellsCount > 0 ? (directionPerformance.sellsCount / (directionPerformance.buysCount + directionPerformance.sellsCount)) * 100 : 50}%` }} 
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Top Asset Pairs */}
+                  <div className={`p-5 sm:p-6 rounded-2xl border transition-all ${
+                    isDarkMode ? 'bg-zinc-900/60 border-zinc-800/80 text-zinc-100' : 'bg-white border-slate-200 text-slate-800 shadow-xs'
+                  }`}>
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h4 className="text-base font-black tracking-tight">Top Asset Pairs</h4>
+                        <p className={`text-xs mt-0.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                          Performance by traded pair / symbol
+                        </p>
+                      </div>
+                      <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${
                         isDarkMode ? 'bg-zinc-800 text-zinc-300' : 'bg-slate-100 text-slate-700'
                       }`}>
-                        {pairPerformanceData.length} Pairs Traded
+                        {pairPerformanceData.length} Pairs
                       </span>
                     </div>
 
                     {pairPerformanceData.length > 0 ? (
-                      <div className="space-y-2.5">
-                        {pairPerformanceData.slice(0, 5).map((item, idx) => (
+                      <div className="space-y-2">
+                        {pairPerformanceData.slice(0, 4).map((item, idx) => (
                           <div 
                             key={idx} 
-                            className={`p-3 rounded-xl border flex items-center justify-between transition-all ${
-                              isDarkMode ? 'bg-zinc-950/40 border-zinc-800/70 hover:border-zinc-700' : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                            className={`p-2.5 sm:p-3 rounded-xl border flex items-center justify-between transition-all ${
+                              isDarkMode ? 'bg-zinc-950/40 border-zinc-850 hover:bg-zinc-850/40' : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
                             }`}
                           >
-                            <div className="flex items-center space-x-3 w-1/3">
-                              <span className="text-xs font-mono font-extrabold text-zinc-400">#{idx + 1}</span>
+                            <div className="flex items-center space-x-2.5">
+                              <span className="text-xs font-mono font-bold text-zinc-500">#{idx + 1}</span>
                               <div>
-                                <h5 className="text-sm font-black tracking-tight">{item.pair}</h5>
-                                <p className="text-[10px] text-zinc-400 font-medium">{item.trades} trades executed</p>
+                                <h5 className="text-xs sm:text-sm font-bold">{item.pair}</h5>
+                                <p className="text-[10px] text-zinc-400">{item.trades} trades • {item.winRate.toFixed(0)}% win</p>
                               </div>
                             </div>
 
-                            {/* Progress bar for Win Rate */}
-                            <div className="hidden sm:block w-1/3 px-4">
-                              <div className="flex justify-between text-[10px] font-mono font-bold mb-1">
-                                <span className="text-zinc-400">Win Rate</span>
-                                <span className={item.winRate >= 50 ? 'text-emerald-400' : 'text-rose-400'}>
-                                  {item.winRate.toFixed(0)}%
-                                </span>
-                              </div>
-                              <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
-                                <div 
-                                  className={`h-full rounded-full ${item.winRate >= 50 ? 'bg-emerald-400' : 'bg-rose-400'}`}
-                                  style={{ width: `${Math.min(100, Math.max(0, item.winRate))}%` }}
-                                />
-                              </div>
-                            </div>
-
-                            {/* Net PnL */}
                             <div className="text-right font-mono">
-                              <p className={`text-sm font-black ${item.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                              <p className={`text-xs sm:text-sm font-black ${item.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                                 {item.pnl >= 0 ? '+' : ''}${item.pnl.toFixed(2)}
                               </p>
-                              <span className="text-[10px] text-zinc-400 font-semibold">{item.wins}W - {item.trades - item.wins}L</span>
+                              <span className="text-[10px] text-zinc-400">{item.wins}W - {item.trades - item.wins}L</span>
                             </div>
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <p className="text-xs text-zinc-400 py-6 text-center">No asset breakdown data available yet.</p>
+                      <p className="text-xs text-zinc-400 py-6 text-center">No pair statistics available yet.</p>
                     )}
-                  </div>
-
-                  {/* Trade Outcome Breakdown (TP / SL / BE) */}
-                  <div className={`p-5 sm:p-6 rounded-2xl border transition-all flex flex-col justify-between ${
-                    isDarkMode ? 'bg-zinc-900/70 border-zinc-800/80 text-zinc-100 shadow-xl shadow-black/20' : 'bg-white border-slate-200 shadow-sm text-slate-800'
-                  }`}>
-                    <div>
-                      <h4 className="text-base font-extrabold tracking-tight">Outcome Distribution</h4>
-                      <p className={`text-xs mt-0.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
-                        အရောင်းအဝယ် ပြီးဆုံးမှု အခြေအနေ အချိုးအစား
-                      </p>
-
-                      <div className="space-y-3 mt-5">
-                        {/* Take Profit */}
-                        <div className="flex items-center justify-between p-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5">
-                          <div className="flex items-center space-x-2.5">
-                            <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                            <span className="text-xs font-bold text-emerald-400">Take Profit (TP)</span>
-                          </div>
-                          <span className="font-mono text-xs font-black text-emerald-400">
-                            {metrics.winTrades} ({dashboardFilteredTrades.length > 0 ? ((metrics.winTrades / dashboardFilteredTrades.length) * 100).toFixed(0) : 0}%)
-                          </span>
-                        </div>
-
-                        {/* Stop Loss */}
-                        <div className="flex items-center justify-between p-3 rounded-xl border border-rose-500/20 bg-rose-500/5">
-                          <div className="flex items-center space-x-2.5">
-                            <span className="h-2 w-2 rounded-full bg-rose-400" />
-                            <span className="text-xs font-bold text-rose-400">Stop Loss (SL)</span>
-                          </div>
-                          <span className="font-mono text-xs font-black text-rose-400">
-                            {metrics.lossTrades} ({dashboardFilteredTrades.length > 0 ? ((metrics.lossTrades / dashboardFilteredTrades.length) * 100).toFixed(0) : 0}%)
-                          </span>
-                        </div>
-
-                        {/* Breakeven */}
-                        <div className="flex items-center justify-between p-3 rounded-xl border border-zinc-700/40 bg-zinc-800/20">
-                          <div className="flex items-center space-x-2.5">
-                            <span className="h-2 w-2 rounded-full bg-zinc-400" />
-                            <span className="text-xs font-bold text-zinc-300">Breakeven (BE)</span>
-                          </div>
-                          <span className="font-mono text-xs font-black text-zinc-300">
-                            {metrics.beTrades} ({dashboardFilteredTrades.length > 0 ? ((metrics.beTrades / dashboardFilteredTrades.length) * 100).toFixed(0) : 0}%)
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className={`mt-5 pt-4 border-t text-[11px] font-semibold flex items-center justify-between ${
-                      isDarkMode ? 'border-zinc-800 text-zinc-400' : 'border-slate-200 text-slate-500'
-                    }`}>
-                      <span>Risk-Free Management</span>
-                      <span className="text-emerald-400 font-bold">Disciplined Execution</span>
-                    </div>
                   </div>
                 </div>
               </div>
@@ -5617,6 +5867,434 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                 </div>
               </div>
             )}
+
+            {/* CRYPTO & FOREX WATCHLIST TAB VIEW */}
+            {activeTab === 'watchlist' && (
+              <div className="space-y-5">
+                {/* Top Controls & Metrics Bar */}
+                <div className={`p-5 rounded-2xl border transition-all ${
+                  isDarkMode ? 'bg-zinc-900/50 border-zinc-800/70 text-zinc-100' : 'bg-white border-slate-200/80 shadow-xs'
+                }`}>
+                  {/* Header Row */}
+                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pb-4 border-b border-zinc-200/40 dark:border-zinc-800/60">
+                    <div className="flex items-center space-x-3">
+                      <div className={`p-2.5 rounded-xl ${isDarkMode ? 'bg-zinc-800 text-zinc-300' : 'bg-slate-100 text-slate-700'}`}>
+                        <Eye className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-lg font-bold tracking-tight">Crypto & Forex Watchlist</h3>
+                          <span className={`text-xs px-2 py-0.5 rounded-md font-medium ${
+                            isDarkMode ? 'bg-zinc-800 text-zinc-400' : 'bg-slate-100 text-slate-600'
+                          }`}>
+                            {watchlistItems.length} Setups
+                          </span>
+                        </div>
+                        <p className="text-xs text-zinc-400 mt-0.5">
+                          စောင့်ကြည့်လိုသော Market Setups, Key Levels နှင့် Chart ပုံများကို Google Drive / Sheet တွင် စနစ်တကျ မှတ်တမ်းတင်ခြင်း
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      {token && spreadsheetId && (
+                        <button
+                          type="button"
+                          onClick={() => user?.uid && loadWatchlist(user.uid, false)}
+                          disabled={isWatchlistLoading}
+                          className={`p-2 rounded-xl border transition-colors cursor-pointer ${
+                            isDarkMode ? 'border-zinc-800 bg-zinc-900/80 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200' : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-600'
+                          }`}
+                          title="Refresh Watchlist from Google"
+                        >
+                          <RefreshCw className={`h-4 w-4 ${isWatchlistLoading ? 'animate-spin text-zinc-300' : ''}`} />
+                        </button>
+                      )}
+                      
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingWatchlistItem(null);
+                          setWatchlistPair('');
+                          setWatchlistCategory('Crypto');
+                          setWatchlistBias('Bullish');
+                          setWatchlistStatus('Watching');
+                          setWatchlistTimeframe('4H');
+                          setWatchlistKeyLevels('');
+                          setWatchlistNotes('');
+                          setWatchlistImage('');
+                          setWatchlistError(null);
+                          setShowWatchlistModal(true);
+                        }}
+                        className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-zinc-100 hover:bg-white text-zinc-950 font-bold text-xs transition-all shadow-sm cursor-pointer active:scale-95"
+                      >
+                        <Plus className="h-4 w-4 stroke-[2.5]" />
+                        <span>Add Setup</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Summary Metric Counters */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 pt-4">
+                    <div className={`p-3 rounded-xl border ${isDarkMode ? 'bg-zinc-950/40 border-zinc-800/50' : 'bg-slate-50 border-slate-200/60'}`}>
+                      <span className="text-[10px] uppercase font-medium text-zinc-400 block mb-0.5">Total Pairs</span>
+                      <span className="text-lg font-bold text-zinc-100 dark:text-zinc-100">{watchlistStats.total}</span>
+                    </div>
+                    <div className={`p-3 rounded-xl border ${isDarkMode ? 'bg-zinc-950/40 border-zinc-800/50' : 'bg-slate-50 border-slate-200/60'}`}>
+                      <span className="text-[10px] uppercase font-medium text-zinc-400 block mb-0.5">Ready to Enter</span>
+                      <span className="text-lg font-bold text-zinc-200">{watchlistStats.ready}</span>
+                    </div>
+                    <div className={`p-3 rounded-xl border ${isDarkMode ? 'bg-zinc-950/40 border-zinc-800/50' : 'bg-slate-50 border-slate-200/60'}`}>
+                      <span className="text-[10px] uppercase font-medium text-zinc-400 block mb-0.5">Crypto</span>
+                      <span className="text-lg font-bold text-zinc-200">{watchlistStats.crypto}</span>
+                    </div>
+                    <div className={`p-3 rounded-xl border ${isDarkMode ? 'bg-zinc-950/40 border-zinc-800/50' : 'bg-slate-50 border-slate-200/60'}`}>
+                      <span className="text-[10px] uppercase font-medium text-zinc-400 block mb-0.5">Forex</span>
+                      <span className="text-lg font-bold text-zinc-200">{watchlistStats.forex}</span>
+                    </div>
+                    <div className={`p-3 rounded-xl border ${isDarkMode ? 'bg-zinc-950/40 border-zinc-800/50' : 'bg-slate-50 border-slate-200/60'}`}>
+                      <span className="text-[10px] uppercase font-medium text-emerald-400/90 block mb-0.5">Bullish</span>
+                      <span className="text-lg font-bold text-emerald-400">{watchlistStats.bullish}</span>
+                    </div>
+                    <div className={`p-3 rounded-xl border ${isDarkMode ? 'bg-zinc-950/40 border-zinc-800/50' : 'bg-slate-50 border-slate-200/60'}`}>
+                      <span className="text-[10px] uppercase font-medium text-rose-400/90 block mb-0.5">Bearish</span>
+                      <span className="text-lg font-bold text-rose-400">{watchlistStats.bearish}</span>
+                    </div>
+                  </div>
+
+                  {/* Filter Toolbar & Search */}
+                  <div className="mt-4 pt-4 border-t border-zinc-200/30 dark:border-zinc-800/60 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                    {/* Category Filter Pills */}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {(['ALL', 'Crypto', 'Forex', 'Commodity', 'Index'] as const).map((cat) => (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => setWatchlistFilterCategory(cat)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                            watchlistFilterCategory === cat
+                              ? (isDarkMode ? 'bg-zinc-750 text-white font-bold' : 'bg-slate-800 text-white font-bold')
+                              : (isDarkMode ? 'bg-zinc-950/60 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-850' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')
+                          }`}
+                        >
+                          {cat === 'ALL' ? 'All Assets' : cat}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Filters and Search */}
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      {/* Bias Filter */}
+                      <select
+                        value={watchlistFilterBias}
+                        onChange={(e) => setWatchlistFilterBias(e.target.value as any)}
+                        className={`text-xs font-medium px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer focus:outline-hidden ${
+                          isDarkMode ? 'bg-zinc-950 border-zinc-800/80 text-zinc-300' : 'bg-slate-50 border-slate-200 text-slate-700'
+                        }`}
+                      >
+                        <option value="ALL">All Biases</option>
+                        <option value="Bullish">Bullish</option>
+                        <option value="Bearish">Bearish</option>
+                        <option value="Neutral">Neutral</option>
+                        <option value="Monitoring">Monitoring</option>
+                      </select>
+
+                      {/* Status Filter */}
+                      <select
+                        value={watchlistFilterStatus}
+                        onChange={(e) => setWatchlistFilterStatus(e.target.value as any)}
+                        className={`text-xs font-medium px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer focus:outline-hidden ${
+                          isDarkMode ? 'bg-zinc-950 border-zinc-800/80 text-zinc-300' : 'bg-slate-50 border-slate-200 text-slate-700'
+                        }`}
+                      >
+                        <option value="ALL">All Statuses</option>
+                        <option value="Ready to Enter">Ready to Enter</option>
+                        <option value="Setup Forming">Setup Forming</option>
+                        <option value="Watching">Watching</option>
+                        <option value="Triggered">Triggered</option>
+                        <option value="Invalidated">Invalidated</option>
+                      </select>
+
+                      {/* Search Bar */}
+                      <div className="relative flex items-center min-w-[190px]">
+                        <Search className="h-3.5 w-3.5 absolute left-3 text-zinc-400" />
+                        <input
+                          type="text"
+                          placeholder="Search pairs, levels..."
+                          value={watchlistSearch}
+                          onChange={(e) => setWatchlistSearch(e.target.value)}
+                          className={`w-full pl-8 pr-7 py-1.5 text-xs font-medium rounded-lg border focus:outline-hidden transition-all ${
+                            isDarkMode 
+                              ? 'bg-zinc-950 border-zinc-800/80 text-zinc-100 focus:border-zinc-600' 
+                              : 'bg-slate-50 border-slate-200 text-slate-800 focus:border-slate-400'
+                          }`}
+                        />
+                        {watchlistSearch && (
+                          <button
+                            type="button"
+                            onClick={() => setWatchlistSearch('')}
+                            className="absolute right-2 text-zinc-400 hover:text-zinc-200 text-xs"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Watchlist Cards Grid */}
+                {isWatchlistLoading && watchlistItems.length === 0 ? (
+                  <div className="py-24 text-center">
+                    <RefreshCw className="h-7 w-7 animate-spin mx-auto text-zinc-400 mb-3" />
+                    <p className="text-xs font-medium text-zinc-400">Watchlist ဒေတာများ ရယူနေပါသည်...</p>
+                  </div>
+                ) : filteredWatchlistItems.length === 0 ? (
+                  <div className={`py-16 text-center border border-dashed rounded-2xl ${
+                    isDarkMode ? 'border-zinc-800/80 bg-zinc-900/20' : 'border-slate-200 bg-slate-50/50'
+                  }`}>
+                    <Eye className="h-10 w-10 text-zinc-500 mx-auto mb-2.5 stroke-1" />
+                    <h5 className="font-bold text-sm text-zinc-300 dark:text-zinc-200 mb-1">
+                      {watchlistSearch ? 'ကိုက်ညီသော Watchlist Setup မရှိပါ' : 'Watchlist Setups မရှိသေးပါ'}
+                    </h5>
+                    <p className="text-xs text-zinc-500 max-w-sm mx-auto mb-4">
+                      {watchlistSearch 
+                        ? 'အခြား စာလုံးများဖြင့် ရှာဖွေကြည့်ပါ သို့မဟုတ် Filter ကို ပြောင်းလဲပါ။' 
+                        : 'Crypto နှင့် Forex pairs များအတွက် စောင့်ကြည့်လိုသော Key Levels နှင့် Analysis ပုံများကို စတင်ထည့်သွင်းပါ။'}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingWatchlistItem(null);
+                        setWatchlistPair('BTC/USDT');
+                        setWatchlistCategory('Crypto');
+                        setWatchlistBias('Bullish');
+                        setWatchlistStatus('Watching');
+                        setWatchlistTimeframe('4H');
+                        setWatchlistKeyLevels('');
+                        setWatchlistNotes('');
+                        setWatchlistImage('');
+                        setShowWatchlistModal(true);
+                      }}
+                      className="inline-flex items-center space-x-1.5 px-3.5 py-2 bg-zinc-100 hover:bg-white text-zinc-950 font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      <span>Setup အသစ် ထည့်သွင်းရန်</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                    {filteredWatchlistItems.map((item) => {
+                      const isBull = item.bias === 'Bullish';
+                      const isBear = item.bias === 'Bearish';
+                      const isReady = item.status === 'Ready to Enter';
+
+                      return (
+                        <div
+                          key={item.id}
+                          className={`rounded-2xl border flex flex-col justify-between transition-all duration-200 overflow-hidden ${
+                            isDarkMode 
+                              ? 'border-zinc-800/70 bg-zinc-900/40 hover:border-zinc-700/80 hover:bg-zinc-900/60' 
+                              : 'border-slate-200 bg-white hover:border-slate-300'
+                          }`}
+                        >
+                          <div>
+                            {/* Chart Screenshot Thumbnail */}
+                            {item.imageUrl ? (
+                              <div 
+                                onClick={() => setLightboxImage(item.imageUrl || null)}
+                                className="relative h-40 w-full overflow-hidden bg-zinc-950 cursor-zoom-in border-b border-zinc-800/40 group/img"
+                                title="ပုံကို အပြည့်ချဲ့ကြည့်ရန် (Click to view full image)"
+                              >
+                                <img
+                                  src={getDirectDriveImageUrl(item.imageUrl)}
+                                  alt={item.pair}
+                                  className="h-full w-full object-cover transition-transform duration-300 group-hover/img:scale-103"
+                                />
+                                <div className="absolute inset-0 bg-black/30 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center">
+                                  <span className="bg-zinc-900/90 text-zinc-200 text-[11px] font-medium px-2.5 py-1 rounded-lg backdrop-blur-xs flex items-center gap-1.5 shadow-sm border border-zinc-700/50">
+                                    <ZoomIn className="h-3.5 w-3.5 text-zinc-300" />
+                                    <span>Zoom Chart</span>
+                                  </span>
+                                </div>
+                              </div>
+                            ) : null}
+
+                            {/* Card Content Area */}
+                            <div className="p-4 space-y-3">
+                              {/* Pair Header & Badges */}
+                              <div className="flex items-start justify-between gap-2">
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <h4 
+                                      onClick={() => setSelectedWatchlistItem(item)}
+                                      className="text-base font-bold tracking-tight hover:text-zinc-300 cursor-pointer text-zinc-100"
+                                    >
+                                      {item.pair}
+                                    </h4>
+                                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-md ${
+                                      isDarkMode ? 'bg-zinc-800 text-zinc-300' : 'bg-slate-100 text-slate-600'
+                                    }`}>
+                                      {item.category}
+                                    </span>
+                                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                                      isDarkMode ? 'bg-zinc-800 text-zinc-400' : 'bg-slate-100 text-slate-500'
+                                    }`}>
+                                      {item.timeframe}
+                                    </span>
+                                  </div>
+                                  <span className="text-[10px] text-zinc-500 block mt-0.5">
+                                    {item.createdAt ? new Date(item.createdAt).toLocaleDateString('my-MM', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Recently added'}
+                                  </span>
+                                </div>
+
+                                {/* Bias Badge */}
+                                <span className={`text-xs px-2.5 py-0.5 rounded-md font-semibold shrink-0 ${
+                                  isBull 
+                                    ? 'bg-emerald-500/10 text-emerald-400' 
+                                    : isBear 
+                                      ? 'bg-rose-500/10 text-rose-400' 
+                                      : 'bg-zinc-800 text-zinc-300'
+                                }`}>
+                                  {isBull ? '▲ Bullish' : isBear ? '▼ Bearish' : item.bias}
+                                </span>
+                              </div>
+
+                              {/* Status Row with interactive Quick-Select */}
+                              <div className={`flex items-center justify-between text-xs py-1 px-2.5 rounded-lg border ${
+                                isDarkMode ? 'bg-zinc-950/40 border-zinc-800/50' : 'bg-slate-50 border-slate-200/60'
+                              }`}>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-[10px] font-medium text-zinc-500">Status:</span>
+                                  <span className={`font-semibold text-xs ${
+                                    isReady ? 'text-emerald-400' : isBull ? 'text-zinc-200' : 'text-zinc-300'
+                                  }`}>
+                                    {item.status}
+                                  </span>
+                                </div>
+
+                                {/* Status Quick Switcher */}
+                                <select
+                                  value={item.status}
+                                  onChange={(e) => handleQuickWatchlistStatus(item, e.target.value as any)}
+                                  className={`text-[11px] font-medium px-1.5 py-0.5 rounded bg-transparent cursor-pointer focus:outline-hidden ${
+                                    isDarkMode ? 'text-zinc-400 hover:text-zinc-200' : 'text-slate-600'
+                                  }`}
+                                  title="Change status"
+                                >
+                                  <option value="Watching">Watching</option>
+                                  <option value="Setup Forming">Setup Forming</option>
+                                  <option value="Ready to Enter">Ready to Enter</option>
+                                  <option value="Triggered">Triggered</option>
+                                  <option value="Invalidated">Invalidated</option>
+                                </select>
+                              </div>
+
+                              {/* Key Levels Box */}
+                              {item.keyLevels && (
+                                <div className={`p-2.5 rounded-lg border text-xs ${
+                                  isDarkMode ? 'bg-zinc-950/50 border-zinc-800/50' : 'bg-slate-50 border-slate-200/60'
+                                }`}>
+                                  <span className="text-[10px] font-semibold text-zinc-400 block mb-1 flex items-center gap-1">
+                                    <Target className="h-3 w-3 text-zinc-400" />
+                                    <span>Key Levels / POI</span>
+                                  </span>
+                                  <p className="font-mono text-[11px] leading-relaxed text-zinc-300 break-words whitespace-pre-wrap">
+                                    {item.keyLevels}
+                                  </p>
+                                </div>
+                              )}
+
+                              {/* Notes & Analysis Preview */}
+                              {item.notes && (
+                                <div>
+                                  <p 
+                                    onClick={() => setSelectedWatchlistItem(item)}
+                                    className="text-xs leading-relaxed text-zinc-400 hover:text-zinc-200 line-clamp-2 cursor-pointer whitespace-pre-wrap"
+                                  >
+                                    {item.notes}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Card Footer Actions */}
+                          <div className={`p-3 border-t flex items-center justify-between gap-2 ${
+                            isDarkMode ? 'border-zinc-800/50 bg-zinc-950/20' : 'border-slate-200/60 bg-slate-50/50'
+                          }`}>
+                            {/* Convert to Trade CTA */}
+                            <button
+                              type="button"
+                              onClick={() => handleConvertWatchlistToTrade(item)}
+                              className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-md bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-semibold text-xs transition-all cursor-pointer active:scale-95"
+                              title="Convert this setup directly into a Trade Journal entry"
+                            >
+                              <Play className="h-3 w-3 fill-current" />
+                              <span>Log Trade</span>
+                            </button>
+
+                            <div className="flex items-center gap-1 shrink-0">
+                              {/* Open Google Doc if exists */}
+                              {item.docUrl && (
+                                <a
+                                  href={item.docUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+                                    isDarkMode ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
+                                  }`}
+                                  title="Open synchronized Google Doc"
+                                >
+                                  <FileText className="h-3.5 w-3.5" />
+                                </a>
+                              )}
+
+                              {/* Edit Button */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingWatchlistItem(item);
+                                  setWatchlistPair(item.pair);
+                                  setWatchlistCategory(item.category);
+                                  setWatchlistBias(item.bias);
+                                  setWatchlistStatus(item.status);
+                                  setWatchlistTimeframe(item.timeframe);
+                                  setWatchlistKeyLevels(item.keyLevels || '');
+                                  setWatchlistNotes(item.notes || '');
+                                  setWatchlistImage(item.imageUrl || '');
+                                  setWatchlistError(null);
+                                  setShowWatchlistModal(true);
+                                }}
+                                className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+                                  isDarkMode ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
+                                }`}
+                                title="Edit Setup"
+                              >
+                                <Edit2 className="h-3.5 w-3.5" />
+                              </button>
+
+                              {/* Delete Button */}
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteWatchlistItem(item.id)}
+                                className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+                                  isDarkMode ? 'text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10' : 'text-slate-500 hover:text-rose-600 hover:bg-rose-50'
+                                }`}
+                                title="Delete Setup"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </main>
@@ -6803,6 +7481,525 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                     className="bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs px-4 py-2 rounded-lg transition-colors cursor-pointer shadow-xs"
                   >
                     Close
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* NOTION-STYLE ADD / EDIT WATCHLIST SETUP MODAL */}
+        {showWatchlistModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+            {/* Backdrop */}
+            <div 
+              className="fixed inset-0 bg-slate-900/70 backdrop-blur-xs transition-opacity" 
+              onClick={() => !isSavingWatchlistItem && setShowWatchlistModal(false)}
+            />
+
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className={`w-full max-w-2xl rounded-2xl border shadow-2xl relative z-10 overflow-hidden my-8 max-h-[92vh] flex flex-col ${
+                isDarkMode ? 'bg-zinc-900 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 text-slate-900'
+              }`}
+            >
+              {/* Modal Header */}
+              <div className={`p-5 sm:p-6 border-b flex items-center justify-between shrink-0 ${
+                isDarkMode ? 'border-zinc-800/80 bg-zinc-950/40' : 'border-slate-100 bg-slate-50/50'
+              }`}>
+                <div className="flex items-center space-x-3">
+                  <div className={`p-2.5 rounded-xl ${isDarkMode ? 'bg-zinc-800 text-zinc-300' : 'bg-slate-100 text-slate-700'}`}>
+                    <Eye className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-base tracking-tight">
+                      {editingWatchlistItem ? 'Edit Watchlist Setup' : 'Add Watchlist Setup'}
+                    </h3>
+                    <p className="text-xs text-zinc-400">
+                      Crypto သို့မဟုတ် Forex စောင့်ကြည့် setup ကို Google Drive တွင် ချက်ချင်းသိမ်းဆည်းပါမည်
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowWatchlistModal(false)}
+                  disabled={isSavingWatchlistItem}
+                  className={`p-2 rounded-xl transition-colors cursor-pointer ${
+                    isDarkMode ? 'hover:bg-zinc-800 text-zinc-400' : 'hover:bg-slate-100 text-slate-500'
+                  }`}
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Modal Form Scroll Area */}
+              <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5">
+                {watchlistError && (
+                  <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                    <span>{watchlistError}</span>
+                  </div>
+                )}
+
+                {/* Pair Name Input & Quick Select Chips */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                    Asset / Trading Pair *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. BTC/USDT, EUR/USD, XAU/USD"
+                    value={watchlistPair}
+                    onChange={(e) => setWatchlistPair(e.target.value.toUpperCase())}
+                    className={`w-full px-3.5 py-2.5 rounded-xl border text-sm font-mono font-bold focus:outline-hidden transition-all ${
+                      isDarkMode 
+                        ? 'bg-zinc-950 border-zinc-800 text-zinc-100 focus:border-zinc-600' 
+                        : 'bg-slate-50 border-slate-200 text-slate-900 focus:border-slate-400'
+                    }`}
+                  />
+                  {/* Quick Pair Chips */}
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    <span className="text-[10px] text-zinc-500 self-center mr-1">Quick Select:</span>
+                    {['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'EUR/USD', 'GBP/USD', 'XAU/USD', 'USD/JPY'].map((p) => (
+                      <button
+                        type="button"
+                        key={p}
+                        onClick={() => {
+                          setWatchlistPair(p);
+                          setWatchlistCategory(p.includes('/') && !p.includes('USDT') ? 'Forex' : 'Crypto');
+                        }}
+                        className={`px-2 py-0.5 rounded text-[11px] font-mono font-semibold transition-all cursor-pointer ${
+                          watchlistPair === p 
+                            ? (isDarkMode ? 'bg-zinc-750 text-white font-bold' : 'bg-slate-800 text-white font-bold')
+                            : isDarkMode ? 'bg-zinc-800/80 text-zinc-400 hover:text-zinc-200' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Category & Timeframe Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Category */}
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
+                      Category
+                    </label>
+                    <select
+                      value={watchlistCategory}
+                      onChange={(e) => setWatchlistCategory(e.target.value as any)}
+                      className={`w-full px-3 py-2 rounded-xl border text-xs font-medium cursor-pointer focus:outline-hidden ${
+                        isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-800'
+                      }`}
+                    >
+                      <option value="Crypto">Crypto</option>
+                      <option value="Forex">Forex</option>
+                      <option value="Commodity">Commodity (Gold, Silver, Oil)</option>
+                      <option value="Index">Index (US30, NAS100, SPX)</option>
+                    </select>
+                  </div>
+
+                  {/* Timeframe */}
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
+                      Timeframe
+                    </label>
+                    <select
+                      value={watchlistTimeframe}
+                      onChange={(e) => setWatchlistTimeframe(e.target.value)}
+                      className={`w-full px-3 py-2 rounded-xl border text-xs font-medium cursor-pointer focus:outline-hidden ${
+                        isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-800'
+                      }`}
+                    >
+                      <option value="15M">15M (Scalping / Execution)</option>
+                      <option value="30M">30M (Short-Term)</option>
+                      <option value="1H">1H (Intraday Setup)</option>
+                      <option value="4H">4H (Swing / Trend)</option>
+                      <option value="Daily">Daily (HTF Direction)</option>
+                      <option value="Weekly">Weekly (Macro Bias)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Bias & Status Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Bias */}
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
+                      Market Bias
+                    </label>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {(['Bullish', 'Bearish', 'Neutral'] as const).map((b) => (
+                        <button
+                          type="button"
+                          key={b}
+                          onClick={() => setWatchlistBias(b)}
+                          className={`py-2 rounded-xl text-xs font-medium transition-all cursor-pointer text-center ${
+                            watchlistBias === b 
+                              ? (b === 'Bullish' ? 'bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40' :
+                                 b === 'Bearish' ? 'bg-rose-500/20 text-rose-300 font-bold border border-rose-500/40' :
+                                 'bg-zinc-800 text-zinc-100 font-bold border border-zinc-700')
+                              : isDarkMode ? 'bg-zinc-950 border border-zinc-800/80 text-zinc-400' : 'bg-slate-50 border border-slate-200 text-slate-600'
+                          }`}
+                        >
+                          {b === 'Bullish' ? '▲ Bullish' : b === 'Bearish' ? '▼ Bearish' : 'Neutral'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Status */}
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
+                      Setup Status
+                    </label>
+                    <select
+                      value={watchlistStatus}
+                      onChange={(e) => setWatchlistStatus(e.target.value as any)}
+                      className={`w-full px-3 py-2 rounded-xl border text-xs font-medium cursor-pointer focus:outline-hidden ${
+                        isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-800'
+                      }`}
+                    >
+                      <option value="Ready to Enter">Ready to Enter</option>
+                      <option value="Setup Forming">Setup Forming</option>
+                      <option value="Watching">Watching</option>
+                      <option value="Triggered">Triggered</option>
+                      <option value="Invalidated">Invalidated</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Key Levels & POI */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 flex items-center justify-between">
+                    <span>Key Levels / POI</span>
+                    <span className="text-[10px] text-zinc-500 font-normal lowercase">Optional</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Support: $64,200 | Resistance: $68,500 | Invalidation: $62,900"
+                    value={watchlistKeyLevels}
+                    onChange={(e) => setWatchlistKeyLevels(e.target.value)}
+                    className={`w-full px-3 py-2 rounded-xl border text-xs font-mono font-medium focus:outline-hidden ${
+                      isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100 focus:border-zinc-600' : 'bg-slate-50 border-slate-200 text-slate-800 focus:border-slate-400'
+                    }`}
+                  />
+                </div>
+
+                {/* Strategy Notes & Plan Textarea */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                    Analysis & Execution Notes
+                  </label>
+                  <textarea
+                    rows={4}
+                    placeholder="e.g. 4H Demand zone ထဲကို ဈေးဆင်းလာပြီး 15M မှာ MSS ဖြစ်သည်နှင့် ဝင်မည်..."
+                    value={watchlistNotes}
+                    onChange={(e) => setWatchlistNotes(e.target.value)}
+                    className={`w-full p-3 rounded-xl border text-xs leading-relaxed focus:outline-hidden resize-none ${
+                      isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100 focus:border-zinc-600' : 'bg-slate-50 border-slate-200 text-slate-800 focus:border-slate-400'
+                    }`}
+                  />
+                </div>
+
+                {/* Chart Screenshot Upload */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                    Chart Screenshot / Analysis Photo
+                  </label>
+                  {watchlistImage ? (
+                    <div className="relative rounded-xl overflow-hidden border border-zinc-800 max-h-56 bg-zinc-950 group">
+                      <img
+                        src={watchlistImage}
+                        alt="Watchlist Chart Preview"
+                        className="h-full w-full object-contain max-h-48 mx-auto"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setWatchlistImage('')}
+                        className="absolute top-2 right-2 bg-rose-600/90 hover:bg-rose-700 text-white p-1.5 rounded-lg shadow-md transition-colors cursor-pointer"
+                        title="Remove Image"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className={`border border-dashed rounded-xl p-5 text-center transition-all relative ${
+                      isDarkMode 
+                        ? 'border-zinc-800 hover:border-zinc-700 hover:bg-zinc-950/40 bg-zinc-950/20' 
+                        : 'border-slate-200 hover:border-slate-300 hover:bg-slate-100 bg-slate-50/20'
+                    }`}>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageChangeWatchlist}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                      />
+                      <div className="flex items-center justify-center gap-2 text-xs font-semibold text-zinc-300 mb-1">
+                        <ImageIcon className="h-4 w-4 text-zinc-400" />
+                        <span>Chart ပုံတင်ရန် (Upload Chart Image)</span>
+                      </div>
+                      <p className="text-[11px] text-zinc-500">နှိပ်ပါ သို့မဟုတ် ပုံကို ဆွဲထည့်ပါ (Auto-uploaded to Google Drive)</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Modal Actions Footer */}
+              <div className={`p-4 sm:p-5 border-t flex items-center justify-end gap-3 shrink-0 ${
+                isDarkMode ? 'border-zinc-800/80 bg-zinc-950/40' : 'border-slate-100 bg-slate-50/50'
+              }`}>
+                <button
+                  type="button"
+                  onClick={() => setShowWatchlistModal(false)}
+                  disabled={isSavingWatchlistItem}
+                  className={`px-4 py-2 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
+                    isDarkMode ? 'hover:bg-zinc-800 text-zinc-400' : 'hover:bg-slate-200 text-slate-600'
+                  }`}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSaveWatchlistItem}
+                  disabled={isSavingWatchlistItem || !watchlistPair.trim()}
+                  className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-zinc-100 hover:bg-white active:scale-95 disabled:opacity-50 text-zinc-950 font-bold text-xs shadow-sm transition-all cursor-pointer"
+                >
+                  {isSavingWatchlistItem ? (
+                    <>
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                      <span>Drive သို့ သိမ်းဆည်းနေပါသည်...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-3.5 w-3.5" />
+                      <span>{editingWatchlistItem ? 'Update Setup' : 'Save Setup'}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* NOTION-STYLE WATCHLIST SETUP DETAIL INSPECTOR MODAL */}
+        {selectedWatchlistItem && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+            {/* Backdrop */}
+            <div 
+              className="fixed inset-0 bg-slate-900/75 backdrop-blur-xs transition-opacity" 
+              onClick={() => setSelectedWatchlistItem(null)}
+            />
+
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className={`w-full max-w-3xl rounded-2xl border shadow-2xl relative z-10 overflow-hidden my-8 max-h-[92vh] flex flex-col ${
+                isDarkMode ? 'bg-zinc-900 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 text-slate-900'
+              }`}
+            >
+              {/* Modal Header */}
+              <div className={`p-5 sm:p-6 border-b flex items-center justify-between shrink-0 ${
+                isDarkMode ? 'border-zinc-800/80 bg-zinc-950/40' : 'border-slate-100 bg-slate-50/50'
+              }`}>
+                <div className="flex items-center space-x-3">
+                  <div className={`p-2.5 rounded-xl ${isDarkMode ? 'bg-zinc-800 text-zinc-300' : 'bg-slate-100 text-slate-700'}`}>
+                    <Eye className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-bold text-lg tracking-tight">{selectedWatchlistItem.pair}</h3>
+                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-md ${
+                        isDarkMode ? 'bg-zinc-800 text-zinc-300' : 'bg-slate-100 text-slate-700'
+                      }`}>
+                        {selectedWatchlistItem.category}
+                      </span>
+                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400">
+                        {selectedWatchlistItem.timeframe}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-zinc-400 mt-0.5">
+                      {selectedWatchlistItem.createdAt ? new Date(selectedWatchlistItem.createdAt).toLocaleString('my-MM') : 'Recently added'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const item = selectedWatchlistItem;
+                      setSelectedWatchlistItem(null);
+                      setEditingWatchlistItem(item);
+                      setWatchlistPair(item.pair);
+                      setWatchlistCategory(item.category);
+                      setWatchlistBias(item.bias);
+                      setWatchlistStatus(item.status);
+                      setWatchlistTimeframe(item.timeframe);
+                      setWatchlistKeyLevels(item.keyLevels || '');
+                      setWatchlistNotes(item.notes || '');
+                      setWatchlistImage(item.imageUrl || '');
+                      setShowWatchlistModal(true);
+                    }}
+                    className={`p-2 rounded-xl border transition-colors cursor-pointer ${
+                      isDarkMode ? 'border-zinc-800 hover:bg-zinc-800 text-zinc-300' : 'border-slate-200 hover:bg-slate-100 text-slate-700'
+                    }`}
+                    title="Edit Setup"
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedWatchlistItem(null)}
+                    className={`p-2 rounded-xl transition-colors cursor-pointer ${
+                      isDarkMode ? 'hover:bg-zinc-800 text-zinc-400' : 'hover:bg-slate-100 text-slate-500'
+                    }`}
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Modal Body Scroll Area */}
+              <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
+                {/* Status & Bias Row */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className={`p-4 rounded-xl border ${isDarkMode ? 'bg-zinc-950/40 border-zinc-800/60' : 'bg-slate-50 border-slate-200'}`}>
+                    <span className="text-[10px] uppercase font-semibold text-zinc-400 block mb-1">Market Bias</span>
+                    <span className={`text-sm font-bold flex items-center gap-1.5 ${
+                      selectedWatchlistItem.bias === 'Bullish' ? 'text-emerald-400' :
+                      selectedWatchlistItem.bias === 'Bearish' ? 'text-rose-400' : 'text-zinc-300'
+                    }`}>
+                      {selectedWatchlistItem.bias === 'Bullish' ? '▲ Bullish (အဝယ်ဘက် အသာစီး)' :
+                       selectedWatchlistItem.bias === 'Bearish' ? '▼ Bearish (အရောင်းဘက် အသာစီး)' :
+                       selectedWatchlistItem.bias}
+                    </span>
+                  </div>
+
+                  <div className={`p-4 rounded-xl border ${isDarkMode ? 'bg-zinc-950/40 border-zinc-800/60' : 'bg-slate-50 border-slate-200'}`}>
+                    <span className="text-[10px] uppercase font-semibold text-zinc-400 block mb-1">Execution Status</span>
+                    <span className={`text-sm font-bold flex items-center gap-1.5 ${
+                      selectedWatchlistItem.status === 'Ready to Enter' ? 'text-emerald-400' : 'text-zinc-200'
+                    }`}>
+                      {selectedWatchlistItem.status}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Key Levels */}
+                {selectedWatchlistItem.keyLevels && (
+                  <div className={`p-4 rounded-xl border ${isDarkMode ? 'bg-zinc-950/50 border-zinc-800/60' : 'bg-slate-50 border-slate-200'}`}>
+                    <h5 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-2 flex items-center gap-1.5">
+                      <Target className="h-4 w-4 text-zinc-400" />
+                      <span>Key Levels & POI</span>
+                    </h5>
+                    <p className="font-mono text-xs leading-relaxed text-zinc-200 whitespace-pre-wrap">
+                      {selectedWatchlistItem.keyLevels}
+                    </p>
+                  </div>
+                )}
+
+                {/* Chart Screenshot */}
+                {selectedWatchlistItem.imageUrl && (
+                  <div className="space-y-2">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-zinc-400 block">
+                      Technical Chart Screenshot
+                    </span>
+                    <div 
+                      onClick={() => setLightboxImage(selectedWatchlistItem.imageUrl || null)}
+                      className="rounded-xl overflow-hidden border border-zinc-800 bg-zinc-950 cursor-zoom-in group max-h-96 flex items-center justify-center"
+                    >
+                      <img
+                        src={getDirectDriveImageUrl(selectedWatchlistItem.imageUrl)}
+                        alt={selectedWatchlistItem.pair}
+                        className="w-full object-contain max-h-96 transition-transform duration-300 group-hover:scale-102"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Analysis Notes */}
+                {selectedWatchlistItem.notes && (
+                  <div className="space-y-2">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-zinc-400 block">
+                      Strategy & Execution Notes
+                    </span>
+                    <div className={`p-4 rounded-xl border leading-relaxed text-xs sm:text-sm whitespace-pre-wrap ${
+                      isDarkMode ? 'bg-zinc-950/40 border-zinc-800/60 text-zinc-200' : 'bg-slate-50 border-slate-200 text-slate-800'
+                    }`}>
+                      {selectedWatchlistItem.notes}
+                    </div>
+                  </div>
+                )}
+
+                {/* Synced Google Doc Link */}
+                {selectedWatchlistItem.docUrl && (
+                  <div className={`p-4 rounded-xl border flex items-center justify-between ${
+                    isDarkMode ? 'bg-zinc-950/30 border-zinc-800/60' : 'bg-slate-50 border-slate-200'
+                  }`}>
+                    <div className="flex items-center gap-2 text-xs">
+                      <FileText className="h-4 w-4 text-zinc-400" />
+                      <span className="font-medium text-zinc-300">Google Drive Document Synced</span>
+                    </div>
+                    <a
+                      href={selectedWatchlistItem.docUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-300 hover:text-white underline"
+                    >
+                      <span>Open in Google Docs</span>
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer Actions */}
+              <div className={`p-4 sm:p-5 border-t flex items-center justify-between gap-3 shrink-0 ${
+                isDarkMode ? 'border-zinc-800/80 bg-zinc-950/40' : 'border-slate-100 bg-slate-50/50'
+              }`}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const id = selectedWatchlistItem.id;
+                    setSelectedWatchlistItem(null);
+                    handleDeleteWatchlistItem(id);
+                  }}
+                  className="inline-flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>Delete Setup</span>
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedWatchlistItem(null)}
+                    className={`px-4 py-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
+                      isDarkMode ? 'hover:bg-zinc-800 text-zinc-400' : 'hover:bg-slate-200 text-slate-600'
+                    }`}
+                  >
+                    Close
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const item = selectedWatchlistItem;
+                      setSelectedWatchlistItem(null);
+                      handleConvertWatchlistToTrade(item);
+                    }}
+                    className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-semibold text-xs shadow-sm transition-all cursor-pointer"
+                  >
+                    <Play className="h-3.5 w-3.5 fill-current" />
+                    <span>Log as Executed Trade</span>
                   </button>
                 </div>
               </div>
