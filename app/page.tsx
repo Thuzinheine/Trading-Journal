@@ -285,14 +285,17 @@ export default function Home() {
     const overlapOpen = currentDec >= 13 && currentDec < 16.5;
 
     const pad = (n: number) => n.toString().padStart(2, '0');
-    const timeStr = `${pad(utcHours)}:${pad(utcMinutes)}:${pad(currentTime.getUTCSeconds())} UTC`;
+    const localHours = currentTime.getHours();
+    const localMinutes = currentTime.getMinutes();
+    const localSeconds = currentTime.getSeconds();
+    const timeStr = `${pad(localHours)}:${pad(localMinutes)}:${pad(localSeconds)}`;
 
     return { tokyoOpen, londonOpen, nyOpen, overlapOpen, timeStr };
   }, [currentTime]);
 
   // Dashboard Controls & Filters State
   const [dashboardTimeframe, setDashboardTimeframe] = useState<'all' | '30d' | '7d'>('all');
-  const [cumulativeViewMode, setCumulativeViewMode] = useState<'pnl' | 'rr'>('pnl');
+  const [cumulativeViewMode, setCumulativeViewMode] = useState<'pnl' | 'rr' | 'drawdown'>('pnl');
 
   // NFP & CPI Macro Indicators State
   const [selectedIndicatorMonth, setSelectedIndicatorMonth] = useState('Aug 2026');
@@ -508,6 +511,8 @@ export default function Home() {
   const [watchlistFilterBias, setWatchlistFilterBias] = useState<'ALL' | 'Bullish' | 'Bearish' | 'Neutral' | 'Monitoring'>('ALL');
   const [watchlistFilterStatus, setWatchlistFilterStatus] = useState<'ALL' | 'Watching' | 'Setup Forming' | 'Ready to Enter' | 'Triggered' | 'Invalidated'>('ALL');
   const [watchlistSearch, setWatchlistSearch] = useState('');
+  const [openWatchlistStatusId, setOpenWatchlistStatusId] = useState<string | null>(null);
+  const [journalSortOrder, setJournalSortOrder] = useState<'newest' | 'oldest'>('newest');
 
   // Learning Notes States
   const [learningNotes, setLearningNotes] = useState<LearningNote[]>([]);
@@ -697,15 +702,23 @@ export default function Home() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Escape key to close image lightbox preview
+  // Escape key to close image lightbox preview & click outside to close status menus
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setLightboxImage(null);
+        setOpenWatchlistStatusId(null);
       }
     };
+    const handleClickOutside = () => {
+      setOpenWatchlistStatusId(null);
+    };
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('click', handleClickOutside);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('click', handleClickOutside);
+    };
   }, []);
 
   const loadTrades = async (accessToken: string, sheetId: string) => {
@@ -2261,6 +2274,20 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
           tradePhotoAfter: formData.tradePhotoAfter,
         };
 
+        // Optimistic UI update: put newly created trade at the top of the local state
+        const maxRow = trades.length > 0 ? Math.max(...trades.map(t => t.row || 0)) : 1;
+        const optimisticTrade: Trade = {
+          ...newTrade,
+          row: maxRow + 1,
+        };
+        setTrades(prev => {
+          const next = [optimisticTrade, ...prev];
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('trading_trades', JSON.stringify(next));
+          }
+          return next;
+        });
+
         setShowFormModal(false);
 
         // Persist to Google Sheet
@@ -2326,9 +2353,9 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
     }
   };
 
-  // Filtered & Searched Trades
+  // Filtered & Searched Trades (Sorted with Newest First by default)
   const filteredTrades = useMemo(() => {
-    return trades.filter(t => {
+    const list = trades.filter(t => {
       const matchSearch = t.pair.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           (t.watchlist && t.watchlist.toLowerCase().includes(searchQuery.toLowerCase())) ||
                           t.notes.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -2341,7 +2368,30 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
 
       return matchSearch && matchStatus;
     });
-  }, [trades, searchQuery, filterStatus]);
+
+    return list.sort((a, b) => {
+      if (journalSortOrder === 'oldest') {
+        const numA = parseInt(a.tradeNumber || '0', 10);
+        const numB = parseInt(b.tradeNumber || '0', 10);
+        if (!isNaN(numA) && !isNaN(numB) && numA !== numB) return numA - numB;
+        if (a.date && b.date && a.date !== b.date) {
+          const dateDiff = new Date(a.date).getTime() - new Date(b.date).getTime();
+          if (!isNaN(dateDiff) && dateDiff !== 0) return dateDiff;
+        }
+        return (a.row || 0) - (b.row || 0);
+      } else {
+        // Default: Newest first (highest trade number, latest date, or latest row first)
+        const numA = parseInt(a.tradeNumber || '0', 10);
+        const numB = parseInt(b.tradeNumber || '0', 10);
+        if (!isNaN(numA) && !isNaN(numB) && numA !== numB) return numB - numA;
+        if (a.date && b.date && a.date !== b.date) {
+          const dateDiff = new Date(b.date).getTime() - new Date(a.date).getTime();
+          if (!isNaN(dateDiff) && dateDiff !== 0) return dateDiff;
+        }
+        return (b.row || 0) - (a.row || 0);
+      }
+    });
+  }, [trades, searchQuery, filterStatus, journalSortOrder]);
 
   // Helper to parse string PnL fields to numeric values for charts & stats
   const parsePnLValue = (pnlStr: string | null, winLoss?: string): number => {
@@ -2426,17 +2476,32 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
       return val < worst ? val : worst;
     }, Infinity);
 
-    // Calculate streaks
+    // Calculate streaks and drawdown
     let currentStreak = 0;
     let maxWinStreak = 0;
-    let tempStreak = 0;
+    let maxLossStreak = 0;
+    let tempWinStreak = 0;
+    let tempLossStreak = 0;
+    let runningForDD = 0;
+    let peakForDD = 0;
+    let maxDrawdown = 0;
+
     for (const t of closedTrades) {
-      const isWin = t.winLoss === 'TP' || (t.winLoss === 'Trailing Stop' && parsePnLValue(t.pnl, t.winLoss) > 0);
+      const pnlVal = parsePnLValue(t.pnl, t.winLoss);
+      runningForDD += pnlVal;
+      if (runningForDD > peakForDD) peakForDD = runningForDD;
+      const dd = peakForDD - runningForDD;
+      if (dd > maxDrawdown) maxDrawdown = dd;
+
+      const isWin = t.winLoss === 'TP' || (t.winLoss === 'Trailing Stop' && pnlVal > 0);
       if (isWin) {
-        tempStreak++;
-        if (tempStreak > maxWinStreak) maxWinStreak = tempStreak;
+        tempWinStreak++;
+        tempLossStreak = 0;
+        if (tempWinStreak > maxWinStreak) maxWinStreak = tempWinStreak;
       } else if (t.winLoss === 'SL') {
-        tempStreak = 0;
+        tempLossStreak++;
+        tempWinStreak = 0;
+        if (tempLossStreak > maxLossStreak) maxLossStreak = tempLossStreak;
       }
     }
     // Current streak (from newest)
@@ -2451,6 +2516,9 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
       }
     }
 
+    const totalRR = closedTrades.reduce((sum, t) => sum + parseRRValue(t.rr, t.winLoss), 0);
+    const avgRR = totalClosed > 0 ? totalRR / totalClosed : 0;
+
     return {
       totalTrades,
       openTrades,
@@ -2459,13 +2527,18 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
       winRate,
       avgWin,
       avgLoss,
+      totalWins,
+      totalLosses,
       profitFactor,
       expectancy,
       winTrades,
       lossTrades,
       beTrades: beTradesList.length,
       maxWinStreak,
+      maxLossStreak,
       currentStreak,
+      maxDrawdown,
+      avgRR,
       bestTrade: bestTrade === -Infinity ? 0 : bestTrade,
       worstTrade: worstTrade === Infinity ? 0 : worstTrade,
     };
@@ -2514,7 +2587,7 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
       result.push({
         name: t.date ? t.date.slice(5) : `#${index}`,
         fullDate: t.date || 'Unknown',
-        tradeNum: t.no || `#${index}`,
+        tradeNum: t.tradeNumber || `#${index}`,
         pnl: pnlVal,
         total: parseFloat(runningTotal.toFixed(2)),
         rrVal: parseFloat(rrVal.toFixed(1)),
@@ -2993,12 +3066,9 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                 {activeTab === 'watchlist' && <Eye className="h-4 w-4 text-amber-500" />}
                 {activeTab === 'alignment' && <Percent className="h-4 w-4 text-amber-500" />}
                 {activeTab === 'journal' && <Layers className="h-4 w-4" />}
-                {activeTab === 'strategy' && <BookOpen className="h-4 w-4" />}
-                {activeTab === 'notes' && <StickyNote className="h-4 w-4" />}
                 {activeTab === 'learning' && <ImageIcon className="h-4 w-4 text-teal-400" />}
                 {activeTab === 'micro' && <Zap className="h-4 w-4 text-amber-400" />}
                 {activeTab === 'macro' && <Globe className="h-4 w-4 text-sky-400" />}
-                {activeTab === 'fomc' && <Calendar className="h-4 w-4" />}
               </div>
               <div>
                 <div className="flex items-center space-x-2">
@@ -3008,11 +3078,8 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                     {activeTab === 'alignment' && 'Position Alignment Calculator'}
                     {activeTab === 'journal' && 'Trading Journal'}
                     {activeTab === 'learning' && 'Learning Notes & Strategy Vault'}
-                    {activeTab === 'strategy' && 'Trading Playbook & Strategy'}
-                    {activeTab === 'notes' && 'Learning Notes & Case Studies'}
                     {activeTab === 'micro' && 'Micro Framework (LTF Checklist)'}
-                    {activeTab === 'macro' && 'Macro Framework (HTF Matrix)'}
-                    {activeTab === 'fomc' && 'FOMC Economic Calendar & Fed Watch'}
+                    {activeTab === 'macro' && 'Macro Framework (HTF Matrix & FOMC)'}
                   </h1>
                   <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
                     isDarkMode ? 'bg-zinc-800 text-zinc-400' : 'bg-slate-100 text-slate-600'
@@ -3026,11 +3093,8 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                   {activeTab === 'alignment' && 'Precision position sizing, isolated leverage alignment & SL distance engine'}
                   {activeTab === 'journal' && `${filteredTrades.length} Trades recorded • Synced with Google Sheets`}
                   {activeTab === 'learning' && `${learningNotes.length} Lessons & Case Studies stored in Google Drive`}
-                  {activeTab === 'strategy' && 'Document your setups, risk management rules & execution criteria'}
-                  {activeTab === 'notes' && 'Visual chart breakdowns, lessons learned & market observations'}
                   {activeTab === 'micro' && 'Lower Timeframe execution triggers, FVG & liquidity sweeps'}
-                  {activeTab === 'macro' && 'Higher Timeframe bias, demand/supply zones & macro sentiment'}
-                  {activeTab === 'fomc' && 'Federal Reserve meeting dates, rate projections & CPI/NFP tracker'}
+                  {activeTab === 'macro' && 'Higher Timeframe bias, demand/supply zones & FOMC Fed Watch'}
                 </p>
               </div>
             </div>
@@ -3317,79 +3381,182 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
         ) : (
           /* Main Dashboard UI */
           <div className="space-y-8">
-            {/* Top Toolbar / Tab Switcher (Redesigned as Page Header with Sync Status) */}
-            {activeTab !== 'overview' && (
-              <div className={`flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-5 rounded-2xl border transition-all ${
-                isDarkMode 
-                  ? 'bg-zinc-900/50 border-zinc-800/80 text-zinc-100' 
-                  : 'bg-white border-slate-200/80 text-slate-800'
-              }`}>
-                <div>
-                  <h2 className="text-xl font-bold tracking-tight">
-                    {activeTab === 'journal' && 'Trading Journal (အရောင်းအဝယ်မှတ်တမ်း)'}
-                    {activeTab === 'micro' && 'Micro Analysis (အသေးစိတ်အရောင်းအဝယ်ဆန်းစစ်ချက်)'}
-                    {activeTab === 'macro' && 'Macro Analysis (အခြေခံစီးပွားရေးနှင့် ဈေးကွက်ဆန်းစစ်ချက်)'}
-                    {activeTab === 'alignment' && 'Position & Alignment (အရွယ်အစားနှင့် စွန့်စားမှုတွက်ချက်မှု)'}
-                    {activeTab === 'learning' && 'Learning Notes (သင်ခန်းစာနှင့် လေ့လာတွေ့ရှိချက်များ)'}
-                  </h2>
-                  <p className={`text-xs mt-1 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
-                    {activeTab === 'journal' && 'Google Sheet နှင့် ချိတ်ဆက်ပြီး သင့် Trading Data များကို အချိန်နှင့်တပြေးညီ မှတ်တမ်းတင်ပါ'}
-                    {activeTab === 'micro' && 'အချိန်တို (LTF) Chart များနှင့် Price Action Confirmation များကို စစ်ဆေးပါ'}
-                    {activeTab === 'macro' && 'Fed FOMC အတိုးနှုန်းခန့်မှန်းချက်များနှင့် အဓိက Economic Data များကို စောင့်ကြည့်ပါ'}
-                    {activeTab === 'alignment' && 'Lot Size, Margin, Leverage နှင့် Risk to Reward တိကျစွာ တွက်ချက်ပါ'}
-                    {activeTab === 'learning' && 'Trading မှတ်စုများ၊ Chart ပုံများနှင့် ဗျူဟာသင်ခန်းစာများကို သိမ်းဆည်းပါ'}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* OVERVIEW DASHBOARD VIEW - CLEAN, MODERN & UNCLUTTERED */}
+            {/* OVERVIEW DASHBOARD VIEW - HIGH PERFORMANCE TRADING TERMINAL */}
             {activeTab === 'overview' && (
               <div className="space-y-6">
-                {/* 1. Header Command & Filter Bar */}
-                <div className={`p-4 sm:p-5 rounded-2xl border transition-all ${
-                  isDarkMode 
-                    ? 'bg-zinc-900/60 border-zinc-800/80 text-zinc-100' 
-                    : 'bg-white border-slate-200/90 shadow-xs text-slate-900'
-                }`}>
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    {/* Title & Status */}
-                    <div className="flex items-center space-x-3">
-                      <div className={`p-2.5 rounded-xl border shrink-0 ${
-                        isDarkMode 
-                          ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
-                          : 'bg-emerald-50 border-emerald-200 text-emerald-600'
+                {/* 1. Executive 6-Card Balanced Performance Matrix */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5">
+                  {/* Card 1: Net Profit / Loss */}
+                  <div className={`p-4 rounded-2xl border transition-all flex flex-col justify-between ${
+                    isDarkMode ? 'bg-zinc-900/60 border-zinc-800/80 text-zinc-100' : 'bg-white border-slate-200 text-slate-800 shadow-xs'
+                  }`}>
+                    <div className="flex items-center justify-between text-xs mb-2">
+                      <span className="font-bold text-zinc-400">Net Profit ($)</span>
+                      <span className={`p-1.5 rounded-lg ${metrics.netPnL >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                        {metrics.netPnL >= 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
+                      </span>
+                    </div>
+                    <div>
+                      <h3 className={`text-xl sm:text-2xl font-black font-mono tracking-tight ${
+                        metrics.netPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'
                       }`}>
-                        <TrendingUp className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <h2 className="text-lg sm:text-xl font-black tracking-tight">Performance Overview</h2>
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-mono font-bold border ${
-                            metrics.netPnL >= 0 
-                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
-                              : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
-                          }`}>
-                            {metrics.netPnL >= 0 ? '● Profitable' : '● Drawdown'}
-                          </span>
-                        </div>
-                        <p className={`text-xs mt-0.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
-                          အရောင်းအဝယ်မှတ်တမ်းများနှင့် အမြတ်/အရှုံး တိုးတက်မှုမျဉ်းကွေး အကျဉ်းချုပ်
-                        </p>
+                        {metrics.netPnL >= 0 ? '+' : ''}${metrics.netPnL.toFixed(2)}
+                      </h3>
+                      <div className="flex items-center justify-between text-[11px] font-mono text-zinc-400 mt-1.5">
+                        <span>{dashboardFilteredTrades.length} Trades</span>
+                        <span className="text-emerald-400 font-semibold">{metrics.winTrades} Won</span>
                       </div>
                     </div>
+                  </div>
 
-                    {/* Timeframe Selector & Sync */}
-                    <div className="flex items-center gap-2 self-start sm:self-auto">
+                  {/* Card 2: Win Rate */}
+                  <div className={`p-4 rounded-2xl border transition-all flex flex-col justify-between ${
+                    isDarkMode ? 'bg-zinc-900/60 border-zinc-800/80 text-zinc-100' : 'bg-white border-slate-200 text-slate-800 shadow-xs'
+                  }`}>
+                    <div className="flex items-center justify-between text-xs mb-2">
+                      <span className="font-bold text-zinc-400">Win Rate (%)</span>
+                      <span className="p-1.5 rounded-lg bg-sky-500/10 text-sky-400">
+                        <Percent className="h-3.5 w-3.5" />
+                      </span>
+                    </div>
+                    <div>
+                      <h3 className="text-xl sm:text-2xl font-black font-mono tracking-tight text-sky-400">
+                        {metrics.winRate.toFixed(1)}%
+                      </h3>
+                      <div className="flex items-center space-x-1.5 text-[11px] font-mono font-semibold text-zinc-400 mt-1.5">
+                        <span className="text-emerald-400">{metrics.winTrades}W</span>
+                        <span>•</span>
+                        <span className="text-rose-400">{metrics.lossTrades}L</span>
+                        {metrics.beTrades > 0 && <span>• {metrics.beTrades}BE</span>}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 3: Profit Factor */}
+                  <div className={`p-4 rounded-2xl border transition-all flex flex-col justify-between ${
+                    isDarkMode ? 'bg-zinc-900/60 border-zinc-800/80 text-zinc-100' : 'bg-white border-slate-200 text-slate-800 shadow-xs'
+                  }`}>
+                    <div className="flex items-center justify-between text-xs mb-2">
+                      <span className="font-bold text-zinc-400">Profit Factor</span>
+                      <span className="p-1.5 rounded-lg bg-purple-500/10 text-purple-400">
+                        <Shield className="h-3.5 w-3.5" />
+                      </span>
+                    </div>
+                    <div>
+                      <h3 className="text-xl sm:text-2xl font-black font-mono tracking-tight text-purple-400">
+                        {metrics.profitFactor === Infinity ? '∞' : metrics.profitFactor.toFixed(2)}
+                      </h3>
+                      <p className="text-[11px] font-medium text-zinc-400 mt-1.5">
+                        {metrics.profitFactor >= 2.0 ? '🌟 High Edge' : metrics.profitFactor >= 1.2 ? '✓ Positive Edge' : 'Needs Tuning'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Card 4: Expectancy & Avg R:R */}
+                  <div className={`p-4 rounded-2xl border transition-all flex flex-col justify-between ${
+                    isDarkMode ? 'bg-zinc-900/60 border-zinc-800/80 text-zinc-100' : 'bg-white border-slate-200 text-slate-800 shadow-xs'
+                  }`}>
+                    <div className="flex items-center justify-between text-xs mb-2">
+                      <span className="font-bold text-zinc-400">Avg Expectancy</span>
+                      <span className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400">
+                        <Scale className="h-3.5 w-3.5" />
+                      </span>
+                    </div>
+                    <div>
+                      <h3 className={`text-xl sm:text-2xl font-black font-mono tracking-tight ${metrics.expectancy >= 0 ? 'text-amber-400' : 'text-rose-400'}`}>
+                        {metrics.expectancy >= 0 ? '+' : ''}${metrics.expectancy.toFixed(1)}
+                      </h3>
+                      <p className="text-[11px] font-mono text-zinc-400 mt-1.5">
+                        Avg R:R: <strong className="text-zinc-200">1:{Math.abs(metrics.avgRR || 2).toFixed(1)}</strong>
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Card 5: Streaks & Momentum */}
+                  <div className={`p-4 rounded-2xl border transition-all flex flex-col justify-between ${
+                    isDarkMode ? 'bg-zinc-900/60 border-zinc-800/80 text-zinc-100' : 'bg-white border-slate-200 text-slate-800 shadow-xs'
+                  }`}>
+                    <div className="flex items-center justify-between text-xs mb-2">
+                      <span className="font-bold text-zinc-400">Current Streak</span>
+                      <span className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400">
+                        <Flame className="h-3.5 w-3.5" />
+                      </span>
+                    </div>
+                    <div>
+                      <h3 className={`text-xl sm:text-2xl font-black font-mono tracking-tight ${
+                        metrics.currentStreak > 0 ? 'text-emerald-400' : metrics.currentStreak < 0 ? 'text-rose-400' : 'text-zinc-400'
+                      }`}>
+                        {metrics.currentStreak > 0 ? `+${metrics.currentStreak}W` : metrics.currentStreak < 0 ? `${metrics.currentStreak}L` : '0'}
+                      </h3>
+                      <p className="text-[11px] font-mono text-zinc-400 mt-1.5">
+                        Max Win Streak: <strong className="text-emerald-400">{metrics.maxWinStreak}W</strong>
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Card 6: Max Drawdown */}
+                  <div className={`p-4 rounded-2xl border transition-all flex flex-col justify-between ${
+                    isDarkMode ? 'bg-zinc-900/60 border-zinc-800/80 text-zinc-100' : 'bg-white border-slate-200 text-slate-800 shadow-xs'
+                  }`}>
+                    <div className="flex items-center justify-between text-xs mb-2">
+                      <span className="font-bold text-zinc-400">Max Drawdown</span>
+                      <span className="p-1.5 rounded-lg bg-rose-500/10 text-rose-400">
+                        <Activity className="h-3.5 w-3.5" />
+                      </span>
+                    </div>
+                    <div>
+                      <h3 className="text-xl sm:text-2xl font-black font-mono tracking-tight text-rose-400">
+                        -${Math.abs(metrics.maxDrawdown || 0).toFixed(2)}
+                      </h3>
+                      <p className="text-[11px] font-mono text-zinc-400 mt-1.5">
+                        Best: <strong className="text-emerald-400">+${metrics.bestTrade.toFixed(0)}</strong>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Interactive Charting Suite */}
+                <div className={`p-5 sm:p-6 rounded-2xl border transition-all ${
+                  isDarkMode ? 'bg-zinc-900/60 border-zinc-800/50 text-zinc-100' : 'bg-white border-slate-200 text-slate-800 shadow-xs'
+                }`}>
+                  {/* Chart Header & Mode Switcher */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                    <div>
+                      <div className="flex items-center space-x-2.5">
+                        <h3 className="text-base font-black tracking-tight">
+                          {cumulativeViewMode === 'pnl' && 'Cumulative Net Profit Curve ($)'}
+                          {cumulativeViewMode === 'rr' && 'Cumulative R-Multiple Curve (R)'}
+                          {cumulativeViewMode === 'drawdown' && 'Drawdown Underwater Curve ($)'}
+                        </h3>
+                        <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold ${
+                          cumulativeViewMode === 'pnl' 
+                            ? 'bg-emerald-500/15 text-emerald-400' 
+                            : cumulativeViewMode === 'rr'
+                              ? 'bg-sky-500/15 text-sky-400'
+                              : 'bg-rose-500/15 text-rose-400'
+                        }`}>
+                          {cumulativeViewMode === 'pnl' ? 'USD ($)' : cumulativeViewMode === 'rr' ? 'Multiple (R)' : 'DD ($)'}
+                        </span>
+                      </div>
+                      <p className={`text-xs mt-0.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                        {cumulativeViewMode === 'pnl' && 'အရောင်းအဝယ်တစ်ခုချင်းစီ၏ စုစုပေါင်း အမြတ်/အရှုံး တိုးတက်မှုမျဉ်းကွေး'}
+                        {cumulativeViewMode === 'rr' && 'စွန့်စားမှုနှင့် ပြန်ရငွေအချိုး (R-Multiple) စုစုပေါင်း တိုးတက်မှု'}
+                        {cumulativeViewMode === 'drawdown' && 'အမြင့်ဆုံး အမြတ်မှ အောက်သို့ ကျဆင်းခဲ့သော ပမာဏ ဆန်းစစ်ချက်'}
+                      </p>
+                    </div>
+
+                    {/* Chart Mode Switcher Buttons & Timeframe Filter */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      {/* Timeframe Selector */}
                       <div className={`flex items-center p-1 rounded-xl border text-xs font-semibold ${
-                        isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-400' : 'bg-slate-100 border-slate-200 text-slate-600'
+                        isDarkMode ? 'bg-zinc-950 border-zinc-800/80 text-zinc-400' : 'bg-slate-100 border-slate-200 text-slate-600'
                       }`}>
                         {(['all', '30d', '7d'] as const).map((tf) => (
                           <button
                             key={tf}
                             type="button"
                             onClick={() => setDashboardTimeframe(tf)}
-                            className={`px-3 py-1 rounded-lg transition-all cursor-pointer font-bold ${
+                            className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer font-bold ${
                               dashboardTimeframe === tf
                                 ? isDarkMode ? 'bg-zinc-800 text-emerald-400 shadow-xs' : 'bg-white text-slate-900 shadow-xs'
                                 : 'hover:text-zinc-200'
@@ -3400,184 +3567,64 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                         ))}
                       </div>
 
-                      {token && spreadsheetId && (
+                      {/* Mode switcher */}
+                      <div className={`flex items-center p-1 rounded-xl border text-xs font-bold self-start sm:self-auto overflow-x-auto max-w-full ${
+                        isDarkMode ? 'bg-zinc-950 border-zinc-800/60' : 'bg-slate-100 border-slate-200'
+                      }`}>
                         <button
                           type="button"
-                          onClick={() => loadTrades(token, spreadsheetId)}
-                          disabled={isLoadingTrades}
-                          className={`p-2 rounded-xl border transition-all cursor-pointer flex items-center justify-center ${
-                            isDarkMode 
-                              ? 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800 text-zinc-300' 
-                              : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700 shadow-xs'
+                          onClick={() => setCumulativeViewMode('pnl')}
+                          className={`px-3 py-1 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                            cumulativeViewMode === 'pnl'
+                              ? isDarkMode ? 'bg-zinc-800 text-emerald-400 font-black shadow-xs' : 'bg-white text-slate-900 font-black shadow-xs'
+                              : 'text-zinc-400 hover:text-zinc-200'
                           }`}
-                          title="Google Sheets မှ ဒေတာ အသစ်ပြန်လည် ရယူရန်"
                         >
-                          <RefreshCw className={`h-4 w-4 ${isLoadingTrades ? 'animate-spin text-emerald-400' : ''}`} />
+                          Net PnL ($)
                         </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* 2. Executive 4-Card Balanced KPI Matrix */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {/* Card 1: Net Profit / Loss */}
-                  <div className={`p-4.5 rounded-2xl border transition-all flex flex-col justify-between ${
-                    isDarkMode ? 'bg-zinc-900/60 border-zinc-800/80 text-zinc-100' : 'bg-white border-slate-200 text-slate-800 shadow-xs'
-                  }`}>
-                    <div className="flex items-center justify-between text-xs mb-2">
-                      <span className="font-bold text-zinc-400">Net Profit / Loss</span>
-                      <span className={`p-1.5 rounded-lg ${metrics.netPnL >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
-                        {metrics.netPnL >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                      </span>
-                    </div>
-                    <div>
-                      <h3 className={`text-2xl sm:text-3xl font-black font-mono tracking-tight ${
-                        metrics.netPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'
-                      }`}>
-                        {metrics.netPnL >= 0 ? '+' : ''}${metrics.netPnL.toFixed(2)}
-                      </h3>
-                      <p className="text-[11px] font-mono text-zinc-400 mt-1">
-                        {dashboardFilteredTrades.length} trades recorded
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Card 2: Win Rate */}
-                  <div className={`p-4.5 rounded-2xl border transition-all flex flex-col justify-between ${
-                    isDarkMode ? 'bg-zinc-900/60 border-zinc-800/80 text-zinc-100' : 'bg-white border-slate-200 text-slate-800 shadow-xs'
-                  }`}>
-                    <div className="flex items-center justify-between text-xs mb-2">
-                      <span className="font-bold text-zinc-400">Win Rate</span>
-                      <span className="p-1.5 rounded-lg bg-sky-500/10 text-sky-400">
-                        <Percent className="h-4 w-4" />
-                      </span>
-                    </div>
-                    <div>
-                      <h3 className="text-2xl sm:text-3xl font-black font-mono tracking-tight text-sky-400">
-                        {metrics.winRate.toFixed(1)}%
-                      </h3>
-                      <div className="flex items-center space-x-1.5 text-[11px] font-mono font-semibold text-zinc-400 mt-1">
-                        <span className="text-emerald-400">{metrics.winTrades} Won</span>
-                        <span>•</span>
-                        <span className="text-rose-400">{metrics.lossTrades} Lost</span>
-                        {metrics.beTrades > 0 && <span>• {metrics.beTrades} BE</span>}
+                        <button
+                          type="button"
+                          onClick={() => setCumulativeViewMode('rr')}
+                          className={`px-3 py-1 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                            cumulativeViewMode === 'rr'
+                              ? isDarkMode ? 'bg-zinc-800 text-sky-400 font-black shadow-xs' : 'bg-white text-slate-900 font-black shadow-xs'
+                              : 'text-zinc-400 hover:text-zinc-200'
+                          }`}
+                        >
+                          R-Multiple (R)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCumulativeViewMode('drawdown')}
+                          className={`px-3 py-1 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                            cumulativeViewMode === 'drawdown'
+                              ? isDarkMode ? 'bg-zinc-800 text-rose-400 font-black shadow-xs' : 'bg-white text-slate-900 font-black shadow-xs'
+                              : 'text-zinc-400 hover:text-zinc-200'
+                          }`}
+                        >
+                          Drawdown ($)
+                        </button>
                       </div>
                     </div>
                   </div>
 
-                  {/* Card 3: Profit Factor & Expectancy */}
-                  <div className={`p-4.5 rounded-2xl border transition-all flex flex-col justify-between ${
-                    isDarkMode ? 'bg-zinc-900/60 border-zinc-800/80 text-zinc-100' : 'bg-white border-slate-200 text-slate-800 shadow-xs'
-                  }`}>
-                    <div className="flex items-center justify-between text-xs mb-2">
-                      <span className="font-bold text-zinc-400">Profit Factor / Edge</span>
-                      <span className="p-1.5 rounded-lg bg-purple-500/10 text-purple-400">
-                        <Shield className="h-4 w-4" />
-                      </span>
-                    </div>
-                    <div>
-                      <div className="flex items-baseline space-x-2">
-                        <h3 className="text-2xl sm:text-3xl font-black font-mono tracking-tight text-purple-400">
-                          {metrics.profitFactor === Infinity ? '∞' : metrics.profitFactor.toFixed(2)}
-                        </h3>
-                        <span className="text-xs font-mono text-zinc-400">
-                          (Exp: {metrics.expectancy >= 0 ? '+' : ''}${metrics.expectancy.toFixed(1)})
-                        </span>
-                      </div>
-                      <p className="text-[11px] font-medium text-zinc-400 mt-1">
-                        {metrics.profitFactor >= 2.0 ? '🌟 High Edge System' : metrics.profitFactor >= 1.2 ? '✓ Positive Expectancy' : 'Analyzing Edge'}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Card 4: Avg Win/Loss & Current Streak */}
-                  <div className={`p-4.5 rounded-2xl border transition-all flex flex-col justify-between ${
-                    isDarkMode ? 'bg-zinc-900/60 border-zinc-800/80 text-zinc-100' : 'bg-white border-slate-200 text-slate-800 shadow-xs'
-                  }`}>
-                    <div className="flex items-center justify-between text-xs mb-2">
-                      <span className="font-bold text-zinc-400">Streak & R:R Ratio</span>
-                      <span className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400">
-                        <Scale className="h-4 w-4" />
-                      </span>
-                    </div>
-                    <div>
-                      <div className="flex items-center justify-between text-xs font-mono mb-1">
-                        <span className="text-emerald-400 font-bold">+${metrics.avgWin.toFixed(0)} avg win</span>
-                        <span className="text-rose-400 font-bold">-${Math.abs(metrics.avgLoss).toFixed(0)} avg loss</span>
-                      </div>
-                      <div className="flex items-center justify-between text-[11px] font-mono text-zinc-400 mt-1 pt-1 border-t border-zinc-800/40">
-                        <span>Streak: <strong className={metrics.currentStreak > 0 ? 'text-emerald-400' : metrics.currentStreak < 0 ? 'text-rose-400' : 'text-zinc-400'}>
-                          {metrics.currentStreak > 0 ? `+${metrics.currentStreak} Wins` : metrics.currentStreak < 0 ? `${Math.abs(metrics.currentStreak)} Losses` : '0'}
-                        </strong></span>
-                        <span>Max Streak: <strong className="text-emerald-400">{metrics.maxWinStreak}W</strong></span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 3. Cumulative Growth Performance Curve */}
-                <div className={`p-5 sm:p-6 rounded-2xl border transition-all ${
-                  isDarkMode ? 'bg-zinc-900/60 border-zinc-800/80 text-zinc-100' : 'bg-white border-slate-200 text-slate-800 shadow-xs'
-                }`}>
-                  {/* Chart Header */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
-                    <div>
-                      <div className="flex items-center space-x-2">
-                        <h3 className="text-base font-black tracking-tight">Cumulative Growth Curve</h3>
-                        <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold ${
-                          cumulativeViewMode === 'pnl' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-sky-500/15 text-sky-400'
-                        }`}>
-                          {cumulativeViewMode === 'pnl' ? 'Equity ($)' : 'R-Multiple (R)'}
-                        </span>
-                      </div>
-                      <p className={`text-xs mt-0.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
-                        အရောင်းအဝယ်တစ်ခုချင်းစီ၏ စုစုပေါင်း အမြတ်/အရှုံး တိုးတက်မှုမျဉ်းကွေး
-                      </p>
-                    </div>
-
-                    {/* Chart Metric Switcher */}
-                    <div className={`flex items-center p-0.5 rounded-xl border text-xs font-bold self-start sm:self-auto ${
-                      isDarkMode ? 'bg-zinc-950 border-zinc-800' : 'bg-slate-100 border-slate-200'
-                    }`}>
-                      <button
-                        type="button"
-                        onClick={() => setCumulativeViewMode('pnl')}
-                        className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
-                          cumulativeViewMode === 'pnl'
-                            ? isDarkMode ? 'bg-zinc-800 text-emerald-400 font-extrabold shadow-xs' : 'bg-white text-slate-900 font-extrabold shadow-xs'
-                            : 'text-zinc-400 hover:text-zinc-200'
-                        }`}
-                      >
-                        Net PnL ($)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setCumulativeViewMode('rr')}
-                        className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
-                          cumulativeViewMode === 'rr'
-                            ? isDarkMode ? 'bg-zinc-800 text-sky-400 font-extrabold shadow-xs' : 'bg-white text-slate-900 font-extrabold shadow-xs'
-                            : 'text-zinc-400 hover:text-zinc-200'
-                        }`}
-                      >
-                        R-Multiple (R)
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Chart Canvas */}
-                  <div className="h-64 sm:h-72 w-full relative">
+                  {/* Chart Rendering Canvas */}
+                  <div className="h-68 sm:h-76 w-full relative">
                     {cumulativeChartData.length > 0 ? (
                       <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={cumulativeChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                           <defs>
                             <linearGradient id="pnlGlowGrad" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor={metrics.netPnL >= 0 ? '#10B981' : '#F43F5E'} stopOpacity={0.3} />
+                              <stop offset="5%" stopColor={metrics.netPnL >= 0 ? '#10B981' : '#F43F5E'} stopOpacity={0.35} />
                               <stop offset="95%" stopColor={metrics.netPnL >= 0 ? '#10B981' : '#F43F5E'} stopOpacity={0.0} />
                             </linearGradient>
                             <linearGradient id="rrGlowGrad" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#0EA5E9" stopOpacity={0.3} />
+                              <stop offset="5%" stopColor="#0EA5E9" stopOpacity={0.35} />
                               <stop offset="95%" stopColor="#0EA5E9" stopOpacity={0.0} />
+                            </linearGradient>
+                            <linearGradient id="ddGlowGrad" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#F43F5E" stopOpacity={0.35} />
+                              <stop offset="95%" stopColor="#F43F5E" stopOpacity={0.0} />
                             </linearGradient>
                           </defs>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDarkMode ? '#27272a' : '#E2E8F0'} opacity={0.6} />
@@ -3593,18 +3640,18 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                             fontSize={11} 
                             tickLine={false} 
                             axisLine={{ stroke: isDarkMode ? '#27272a' : '#E2E8F0' }}
-                            tickFormatter={(val) => cumulativeViewMode === 'pnl' ? `$${val}` : `${val}R`}
+                            tickFormatter={(val) => cumulativeViewMode === 'pnl' ? `$${val}` : cumulativeViewMode === 'rr' ? `${val}R` : `-$${val}`}
                           />
-                          <ReferenceLine y={0} stroke={isDarkMode ? '#52525b' : '#cbd5e1'} strokeDasharray="4 4" />
+                          <ReferenceLine y={0} stroke={isDarkMode ? '#3f3f46' : '#cbd5e1'} strokeDasharray="4 4" />
                           <Tooltip 
                             content={({ active, payload }) => {
                               if (active && payload && payload.length) {
                                 const data = payload[0].payload;
                                 return (
                                   <div className={`p-3 rounded-xl border shadow-xl text-xs backdrop-blur-md transition-all ${
-                                    isDarkMode ? 'bg-zinc-950/95 border-zinc-750 text-zinc-100' : 'bg-white/95 border-slate-200 text-slate-900'
+                                    isDarkMode ? 'bg-zinc-950/95 border-zinc-800 text-zinc-100' : 'bg-white/95 border-slate-200 text-slate-900'
                                   }`}>
-                                    <div className="flex items-center justify-between gap-3 mb-1.5 pb-1 border-b border-zinc-700/50">
+                                    <div className="flex items-center justify-between gap-3 mb-1.5 pb-1 border-b border-zinc-800">
                                       <span className="font-extrabold">{data.pair} ({data.type})</span>
                                       <span className="text-[10px] text-zinc-400 font-mono">{data.fullDate}</span>
                                     </div>
@@ -3615,12 +3662,19 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                                           {data.pnl >= 0 ? '+' : ''}${data.pnl.toFixed(2)}
                                         </span>
                                       </div>
-                                      <div className="flex justify-between gap-3">
-                                        <span className="text-zinc-400">Cumulative:</span>
-                                        <span className={`font-black ${data.total >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                          ${data.total.toFixed(2)}
-                                        </span>
-                                      </div>
+                                      {cumulativeViewMode === 'drawdown' ? (
+                                        <div className="flex justify-between gap-3">
+                                          <span className="text-zinc-400">Peak Drawdown:</span>
+                                          <span className="font-bold text-rose-400">-${data.drawdown.toFixed(2)}</span>
+                                        </div>
+                                      ) : (
+                                        <div className="flex justify-between gap-3">
+                                          <span className="text-zinc-400">Cumulative Balance:</span>
+                                          <span className={`font-black ${data.total >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                            ${data.total.toFixed(2)}
+                                          </span>
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
                                 );
@@ -3630,11 +3684,23 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                           />
                           <Area 
                             type="monotone" 
-                            dataKey={cumulativeViewMode === 'pnl' ? 'total' : 'runningRR'} 
-                            stroke={cumulativeViewMode === 'pnl' ? (metrics.netPnL >= 0 ? '#10B981' : '#F43F5E') : '#0EA5E9'} 
+                            dataKey={cumulativeViewMode === 'pnl' ? 'total' : cumulativeViewMode === 'rr' ? 'runningRR' : 'drawdown'} 
+                            stroke={
+                              cumulativeViewMode === 'pnl' 
+                                ? (metrics.netPnL >= 0 ? '#10B981' : '#F43F5E') 
+                                : cumulativeViewMode === 'rr' 
+                                  ? '#0EA5E9' 
+                                  : '#F43F5E'
+                            } 
                             strokeWidth={2.5} 
                             fillOpacity={1} 
-                            fill={cumulativeViewMode === 'pnl' ? 'url(#pnlGlowGrad)' : 'url(#rrGlowGrad)'} 
+                            fill={
+                              cumulativeViewMode === 'pnl' 
+                                ? 'url(#pnlGlowGrad)' 
+                                : cumulativeViewMode === 'rr' 
+                                  ? 'url(#rrGlowGrad)' 
+                                  : 'url(#ddGlowGrad)'
+                            } 
                           />
                         </AreaChart>
                       </ResponsiveContainer>
@@ -3651,7 +3717,7 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Directional Performance (Long vs Short) */}
                   <div className={`p-5 sm:p-6 rounded-2xl border transition-all ${
-                    isDarkMode ? 'bg-zinc-900/60 border-zinc-800/80 text-zinc-100' : 'bg-white border-slate-200 text-slate-800 shadow-xs'
+                    isDarkMode ? 'bg-zinc-900/60 border-zinc-800/50 text-zinc-100' : 'bg-white border-slate-200 text-slate-800 shadow-xs'
                   }`}>
                     <div className="flex items-center justify-between mb-4">
                       <div>
@@ -3667,7 +3733,7 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
 
                     <div className="grid grid-cols-2 gap-3 mb-4">
                       {/* BUY Box */}
-                      <div className={`p-3.5 rounded-xl border ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800' : 'bg-slate-50 border-slate-200'}`}>
+                      <div className={`p-3.5 rounded-xl border ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800/40' : 'bg-slate-50 border-slate-200'}`}>
                         <div className="flex items-center justify-between text-xs mb-1">
                           <span className="font-extrabold text-emerald-400">BUY (Long)</span>
                           <span className="text-[10px] text-zinc-400 font-mono">{directionPerformance.buysCount} trades</span>
@@ -3679,7 +3745,7 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                       </div>
 
                       {/* SELL Box */}
-                      <div className={`p-3.5 rounded-xl border ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800' : 'bg-slate-50 border-slate-200'}`}>
+                      <div className={`p-3.5 rounded-xl border ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800/40' : 'bg-slate-50 border-slate-200'}`}>
                         <div className="flex items-center justify-between text-xs mb-1">
                           <span className="font-extrabold text-rose-400">SELL (Short)</span>
                           <span className="text-[10px] text-zinc-400 font-mono">{directionPerformance.sellsCount} trades</span>
@@ -3697,7 +3763,7 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                         <span>BUY ({directionPerformance.buysCount})</span>
                         <span>SELL ({directionPerformance.sellsCount})</span>
                       </div>
-                      <div className="h-2 w-full bg-zinc-800 rounded-full overflow-hidden flex">
+                      <div className="h-2 w-full bg-zinc-950 rounded-full overflow-hidden flex border border-zinc-800/40">
                         <div 
                           className="bg-emerald-500 h-full transition-all" 
                           style={{ width: `${directionPerformance.buysCount + directionPerformance.sellsCount > 0 ? (directionPerformance.buysCount / (directionPerformance.buysCount + directionPerformance.sellsCount)) * 100 : 50}%` }} 
@@ -3712,7 +3778,7 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
 
                   {/* Top Asset Pairs */}
                   <div className={`p-5 sm:p-6 rounded-2xl border transition-all ${
-                    isDarkMode ? 'bg-zinc-900/60 border-zinc-800/80 text-zinc-100' : 'bg-white border-slate-200 text-slate-800 shadow-xs'
+                    isDarkMode ? 'bg-zinc-900/60 border-zinc-800/50 text-zinc-100' : 'bg-white border-slate-200 text-slate-800 shadow-xs'
                   }`}>
                     <div className="flex items-center justify-between mb-4">
                       <div>
@@ -3729,27 +3795,43 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                     </div>
 
                     {pairPerformanceData.length > 0 ? (
-                      <div className="space-y-2">
+                      <div className="space-y-2.5">
                         {pairPerformanceData.slice(0, 4).map((item, idx) => (
                           <div 
                             key={idx} 
-                            className={`p-2.5 sm:p-3 rounded-xl border flex items-center justify-between transition-all ${
-                              isDarkMode ? 'bg-zinc-950/40 border-zinc-850 hover:bg-zinc-850/40' : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+                            className={`p-3 rounded-xl border transition-all ${
+                              isDarkMode ? 'bg-zinc-950/60 border-zinc-800/40 hover:bg-zinc-900/60' : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
                             }`}
                           >
-                            <div className="flex items-center space-x-2.5">
-                              <span className="text-xs font-mono font-bold text-zinc-500">#{idx + 1}</span>
-                              <div>
-                                <h5 className="text-xs sm:text-sm font-bold">{item.pair}</h5>
-                                <p className="text-[10px] text-zinc-400">{item.trades} trades • {item.winRate.toFixed(0)}% win</p>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <div className="flex items-center space-x-2.5">
+                                <span className="text-xs font-mono font-bold text-zinc-500">#{idx + 1}</span>
+                                <div>
+                                  <h5 className="text-xs sm:text-sm font-bold text-zinc-100">{item.pair}</h5>
+                                  <p className="text-[10px] text-zinc-400 font-mono">{item.trades} trades • {item.winRate.toFixed(0)}% win</p>
+                                </div>
+                              </div>
+
+                              <div className="text-right font-mono">
+                                <p className={`text-xs sm:text-sm font-black ${item.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                  {item.pnl >= 0 ? '+' : ''}${item.pnl.toFixed(2)}
+                                </p>
+                                <span className="text-[10px] text-zinc-400">{item.wins}W - {item.trades - item.wins}L</span>
                               </div>
                             </div>
 
-                            <div className="text-right font-mono">
-                              <p className={`text-xs sm:text-sm font-black ${item.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                {item.pnl >= 0 ? '+' : ''}${item.pnl.toFixed(2)}
-                              </p>
-                              <span className="text-[10px] text-zinc-400">{item.wins}W - {item.trades - item.wins}L</span>
+                            {/* Mini Win Rate Progress Bar */}
+                            <div className="w-full bg-zinc-900 h-1.5 rounded-full overflow-hidden flex border border-zinc-800/30">
+                              <div 
+                                className="bg-emerald-500 h-full transition-all rounded-l-full" 
+                                style={{ width: `${item.winRate}%` }} 
+                                title={`Win Rate: ${item.winRate.toFixed(0)}%`}
+                              />
+                              <div 
+                                className="bg-rose-500/80 h-full transition-all rounded-r-full" 
+                                style={{ width: `${100 - item.winRate}%` }} 
+                                title={`Loss Rate: ${(100 - item.winRate).toFixed(0)}%`}
+                              />
                             </div>
                           </div>
                         ))}
@@ -3759,6 +3841,86 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                     )}
                   </div>
                 </div>
+
+                {/* 5. Recent Executions Stream on Dashboard */}
+                {trades.length > 0 && (
+                  <div className={`p-5 sm:p-6 rounded-2xl border transition-all ${
+                    isDarkMode ? 'bg-zinc-900/60 border-zinc-800/80 text-zinc-100' : 'bg-white border-slate-200 text-slate-800 shadow-xs'
+                  }`}>
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h4 className="text-base font-black tracking-tight">Recent Executed Trades</h4>
+                        <p className={`text-xs mt-0.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                          Latest entries from your trading journal
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('journal')}
+                        className="text-xs font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 cursor-pointer"
+                      >
+                        <span>View Journal</span>
+                        <ChevronRight className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                      {trades.slice(0, 4).map((t, idx) => {
+                        const pnlVal = parsePnLValue(t.pnl, t.winLoss);
+                        const isWin = t.winLoss === 'TP' || (t.winLoss === 'Trailing Stop' && pnlVal > 0);
+                        const isLoss = t.winLoss === 'SL' || (t.winLoss === 'Trailing Stop' && pnlVal < 0);
+                        const isBE = t.winLoss === 'Breakeven';
+
+                        return (
+                          <div 
+                            key={t.id || idx}
+                            onClick={() => {
+                              setSelectedTrade(t);
+                              setActiveTab('journal');
+                            }}
+                            className={`p-3.5 rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${
+                              isDarkMode 
+                                ? 'bg-zinc-950/50 border-zinc-800/70 hover:border-zinc-700 hover:bg-zinc-900/80' 
+                                : 'bg-slate-50 border-slate-200 hover:border-slate-300 hover:bg-white'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between text-xs mb-2">
+                              <span className="font-extrabold">{t.pair}</span>
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                (t.type || 'BUY').toUpperCase() === 'BUY'
+                                  ? 'bg-emerald-500/15 text-emerald-400'
+                                  : 'bg-rose-500/15 text-rose-400'
+                              }`}>
+                                {t.type || 'BUY'}
+                              </span>
+                            </div>
+
+                            <div className="space-y-1 my-1 text-xs">
+                              <div className="flex justify-between text-[11px] text-zinc-400">
+                                <span>{t.date || 'No Date'}</span>
+                                <span className="font-mono">{t.rr ? `R:R ${t.rr}` : ''}</span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between pt-2 border-t border-zinc-800/50 text-xs font-mono">
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                isWin ? 'bg-emerald-500/15 text-emerald-400' :
+                                isLoss ? 'bg-rose-500/15 text-rose-400' :
+                                isBE ? 'bg-amber-500/15 text-amber-400' :
+                                'bg-zinc-800 text-zinc-400'
+                              }`}>
+                                {t.winLoss || 'Pending'}
+                              </span>
+                              <span className={`font-black ${pnlVal > 0 ? 'text-emerald-400' : pnlVal < 0 ? 'text-rose-400' : 'text-zinc-400'}`}>
+                                {pnlVal > 0 ? '+' : ''}${pnlVal.toFixed(2)}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
                         {/* TRADING JOURNAL TAB VIEW */}
@@ -3797,12 +3959,29 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                             isDarkMode ? 'bg-zinc-900 border-zinc-800 text-zinc-200' : 'bg-slate-50 border-slate-200 text-slate-700'
                           }`}
                         >
-                          <option value="ALL">All Status</option>
-                          <option value="OPEN">OPEN Trades</option>
-                          <option value="CLOSED">CLOSED Trades</option>
+                          <option value="ALL" className={isDarkMode ? 'bg-zinc-900 text-zinc-100' : 'bg-white text-slate-900'}>All Status</option>
+                          <option value="OPEN" className={isDarkMode ? 'bg-zinc-900 text-zinc-100' : 'bg-white text-slate-900'}>OPEN Trades</option>
+                          <option value="CLOSED" className={isDarkMode ? 'bg-zinc-900 text-zinc-100' : 'bg-white text-slate-900'}>CLOSED Trades</option>
                         </select>
                         <ChevronDown className="h-3.5 w-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 dark:text-zinc-500" />
                       </div>
+                    </div>
+
+                    {/* Sort Order Toggle (Newest First vs Oldest First) */}
+                    <div className="flex items-center">
+                      <button
+                        type="button"
+                        onClick={() => setJournalSortOrder(prev => prev === 'newest' ? 'oldest' : 'newest')}
+                        className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                          isDarkMode 
+                            ? 'bg-zinc-900 border-zinc-800 text-zinc-200 hover:bg-zinc-800' 
+                            : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                        }`}
+                        title={journalSortOrder === 'newest' ? 'လက်ရှိ: အသစ်ဆုံး အပေါ် (Newest first)' : 'လက်ရှိ: အဟောင်းဆုံး အပေါ် (Oldest first)'}
+                      >
+                        <SlidersHorizontal className="h-3.5 w-3.5 text-emerald-400" />
+                        <span>{journalSortOrder === 'newest' ? 'အသစ်ဆုံး အပေါ်' : 'အဟောင်းဆုံး အပေါ်'}</span>
+                      </button>
                     </div>
                   </div>
 
@@ -5222,55 +5401,8 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                 <div className={`p-6 rounded-2xl border transition-all ${
                   isDarkMode ? 'bg-zinc-900/40 border-zinc-800/80 text-zinc-100' : 'bg-white border-slate-200 shadow-xs'
                 }`}>
-                  {/* Tab Header */}
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-5 border-b border-zinc-200/30 dark:border-zinc-800/80">
-                    <div>
-                      <h4 className={`text-xl font-bold flex items-center gap-2.5 ${isDarkMode ? 'text-zinc-100' : 'text-slate-900'}`}>
-                        <ImageIcon className="h-5.5 w-5.5 text-teal-500" />
-                        Trading Learning Notes & Blog
-                      </h4>
-                      <p className="text-xs text-slate-400 mt-1">
-                        စာများနှင့် ပုံများကို အသုံးပြု၍ သင်ယူမှုမှတ်စုများကို အော့ဖ်လိုင်းနှင့် ကလောက်ဗားရှင်းအဖြစ် အခမဲ့လုံခြုံစွာသိမ်းဆည်းပါ။
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-3 shrink-0">
-                      <button
-                        onClick={() => {
-                          setEditingLearningNote(null);
-                          setLearningNoteTitle('');
-                          setLearningNoteContent('');
-                          setLearningNoteImage('');
-                          setLearningNoteTags([]);
-                          setCustomTagInput('');
-                          setLearningError(null);
-                          setShowLearningModal(true);
-                        }}
-                        className="inline-flex items-center space-x-1.5 bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-md hover:shadow-lg transition-all duration-150 cursor-pointer animate-fade-in"
-                      >
-                        <Plus className="h-4 w-4" />
-                        <span>သင်ခန်းစာသစ်ရေးရန်</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Privacy Guard Notice banner */}
-                  <div className={`mt-4 px-4 py-3 rounded-xl border flex items-center gap-3 text-xs font-medium leading-relaxed ${
-                    isDarkMode 
-                      ? 'bg-teal-950/10 border-teal-900/40 text-teal-300' 
-                      : 'bg-teal-50/50 border-teal-100 text-teal-700'
-                  }`}>
-                    <span className="flex h-2 w-2 relative shrink-0">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-teal-500"></span>
-                    </span>
-                    <span>
-                      🔒 <strong>လုံခြုံရေးအပြည့်ရှိပါသည် -</strong> ဤမှတ်စုများသည် သင်၏ Google Account ({user?.email}) ဖြင့်သာ တိုက်ရိုက်ချိတ်ဆက်ထားပြီး အခြားမည်သူမျှ လုံးဝကြည့်ရှု၍မရပါ။ Account ထွက်လိုက်ပါက အလိုအလျောက် ပိတ်သွားမည်ဖြစ်ပါသည်။
-                    </span>
-                  </div>
-
                   {/* Search and status overview bar */}
-                  <div className="mt-6 flex flex-col gap-4">
+                  <div className="flex flex-col gap-4">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                       <div className="relative flex-1 max-w-md">
                         <input
@@ -5285,8 +5417,26 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                         <Search className="h-4 w-4 absolute left-3 top-2.5 text-slate-400 dark:text-zinc-500" />
                       </div>
                       
-                      <div className="text-xs text-slate-400">
-                        သင်ခန်းစာစုစုပေါင်း: <strong className="text-slate-700 dark:text-zinc-200">{learningNotes.length} ခု</strong>
+                      <div className="flex items-center gap-3">
+                        <div className="text-xs text-slate-400">
+                          သင်ခန်းစာစုစုပေါင်း: <strong className="text-slate-700 dark:text-zinc-200">{learningNotes.length} ခု</strong>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setEditingLearningNote(null);
+                            setLearningNoteTitle('');
+                            setLearningNoteContent('');
+                            setLearningNoteImage('');
+                            setLearningNoteTags([]);
+                            setCustomTagInput('');
+                            setLearningError(null);
+                            setShowLearningModal(true);
+                          }}
+                          className="inline-flex items-center space-x-1.5 bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs px-3.5 py-2 rounded-xl shadow-xs transition-all duration-150 cursor-pointer"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          <span>သင်ခန်းစာသစ်ရေးရန်</span>
+                        </button>
                       </div>
                     </div>
 
@@ -5517,16 +5667,6 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                 <div className={`p-6 rounded-2xl border transition-all ${
                   isDarkMode ? 'bg-zinc-900/40 border-zinc-800/80 text-zinc-100' : 'bg-white border-slate-200 shadow-xs'
                 }`}>
-                  <div className="mb-6 pb-4 border-b border-zinc-200/30 dark:border-zinc-800/80">
-                    <h4 className={`text-lg font-bold flex items-center gap-2 ${isDarkMode ? 'text-zinc-100' : 'text-slate-900'}`}>
-                      <Percent className="h-5 w-5 text-amber-500" />
-                      Alignment Calculator (အရောင်းအဝယ်မဝင်မီ ချိန်ညှိတွက်ချက်စနစ်)
-                    </h4>
-                    <p className="text-xs text-slate-400 mt-1">
-                      Binance / Exchange Settings များကို မိမိတွက်ချက်မှုနှင့် ကိုက်ညီစေရန် တစ်ဆင့်ချင်း ချိန်ညှိပေးသော စနစ်ကျလှသည့် Position Engine ဖြစ်သည်။
-                    </p>
-                  </div>
-
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* INPUTS COLUMN */}
                     <div className="lg:col-span-1 space-y-4">
@@ -5853,7 +5993,7 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                       </div>
 
                       <div className={`p-4 rounded-xl text-center italic border ${
-                        isDarkMode ? 'bg-zinc-900/60 border-zinc-850' : 'bg-slate-100/50 border-slate-200/60'
+                        isDarkMode ? 'bg-zinc-900/60 border-zinc-800/40' : 'bg-slate-100/50 border-slate-200/60'
                       }`}>
                         <p className={`text-xs font-serif ${isDarkMode ? 'text-zinc-300' : 'text-slate-700'}`}>
                           &quot;The system obeys the one who commands themselves first.&quot;
@@ -5875,68 +6015,8 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                 <div className={`p-5 rounded-2xl border transition-all ${
                   isDarkMode ? 'bg-zinc-900/50 border-zinc-800/70 text-zinc-100' : 'bg-white border-slate-200/80 shadow-xs'
                 }`}>
-                  {/* Header Row */}
-                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pb-4 border-b border-zinc-200/40 dark:border-zinc-800/60">
-                    <div className="flex items-center space-x-3">
-                      <div className={`p-2.5 rounded-xl ${isDarkMode ? 'bg-zinc-800 text-zinc-300' : 'bg-slate-100 text-slate-700'}`}>
-                        <Eye className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-lg font-bold tracking-tight">Crypto & Forex Watchlist</h3>
-                          <span className={`text-xs px-2 py-0.5 rounded-md font-medium ${
-                            isDarkMode ? 'bg-zinc-800 text-zinc-400' : 'bg-slate-100 text-slate-600'
-                          }`}>
-                            {watchlistItems.length} Setups
-                          </span>
-                        </div>
-                        <p className="text-xs text-zinc-400 mt-0.5">
-                          စောင့်ကြည့်လိုသော Market Setups, Key Levels နှင့် Chart ပုံများကို Google Drive / Sheet တွင် စနစ်တကျ မှတ်တမ်းတင်ခြင်း
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex items-center gap-2 shrink-0">
-                      {token && spreadsheetId && (
-                        <button
-                          type="button"
-                          onClick={() => user?.uid && loadWatchlist(user.uid, false)}
-                          disabled={isWatchlistLoading}
-                          className={`p-2 rounded-xl border transition-colors cursor-pointer ${
-                            isDarkMode ? 'border-zinc-800 bg-zinc-900/80 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200' : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-600'
-                          }`}
-                          title="Refresh Watchlist from Google"
-                        >
-                          <RefreshCw className={`h-4 w-4 ${isWatchlistLoading ? 'animate-spin text-zinc-300' : ''}`} />
-                        </button>
-                      )}
-                      
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingWatchlistItem(null);
-                          setWatchlistPair('');
-                          setWatchlistCategory('Crypto');
-                          setWatchlistBias('Bullish');
-                          setWatchlistStatus('Watching');
-                          setWatchlistTimeframe('4H');
-                          setWatchlistKeyLevels('');
-                          setWatchlistNotes('');
-                          setWatchlistImage('');
-                          setWatchlistError(null);
-                          setShowWatchlistModal(true);
-                        }}
-                        className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-zinc-100 hover:bg-white text-zinc-950 font-bold text-xs transition-all shadow-sm cursor-pointer active:scale-95"
-                      >
-                        <Plus className="h-4 w-4 stroke-[2.5]" />
-                        <span>Add Setup</span>
-                      </button>
-                    </div>
-                  </div>
-
                   {/* Summary Metric Counters */}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 pt-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
                     <div className={`p-3 rounded-xl border ${isDarkMode ? 'bg-zinc-950/40 border-zinc-800/50' : 'bg-slate-50 border-slate-200/60'}`}>
                       <span className="text-[10px] uppercase font-medium text-zinc-400 block mb-0.5">Total Pairs</span>
                       <span className="text-lg font-bold text-zinc-100 dark:text-zinc-100">{watchlistStats.total}</span>
@@ -5983,7 +6063,7 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                       ))}
                     </div>
 
-                    {/* Filters and Search */}
+                    {/* Filters, Search & Actions */}
                     <div className="flex flex-wrap items-center gap-2.5">
                       {/* Bias Filter */}
                       <select
@@ -6008,16 +6088,16 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                           isDarkMode ? 'bg-zinc-950 border-zinc-800/80 text-zinc-300' : 'bg-slate-50 border-slate-200 text-slate-700'
                         }`}
                       >
-                        <option value="ALL">All Statuses</option>
-                        <option value="Ready to Enter">Ready to Enter</option>
-                        <option value="Setup Forming">Setup Forming</option>
-                        <option value="Watching">Watching</option>
-                        <option value="Triggered">Triggered</option>
-                        <option value="Invalidated">Invalidated</option>
+                        <option value="ALL" className={isDarkMode ? 'bg-zinc-900 text-zinc-100' : 'bg-white text-slate-900'}>All Statuses</option>
+                        <option value="Ready to Enter" className={isDarkMode ? 'bg-zinc-900 text-emerald-400 font-bold' : 'bg-white text-emerald-600 font-bold'}>Ready to Enter</option>
+                        <option value="Setup Forming" className={isDarkMode ? 'bg-zinc-900 text-sky-400 font-bold' : 'bg-white text-sky-600 font-bold'}>Setup Forming</option>
+                        <option value="Watching" className={isDarkMode ? 'bg-zinc-900 text-amber-400 font-bold' : 'bg-white text-amber-600 font-bold'}>Watching</option>
+                        <option value="Triggered" className={isDarkMode ? 'bg-zinc-900 text-purple-400 font-bold' : 'bg-white text-purple-600 font-bold'}>Triggered</option>
+                        <option value="Invalidated" className={isDarkMode ? 'bg-zinc-900 text-zinc-400' : 'bg-white text-slate-500'}>Invalidated</option>
                       </select>
 
                       {/* Search Bar */}
-                      <div className="relative flex items-center min-w-[190px]">
+                      <div className="relative flex items-center min-w-[170px]">
                         <Search className="h-3.5 w-3.5 absolute left-3 text-zinc-400" />
                         <input
                           type="text"
@@ -6040,6 +6120,43 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                           </button>
                         )}
                       </div>
+
+                      {/* Refresh Button */}
+                      {token && spreadsheetId && (
+                        <button
+                          type="button"
+                          onClick={() => user?.uid && loadWatchlist(user.uid, false)}
+                          disabled={isWatchlistLoading}
+                          className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+                            isDarkMode ? 'border-zinc-800 bg-zinc-950 hover:bg-zinc-850 text-zinc-400 hover:text-zinc-200' : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-600'
+                          }`}
+                          title="Refresh Watchlist from Google"
+                        >
+                          <RefreshCw className={`h-3.5 w-3.5 ${isWatchlistLoading ? 'animate-spin text-zinc-300' : ''}`} />
+                        </button>
+                      )}
+
+                      {/* Add Setup Action */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingWatchlistItem(null);
+                          setWatchlistPair('');
+                          setWatchlistCategory('Crypto');
+                          setWatchlistBias('Bullish');
+                          setWatchlistStatus('Watching');
+                          setWatchlistTimeframe('4H');
+                          setWatchlistKeyLevels('');
+                          setWatchlistNotes('');
+                          setWatchlistImage('');
+                          setWatchlistError(null);
+                          setShowWatchlistModal(true);
+                        }}
+                        className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-zinc-100 hover:bg-white text-zinc-950 font-bold text-xs transition-all shadow-xs cursor-pointer active:scale-95 shrink-0"
+                      >
+                        <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
+                        <span>Add Setup</span>
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -6084,7 +6201,7 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                     </button>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
                     {filteredWatchlistItems.map((item) => {
                       const isBull = item.bias === 'Bullish';
                       const isBear = item.bias === 'Bearish';
@@ -6161,34 +6278,63 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                                 </span>
                               </div>
 
-                              {/* Status Row with interactive Quick-Select */}
-                              <div className={`flex items-center justify-between text-xs py-1 px-2.5 rounded-lg border ${
-                                isDarkMode ? 'bg-zinc-950/40 border-zinc-800/50' : 'bg-slate-50 border-slate-200/60'
+                              {/* Status Row with Direct Interactive Status Selector Pill */}
+                              <div className={`relative flex items-center justify-between text-xs py-1.5 px-3 rounded-xl border transition-all ${
+                                isDarkMode ? 'bg-zinc-950/60 border-zinc-800/40' : 'bg-slate-50 border-slate-200/80'
                               }`}>
-                                <div className="flex items-center gap-1.5">
-                                  <span className="text-[10px] font-medium text-zinc-500">Status:</span>
-                                  <span className={`font-semibold text-xs ${
-                                    isReady ? 'text-emerald-400' : isBull ? 'text-zinc-200' : 'text-zinc-300'
-                                  }`}>
-                                    {item.status}
-                                  </span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">Status:</span>
+                                  <div className="relative inline-flex items-center">
+                                    <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all border ${
+                                      item.status === 'Ready to Enter'
+                                        ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 shadow-xs'
+                                        : item.status === 'Setup Forming'
+                                          ? 'bg-sky-500/15 text-sky-400 border-sky-500/30 shadow-xs'
+                                          : item.status === 'Watching'
+                                            ? 'bg-amber-500/15 text-amber-400 border-amber-500/30 shadow-xs'
+                                            : item.status === 'Triggered'
+                                              ? 'bg-purple-500/15 text-purple-400 border-purple-500/30 shadow-xs'
+                                              : 'bg-zinc-800/80 text-zinc-400 border-zinc-700/50'
+                                    }`}>
+                                      {item.status === 'Ready to Enter' && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />}
+                                      {item.status === 'Setup Forming' && <span className="h-1.5 w-1.5 rounded-full bg-sky-400" />}
+                                      {item.status === 'Watching' && <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />}
+                                      {item.status === 'Triggered' && <span className="h-1.5 w-1.5 rounded-full bg-purple-400" />}
+                                      {item.status === 'Invalidated' && <span className="h-1.5 w-1.5 rounded-full bg-zinc-500" />}
+                                      <span>{item.status}</span>
+                                      <ChevronDown className="h-3 w-3 opacity-60 ml-0.5" />
+                                    </div>
+                                    <select
+                                      value={item.status}
+                                      onChange={(e) => {
+                                        e.stopPropagation();
+                                        handleQuickWatchlistStatus(item, e.target.value as any);
+                                      }}
+                                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer text-xs"
+                                      title="Status ပြောင်းလဲရန် နှိပ်ပါ (Change Status)"
+                                    >
+                                      <option value="Ready to Enter" className={isDarkMode ? 'bg-zinc-900 text-emerald-400' : 'bg-white text-emerald-600'}>
+                                        Ready to Enter (Confirmed & Ready)
+                                      </option>
+                                      <option value="Setup Forming" className={isDarkMode ? 'bg-zinc-900 text-sky-400' : 'bg-white text-sky-600'}>
+                                        Setup Forming (Building Structure)
+                                      </option>
+                                      <option value="Watching" className={isDarkMode ? 'bg-zinc-900 text-amber-400' : 'bg-white text-amber-600'}>
+                                        Watching (Waiting for POI)
+                                      </option>
+                                      <option value="Triggered" className={isDarkMode ? 'bg-zinc-900 text-purple-400' : 'bg-white text-purple-600'}>
+                                        Triggered (Active / Running)
+                                      </option>
+                                      <option value="Invalidated" className={isDarkMode ? 'bg-zinc-900 text-zinc-400' : 'bg-white text-slate-500'}>
+                                        Invalidated (Voided / Broken)
+                                      </option>
+                                    </select>
+                                  </div>
                                 </div>
 
-                                {/* Status Quick Switcher */}
-                                <select
-                                  value={item.status}
-                                  onChange={(e) => handleQuickWatchlistStatus(item, e.target.value as any)}
-                                  className={`text-[11px] font-medium px-1.5 py-0.5 rounded bg-transparent cursor-pointer focus:outline-hidden ${
-                                    isDarkMode ? 'text-zinc-400 hover:text-zinc-200' : 'text-slate-600'
-                                  }`}
-                                  title="Change status"
-                                >
-                                  <option value="Watching">Watching</option>
-                                  <option value="Setup Forming">Setup Forming</option>
-                                  <option value="Ready to Enter">Ready to Enter</option>
-                                  <option value="Triggered">Triggered</option>
-                                  <option value="Invalidated">Invalidated</option>
-                                </select>
+                                <span className="text-[10px] text-zinc-500 font-mono">
+                                  Click to switch
+                                </span>
                               </div>
 
                               {/* Key Levels Box */}
@@ -7653,24 +7799,45 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                     </div>
                   </div>
 
-                  {/* Status */}
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
+                  {/* Status Selection Buttons */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400">
                       Setup Status
                     </label>
-                    <select
-                      value={watchlistStatus}
-                      onChange={(e) => setWatchlistStatus(e.target.value as any)}
-                      className={`w-full px-3 py-2 rounded-xl border text-xs font-medium cursor-pointer focus:outline-hidden ${
-                        isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-800'
-                      }`}
-                    >
-                      <option value="Ready to Enter">Ready to Enter</option>
-                      <option value="Setup Forming">Setup Forming</option>
-                      <option value="Watching">Watching</option>
-                      <option value="Triggered">Triggered</option>
-                      <option value="Invalidated">Invalidated</option>
-                    </select>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {[
+                        { key: 'Ready to Enter', label: 'Ready to Enter', desc: 'Execution confirmed', dot: 'bg-emerald-400', activeBg: 'bg-emerald-500/15 border-emerald-500 text-emerald-400' },
+                        { key: 'Setup Forming', label: 'Setup Forming', desc: 'Structure forming', dot: 'bg-sky-400', activeBg: 'bg-sky-500/15 border-sky-500 text-sky-400' },
+                        { key: 'Watching', label: 'Watching', desc: 'Waiting for POI', dot: 'bg-amber-400', activeBg: 'bg-amber-500/15 border-amber-500 text-amber-400' },
+                        { key: 'Triggered', label: 'Triggered', desc: 'Position active', dot: 'bg-purple-400', activeBg: 'bg-purple-500/15 border-purple-500 text-purple-400' },
+                        { key: 'Invalidated', label: 'Invalidated', desc: 'Setup cancelled', dot: 'bg-zinc-400', activeBg: 'bg-zinc-800 border-zinc-600 text-zinc-300' },
+                      ].map((opt) => {
+                        const isSelected = watchlistStatus === opt.key;
+                        return (
+                          <button
+                            key={opt.key}
+                            type="button"
+                            onClick={() => setWatchlistStatus(opt.key as any)}
+                            className={`p-2.5 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer ${
+                              isSelected
+                                ? `${opt.activeBg} font-bold shadow-xs`
+                                : isDarkMode 
+                                  ? 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200' 
+                                  : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className={`h-2.5 w-2.5 rounded-full ${opt.dot}`} />
+                              <div>
+                                <div className="text-xs font-bold leading-tight">{opt.label}</div>
+                                <div className="text-[10px] opacity-75">{opt.desc}</div>
+                              </div>
+                            </div>
+                            {isSelected && <Check className="h-4 w-4 shrink-0" />}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
 
