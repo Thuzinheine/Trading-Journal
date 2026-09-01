@@ -330,10 +330,12 @@ export default function Home() {
     const overlapOpen = currentDec >= 13 && currentDec < 16.5;
 
     const pad = (n: number) => n.toString().padStart(2, '0');
-    const localHours = currentTime.getHours();
+    const localHours24 = currentTime.getHours();
     const localMinutes = currentTime.getMinutes();
     const localSeconds = currentTime.getSeconds();
-    const timeStr = `${pad(localHours)}:${pad(localMinutes)}:${pad(localSeconds)}`;
+    const period = localHours24 >= 12 ? 'PM' : 'AM';
+    const localHours12 = localHours24 % 12 || 12;
+    const timeStr = `${pad(localHours12)}:${pad(localMinutes)}:${pad(localSeconds)} ${period}`;
 
     return { tokyoOpen, londonOpen, nyOpen, overlapOpen, timeStr };
   }, [currentTime]);
