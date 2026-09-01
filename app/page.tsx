@@ -6103,20 +6103,23 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
 
                           <div>
                             <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">Market Edge (1 to 6)</label>
-                            <select
-                              value={microSetupType}
-                              onChange={(e) => setMicroSetupType(e.target.value)}
-                              className={`w-full p-2.5 rounded-xl border font-bold focus:outline-hidden ${
-                                isDarkMode ? 'bg-zinc-950 border-zinc-800 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'
-                              }`}
-                            >
-                              <option value="Horizontal S/R (Edge 1)">1. Horizontal S/R</option>
-                              <option value="Trendline (Edge 2)">2. Trendline</option>
-                              <option value="Fibonacci (Edge 3)">3. Fibonacci</option>
-                              <option value="EMA System (Edge 4)">4. EMA (1ABC / 2ABC)</option>
-                              <option value="SMA TLE (Edge 5)">5. SMA (MEZ's TLE)</option>
-                              <option value="Gap Analysis (Edge 6)">6. Gap</option>
-                            </select>
+                            <div className="relative">
+                              <select
+                                value={microSetupType}
+                                onChange={(e) => setMicroSetupType(e.target.value)}
+                                className={`w-full p-2.5 pr-8 rounded-xl border font-bold appearance-none cursor-pointer focus:outline-hidden ${
+                                  isDarkMode ? 'bg-zinc-950 border-zinc-800 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'
+                                }`}
+                              >
+                                <option value="Horizontal S/R (Edge 1)">1. Horizontal S/R</option>
+                                <option value="Trendline (Edge 2)">2. Trendline</option>
+                                <option value="Fibonacci (Edge 3)">3. Fibonacci</option>
+                                <option value="EMA System (Edge 4)">4. EMA (1ABC / 2ABC)</option>
+                                <option value="SMA TLE (Edge 5)">5. SMA (MEZ's TLE / Big Shadow)</option>
+                                <option value="Gap Analysis (Edge 6)">6. Gap</option>
+                              </select>
+                              <ChevronDown className="h-4 w-4 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400" />
+                            </div>
                           </div>
 
                           <div>
