@@ -78,6 +78,7 @@ import {
   Filter,
   Check,
   AlertTriangle,
+  AlertCircle,
   Sun,
   Moon,
   Menu,
@@ -2011,29 +2012,65 @@ export default function Home() {
     if (user?.uid) await loadLearningNotes(user.uid);
   };
 
-  // Auto calculated suggested Risk/Reward and PnL
+  // Auto calculated suggested Risk/Reward (TradingView & Binance Standard: Reward Distance / Risk Distance)
   const calculatedSuggestions = useMemo(() => {
     const entry = parseFloat(formData.entryPrice);
     const sl = parseFloat(formData.sl);
     const tp = parseFloat(formData.tp);
 
     if (isNaN(entry) || isNaN(sl) || isNaN(tp) || entry <= 0 || sl <= 0 || tp <= 0) {
-      return { rr: '', suggestedPnlWin: '', suggestedPnlLoss: '' };
+      return { rr: '', direction: '', ratio: 0, suggestedPnlWin: '', suggestedPnlLoss: '', isValid: false, invalidReason: '' };
     }
 
-    const risk = Math.abs(entry - sl);
-    const reward = Math.abs(tp - entry);
+    let isLong = false;
+    let isShort = false;
+    let isValid = true;
+    let invalidReason = '';
+
+    if (tp > entry && sl < entry) {
+      isLong = true;
+    } else if (tp < entry && sl > entry) {
+      isShort = true;
+    } else {
+      isValid = false;
+      invalidReason = tp >= entry && sl >= entry 
+        ? 'SL နှင့် TP နှစ်ခုစလုံး Entry ထက် မြင့်နေပါသည်' 
+        : 'SL နှင့် TP နှစ်ခုစလုံး Entry ထက် နိမ့်နေပါသည်';
+    }
+
+    const risk = isLong ? (entry - sl) : isShort ? (sl - entry) : Math.abs(entry - sl);
+    const reward = isLong ? (tp - entry) : isShort ? (entry - tp) : Math.abs(tp - entry);
 
     if (risk <= 0 || reward <= 0) {
-      return { rr: '', suggestedPnlWin: '', suggestedPnlLoss: '' };
+      return { rr: '', direction: '', ratio: 0, suggestedPnlWin: '', suggestedPnlLoss: '', isValid: false, invalidReason: 'Risk သို့မဟုတ် Reward သည် 0 ထက် ကြီးရပါမည်' };
     }
 
+    // TradingView & Binance standard formula:
+    // Risk : Reward Ratio = 1 : (Reward Distance / Risk Distance)
     const ratio = reward / risk;
-    const rrStr = `1:${ratio.toFixed(1)}`;
-    const suggestedPnlWin = `+${ratio.toFixed(1)}R`;
-    const suggestedPnlLoss = `-1R`;
+    const formattedRatio = (ratio % 1 === 0) 
+      ? ratio.toFixed(0) 
+      : ((ratio * 10) % 1 === 0) 
+        ? ratio.toFixed(1) 
+        : ratio.toFixed(2);
 
-    return { rr: rrStr, suggestedPnlWin, suggestedPnlLoss };
+    const rrStr = `1:${formattedRatio}`;
+    const suggestedPnlWin = `+${formattedRatio}R`;
+    const suggestedPnlLoss = `-1R`;
+    const direction = isLong ? 'LONG (BUY)' : isShort ? 'SHORT (SELL)' : '';
+
+    return { 
+      rr: rrStr, 
+      direction, 
+      ratio, 
+      formattedRatio, 
+      suggestedPnlWin, 
+      suggestedPnlLoss, 
+      isValid, 
+      invalidReason,
+      riskDistance: risk,
+      rewardDistance: reward
+    };
   }, [formData.entryPrice, formData.sl, formData.tp]);
 
 function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'Breakeven' | 'Trailing Stop' | 'Pending' {
@@ -2407,24 +2444,42 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
     return pnlStr.includes('-') ? -Math.abs(parsed) : Math.abs(parsed);
   };
 
-  // Helper to parse RR field (e.g., "1:2.5", "2.5R", "3", "-1")
+  // Helper to parse RR field (e.g., "1:2.5", "2.5R", "1:3", "-1R")
+  // In TradingView & R-Multiple standard:
+  // - TP Realized Return = +Reward Multiple (e.g., +3.0R for a 1:3 trade)
+  // - SL Realized Loss = -1.0R (You risked 1 Unit and lost 1 Unit, NOT -3.0R)
+  // - Breakeven = 0.0R
   const parseRRValue = (rrStr: string | null, winLoss?: string): number => {
+    if (winLoss === 'Pending') return 0;
+    if (winLoss === 'Breakeven') return 0;
+    if (winLoss === 'SL') return -1.0;
+
     if (!rrStr) {
       if (winLoss === 'TP') return 2.0;
-      if (winLoss === 'SL') return -1.0;
+      if (winLoss === 'Trailing Stop') return 1.0;
       return 0;
     }
+
     const clean = rrStr.replace(/[^\d\.\-\:]/g, '');
     if (clean.includes(':')) {
       const parts = clean.split(':');
-      const val = parseFloat(parts[1] || parts[0]);
-      if (!isNaN(val)) {
-        return winLoss === 'SL' ? -Math.abs(val) : Math.abs(val);
+      // In "1:3", parts[0] is Risk (1), parts[1] is Target Reward (3)
+      const rewardVal = parseFloat(parts[1]);
+      if (!isNaN(rewardVal)) {
+        if (winLoss === 'TP') return Math.abs(rewardVal);
+        if (winLoss === 'Trailing Stop') return Math.abs(rewardVal) > 0 ? Math.abs(rewardVal) / 2 : 1.0;
+        return Math.abs(rewardVal);
       }
     }
+
     const parsed = parseFloat(clean);
-    if (isNaN(parsed)) return winLoss === 'SL' ? -1 : winLoss === 'TP' ? 2 : 0;
-    return winLoss === 'SL' ? -Math.abs(parsed) : parsed;
+    if (!isNaN(parsed)) {
+      if (winLoss === 'TP') return Math.abs(parsed);
+      if (winLoss === 'Trailing Stop') return Math.abs(parsed) > 0 ? Math.abs(parsed) : 1.0;
+      return parsed;
+    }
+
+    return winLoss === 'TP' ? 2.0 : 0;
   };
 
   // Filtered trades by Dashboard Timeframe
@@ -2685,10 +2740,10 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
     }`}>
       {/* Sidebar Navigation (Visible on Desktop, hidden on Mobile) */}
       {!needsAuth && (
-        <aside className={`fixed top-0 bottom-0 left-0 z-40 w-64 border-r hidden md:block transition-transform ${
+        <aside className={`fixed top-0 bottom-0 left-0 z-40 w-64 border-r hidden md:block transition-colors ${
           isDarkMode 
-            ? 'bg-zinc-900/50 border-zinc-800/80 text-zinc-200' 
-            : 'bg-white border-slate-200/80 text-slate-700'
+            ? 'bg-zinc-950 border-zinc-800 text-zinc-200' 
+            : 'bg-white border-slate-200 text-slate-700'
         }`}>
           <div className="flex flex-col h-full px-4 py-6">
             {/* Logo/Title */}
@@ -3054,8 +3109,8 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
       {/* Main Body content area */}
       <div className={`flex-1 flex flex-col ${needsAuth ? '' : 'md:pl-64'}`}>
         {!needsAuth && (
-          <header className={`hidden md:flex items-center justify-between px-6 py-3.5 border-b sticky top-0 z-30 transition-all ${
-            isDarkMode ? 'bg-zinc-950/80 border-zinc-800/80 backdrop-blur-md' : 'bg-white/80 border-slate-200/80 backdrop-blur-md'
+          <header className={`hidden md:flex items-center justify-between px-6 py-3.5 border-b sticky top-0 z-30 transition-colors shadow-2xs ${
+            isDarkMode ? 'bg-zinc-950 border-zinc-800' : 'bg-white border-slate-200'
           }`}>
             {/* View Breadcrumb / Active Context */}
             <div className="flex items-center space-x-3">
@@ -6444,16 +6499,16 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
           </div>
         )}
       </main>
-    </div>
 
-    {/* FOOTER */}
-    <footer className={`border-t transition-colors mt-16 py-8 text-center text-xs font-medium ${
-      isDarkMode ? 'bg-zinc-900/40 border-zinc-800/80 text-zinc-500' : 'bg-white border-slate-200 text-slate-400'
-    } ${needsAuth ? '' : 'md:pl-64'}`}>
-      <div className="w-full px-6 sm:px-8 lg:px-10">
-        <p>© 2026 Trading Journal Admin Dashboard. All Trade records and Notes are stored securely in your private Google Drive.</p>
-      </div>
-    </footer>
+      {/* FOOTER - Clean borderless natural placement */}
+      <footer className={`mt-auto py-8 text-center text-xs font-medium transition-colors ${
+        isDarkMode ? 'text-zinc-600' : 'text-slate-400'
+      }`}>
+        <div className="w-full px-6 sm:px-8 lg:px-10">
+          <p>© 2026 Trading Journal Admin Dashboard. All Trade records and Notes are stored securely in your private Google Drive.</p>
+        </div>
+      </footer>
+    </div>
 
     {/* ADD / EDIT TRADE MODAL */}
       <AnimatePresence>
@@ -6879,9 +6934,20 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                   {/* Section 3: Execution Pricing & Ratios */}
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <h4 className={`text-[10px] font-bold uppercase tracking-wider ${isDarkMode ? 'text-zinc-500' : 'text-slate-400'}`}>
-                        ၃။ ဈေးနှုန်းသတ်မှတ်ချက်များ (Pricing & Ratios)
-                      </h4>
+                      <div className="flex items-center gap-2">
+                        <h4 className={`text-[10px] font-bold uppercase tracking-wider ${isDarkMode ? 'text-zinc-500' : 'text-slate-400'}`}>
+                          ၃။ ဈေးနှုန်းသတ်မှတ်ချက်များ (Pricing & R:R)
+                        </h4>
+                        {calculatedSuggestions.direction && (
+                          <span className={`text-[10px] px-2 py-0.5 rounded-md font-extrabold ${
+                            calculatedSuggestions.direction.includes('LONG')
+                              ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                              : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
+                          }`}>
+                            {calculatedSuggestions.direction}
+                          </span>
+                        )}
+                      </div>
                       <hr className="flex-1 ml-4 border-dashed border-slate-300 dark:border-zinc-800" />
                     </div>
 
@@ -6941,13 +7007,29 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                       </div>
                     </div>
 
+                    {calculatedSuggestions.invalidReason && (
+                      <div className="text-[11px] text-amber-500 bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+                        <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                        <span>{calculatedSuggestions.invalidReason}</span>
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
                       {/* R:R Ratio */}
                       <div>
                         <div className="flex justify-between items-center mb-1.5">
-                          <label className={`block text-[11px] font-bold ${isDarkMode ? 'text-zinc-400' : 'text-slate-600'}`}>Risk to Reward (R:R)</label>
+                          <label className={`block text-[11px] font-bold ${isDarkMode ? 'text-zinc-400' : 'text-slate-600'}`}>
+                            TradingView R:R Ratio
+                          </label>
                           {calculatedSuggestions.rr && (
-                            <span className="text-[9px] text-emerald-500 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded-sm">Suggest: {calculatedSuggestions.rr}</span>
+                            <button
+                              type="button"
+                              onClick={() => setFormData({ ...formData, rr: calculatedSuggestions.rr })}
+                              className="text-[9px] text-emerald-400 hover:text-emerald-300 font-bold bg-emerald-500/15 hover:bg-emerald-500/25 px-2 py-0.5 rounded transition-all cursor-pointer flex items-center gap-1"
+                              title="TradingView R:R သတ်မှတ်ချက်ကို ဖြည့်သွင်းရန်"
+                            >
+                              <span>⚡ Auto: {calculatedSuggestions.rr}</span>
+                            </button>
                           )}
                         </div>
                         <input
@@ -6966,11 +7048,18 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                       {/* PNL in $ */}
                       <div>
                         <div className="flex justify-between items-center mb-1.5">
-                          <label className={`block text-[11px] font-bold ${isDarkMode ? 'text-zinc-400' : 'text-slate-600'}`}>P&L in $</label>
+                          <label className={`block text-[11px] font-bold ${isDarkMode ? 'text-zinc-400' : 'text-slate-600'}`}>P&L in $ / R</label>
                           {formData.winLoss !== 'Pending' && (
                             <button
                               type="button"
-                              onClick={() => setFormData({ ...formData, pnl: formData.winLoss === 'TP' ? (calculatedSuggestions.suggestedPnlWin || '+$300') : formData.winLoss === 'SL' ? '-$100' : '$0' })}
+                              onClick={() => setFormData({ 
+                                ...formData, 
+                                pnl: formData.winLoss === 'TP' 
+                                  ? (calculatedSuggestions.suggestedPnlWin || '+$300') 
+                                  : formData.winLoss === 'SL' 
+                                    ? '-1R' 
+                                    : '$0' 
+                              })}
                               className="text-[9px] bg-emerald-500/15 hover:bg-emerald-500/25 px-2 py-0.5 rounded text-emerald-500 font-bold tracking-wide transition-all cursor-pointer"
                             >
                               Auto-Fill ⚡
@@ -6979,7 +7068,7 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                         </div>
                         <input
                           type="text"
-                          placeholder="e.g. +$300, -$100"
+                          placeholder="e.g. +$300, -$100, +3R, -1R"
                           value={formData.pnl}
                           onChange={(e) => setFormData({ ...formData, pnl: e.target.value })}
                           className={`w-full px-3 py-2 border border-transparent rounded-lg text-xs font-mono font-bold transition-all duration-150 focus:outline-hidden ${
