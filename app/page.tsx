@@ -100,6 +100,7 @@ import {
   Flame,
   ArrowUpRight,
   ArrowDownRight,
+  Minus,
   SlidersHorizontal,
   BarChart2,
   Sparkles,
@@ -2884,20 +2885,11 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                   </div>
                 </div>
               )}
-              <div className="flex items-center justify-between px-2">
-                <button
-                  onClick={() => setIsDarkMode(!isDarkMode)}
-                  className={`p-2 rounded-xl transition-all duration-150 cursor-pointer ${
-                    isDarkMode ? 'bg-zinc-800 text-yellow-400 hover:text-yellow-300 hover:bg-zinc-700' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                  }`}
-                  title={isDarkMode ? 'Light Mode' : 'Dark Mode'}
-                >
-                  {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                </button>
+              <div className="flex items-center justify-end px-2">
                 {user && (
                   <button
                     onClick={handleLogout}
-                    className={`p-2 rounded-xl transition-all duration-150 flex items-center space-x-1.5 text-xs font-semibold cursor-pointer ${
+                    className={`w-full p-2 rounded-xl transition-all duration-150 flex items-center justify-center space-x-1.5 text-xs font-semibold cursor-pointer ${
                       isDarkMode ? 'text-zinc-400 hover:text-red-400 hover:bg-red-500/10' : 'text-slate-500 hover:text-red-500 hover:bg-red-50'
                     }`}
                   >
@@ -4190,10 +4182,11 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                                         BE ⊜
                                       </span>
                                     ) : trade.winLoss === 'Trailing Stop' ? (
-                                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold shadow-2xs ${
+                                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold shadow-2xs ${
                                         isDarkMode ? 'bg-teal-500/15 text-teal-400 border border-teal-500/30' : 'bg-teal-50 text-teal-700 border border-teal-200'
                                       }`}>
-                                        TS ↗
+                                        <span>TS</span>
+                                        <ArrowUpRight className="h-3 w-3 shrink-0" />
                                       </span>
                                     ) : (
                                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold shadow-2xs ${
@@ -4521,21 +4514,24 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                           <label className={`block text-[11px] font-bold uppercase tracking-wider mb-1.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
                             Setup Type
                           </label>
-                          <select
-                            value={microSetupType}
-                            onChange={(e) => setMicroSetupType(e.target.value)}
-                            className={`w-full p-2.5 rounded-xl text-xs font-semibold border focus:outline-hidden transition-all cursor-pointer ${
-                              isDarkMode 
-                                ? 'bg-zinc-900 border-zinc-800 text-zinc-100' 
-                                : 'bg-slate-50 border-slate-200 text-slate-800'
-                            }`}
-                          >
-                            <option value="Order Block">Order Block</option>
-                            <option value="Liquidity Hunt">Liquidity Hunt</option>
-                            <option value="FVG Mitigation">FVG Mitigation</option>
-                            <option value="Break of Structure">Break of Structure</option>
-                            <option value="Silver Bullet">Silver Bullet</option>
-                          </select>
+                          <div className="relative">
+                            <select
+                              value={microSetupType}
+                              onChange={(e) => setMicroSetupType(e.target.value)}
+                              className={`appearance-none w-full pl-3 pr-8 py-2.5 rounded-xl text-xs font-semibold border focus:outline-hidden transition-all cursor-pointer ${
+                                isDarkMode 
+                                  ? 'bg-zinc-900 border-zinc-800 text-zinc-100' 
+                                  : 'bg-slate-50 border-slate-200 text-slate-800'
+                              }`}
+                            >
+                              <option value="Order Block">Order Block</option>
+                              <option value="Liquidity Hunt">Liquidity Hunt</option>
+                              <option value="FVG Mitigation">FVG Mitigation</option>
+                              <option value="Break of Structure">Break of Structure</option>
+                              <option value="Silver Bullet">Silver Bullet</option>
+                            </select>
+                            <ChevronDown className="h-3.5 w-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 dark:text-zinc-500" />
+                          </div>
                         </div>
                       </div>
 
@@ -4793,15 +4789,17 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                         </div>
 
                         {/* Year Selector Tabs */}
-                        <div className="flex bg-slate-100 dark:bg-zinc-900/80 p-0.5 rounded-lg border border-slate-250/20 dark:border-zinc-800">
+                        <div className={`flex p-0.5 rounded-lg border transition-all ${
+                          isDarkMode ? 'bg-zinc-950 border-zinc-800' : 'bg-slate-100 border-slate-200'
+                        }`}>
                           {([2026, 2027] as const).map((yr) => (
                             <button
                               key={yr}
                               onClick={() => setFomcYear(yr)}
                               className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
                                 fomcYear === yr
-                                  ? 'bg-white dark:bg-zinc-850 text-slate-900 dark:text-zinc-100 shadow-xs'
-                                  : 'text-zinc-400 hover:text-zinc-200'
+                                  ? (isDarkMode ? 'bg-zinc-800 text-zinc-100 shadow-xs border border-zinc-700/50' : 'bg-white text-slate-900 shadow-xs')
+                                  : (isDarkMode ? 'text-zinc-400 hover:text-zinc-200' : 'text-slate-500 hover:text-slate-700')
                               }`}
                             >
                               {yr}
@@ -4918,7 +4916,9 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                         </div>
 
                         {/* Month Select Buttons */}
-                        <div className="flex flex-wrap gap-1 bg-slate-100 dark:bg-zinc-900/80 p-0.5 rounded-lg border border-slate-250/20 dark:border-zinc-800">
+                        <div className={`flex flex-wrap gap-1 p-0.5 rounded-lg border transition-all ${
+                          isDarkMode ? 'bg-zinc-950 border-zinc-800' : 'bg-slate-100 border-slate-200'
+                        }`}>
                           {['Aug 2026', 'Sep 2026', 'Oct 2026', 'Nov 2026', 'Dec 2026'].map((m) => (
                             <button
                               key={m}
@@ -4926,8 +4926,8 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                               onClick={() => handleSelectIndicatorPreset(m)}
                               className={`px-2 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
                                 selectedIndicatorMonth === m
-                                  ? 'bg-white dark:bg-zinc-850 text-slate-900 dark:text-zinc-100 shadow-xs'
-                                  : 'text-zinc-400 hover:text-zinc-200'
+                                  ? (isDarkMode ? 'bg-zinc-800 text-zinc-100 shadow-xs border border-zinc-700/50' : 'bg-white text-slate-900 shadow-xs')
+                                  : (isDarkMode ? 'text-zinc-400 hover:text-zinc-200' : 'text-slate-500 hover:text-slate-700')
                               }`}
                             >
                               {m.split(' ')[0]}
@@ -5257,7 +5257,7 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                                         ...macroTimeframeMatrix,
                                         [key]: bias
                                       })}
-                                      className={`px-2 py-0.5 text-[10px] font-bold rounded-sm border transition-all cursor-pointer ${
+                                      className={`inline-flex items-center justify-center px-2 py-0.5 text-[10px] font-bold rounded-sm border transition-all cursor-pointer ${
                                         macroTimeframeMatrix[key] === bias
                                           ? (bias === 'Bullish' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' :
                                              bias === 'Bearish' ? 'bg-rose-500/10 border-rose-500/30 text-rose-400' :
@@ -5265,7 +5265,7 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                                           : (isDarkMode ? 'bg-zinc-900 border-zinc-800 text-zinc-500' : 'bg-slate-50 border-slate-200 text-slate-500')
                                       }`}
                                     >
-                                      {bias === 'Bullish' ? '▲' : bias === 'Bearish' ? '▼' : '■'}
+                                      {bias === 'Bullish' ? <TrendingUp className="h-3 w-3 shrink-0" /> : bias === 'Bearish' ? <TrendingDown className="h-3 w-3 shrink-0" /> : <Minus className="h-3 w-3 shrink-0" />}
                                     </button>
                                   ))}
                                 </div>
@@ -5365,12 +5365,13 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                             <div className="flex justify-between items-start gap-4 mb-3">
                               <div>
                                 <span className="text-[10px] text-zinc-500 block uppercase font-bold">Weekly Market Bias</span>
-                                <span className={`text-md font-black px-3 py-1 rounded-lg inline-block mt-0.5 ${
+                                <span className={`text-md font-black px-3 py-1 rounded-lg inline-flex items-center gap-1.5 mt-0.5 ${
                                   log.weeklyBias === 'Bullish' ? 'bg-emerald-500/10 text-emerald-400' :
                                   log.weeklyBias === 'Bearish' ? 'bg-rose-500/10 text-rose-400' :
                                   'bg-amber-500/10 text-amber-400'
                                 }`}>
-                                  {log.weeklyBias} {log.weeklyBias === 'Bullish' ? '▲' : log.weeklyBias === 'Bearish' ? '▼' : '■'}
+                                  <span>{log.weeklyBias}</span>
+                                  {log.weeklyBias === 'Bullish' ? <TrendingUp className="h-4 w-4 shrink-0" /> : log.weeklyBias === 'Bearish' ? <TrendingDown className="h-4 w-4 shrink-0" /> : <Minus className="h-4 w-4 shrink-0" />}
                                 </span>
                               </div>
 
@@ -5396,12 +5397,27 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                               {Object.entries(log.timeframeMatrix).map(([tf, bias]) => (
                                 <div key={tf} className="text-center p-1">
                                   <span className="text-[9px] uppercase font-bold text-zinc-500">{tf}</span>
-                                  <span className={`block text-xs font-black mt-0.5 ${
+                                  <span className={`inline-flex items-center justify-center gap-1 text-xs font-black mt-0.5 ${
                                     bias === 'Bullish' ? 'text-emerald-500' :
                                     bias === 'Bearish' ? 'text-rose-500' :
                                     'text-amber-500'
                                   }`}>
-                                    {bias === 'Bullish' ? '▲ Bull' : bias === 'Bearish' ? '▼ Bear' : '■ Range'}
+                                    {bias === 'Bullish' ? (
+                                      <>
+                                        <TrendingUp className="h-3 w-3 shrink-0" />
+                                        <span>Bull</span>
+                                      </>
+                                    ) : bias === 'Bearish' ? (
+                                      <>
+                                        <TrendingDown className="h-3 w-3 shrink-0" />
+                                        <span>Bear</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Minus className="h-3 w-3 shrink-0" />
+                                        <span>Range</span>
+                                      </>
+                                    )}
                                   </span>
                                 </div>
                               ))}
@@ -6121,35 +6137,41 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                     {/* Filters, Search & Actions */}
                     <div className="flex flex-wrap items-center gap-2.5">
                       {/* Bias Filter */}
-                      <select
-                        value={watchlistFilterBias}
-                        onChange={(e) => setWatchlistFilterBias(e.target.value as any)}
-                        className={`text-xs font-medium px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer focus:outline-hidden ${
-                          isDarkMode ? 'bg-zinc-950 border-zinc-800/80 text-zinc-300' : 'bg-slate-50 border-slate-200 text-slate-700'
-                        }`}
-                      >
-                        <option value="ALL">All Biases</option>
-                        <option value="Bullish">Bullish</option>
-                        <option value="Bearish">Bearish</option>
-                        <option value="Neutral">Neutral</option>
-                        <option value="Monitoring">Monitoring</option>
-                      </select>
+                      <div className="relative inline-flex items-center">
+                        <select
+                          value={watchlistFilterBias}
+                          onChange={(e) => setWatchlistFilterBias(e.target.value as any)}
+                          className={`appearance-none text-xs font-medium pl-2.5 pr-7 py-1.5 rounded-lg border transition-all cursor-pointer focus:outline-hidden ${
+                            isDarkMode ? 'bg-zinc-950 border-zinc-800/80 text-zinc-300' : 'bg-slate-50 border-slate-200 text-slate-700'
+                          }`}
+                        >
+                          <option value="ALL">All Biases</option>
+                          <option value="Bullish">Bullish</option>
+                          <option value="Bearish">Bearish</option>
+                          <option value="Neutral">Neutral</option>
+                          <option value="Monitoring">Monitoring</option>
+                        </select>
+                        <ChevronDown className="h-3 w-3 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 dark:text-zinc-500" />
+                      </div>
 
                       {/* Status Filter */}
-                      <select
-                        value={watchlistFilterStatus}
-                        onChange={(e) => setWatchlistFilterStatus(e.target.value as any)}
-                        className={`text-xs font-medium px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer focus:outline-hidden ${
-                          isDarkMode ? 'bg-zinc-950 border-zinc-800/80 text-zinc-300' : 'bg-slate-50 border-slate-200 text-slate-700'
-                        }`}
-                      >
-                        <option value="ALL" className={isDarkMode ? 'bg-zinc-900 text-zinc-100' : 'bg-white text-slate-900'}>All Statuses</option>
-                        <option value="Ready to Enter" className={isDarkMode ? 'bg-zinc-900 text-emerald-400 font-bold' : 'bg-white text-emerald-600 font-bold'}>Ready to Enter</option>
-                        <option value="Setup Forming" className={isDarkMode ? 'bg-zinc-900 text-sky-400 font-bold' : 'bg-white text-sky-600 font-bold'}>Setup Forming</option>
-                        <option value="Watching" className={isDarkMode ? 'bg-zinc-900 text-amber-400 font-bold' : 'bg-white text-amber-600 font-bold'}>Watching</option>
-                        <option value="Triggered" className={isDarkMode ? 'bg-zinc-900 text-purple-400 font-bold' : 'bg-white text-purple-600 font-bold'}>Triggered</option>
-                        <option value="Invalidated" className={isDarkMode ? 'bg-zinc-900 text-zinc-400' : 'bg-white text-slate-500'}>Invalidated</option>
-                      </select>
+                      <div className="relative inline-flex items-center">
+                        <select
+                          value={watchlistFilterStatus}
+                          onChange={(e) => setWatchlistFilterStatus(e.target.value as any)}
+                          className={`appearance-none text-xs font-medium pl-2.5 pr-7 py-1.5 rounded-lg border transition-all cursor-pointer focus:outline-hidden ${
+                            isDarkMode ? 'bg-zinc-950 border-zinc-800/80 text-zinc-300' : 'bg-slate-50 border-slate-200 text-slate-700'
+                          }`}
+                        >
+                          <option value="ALL" className={isDarkMode ? 'bg-zinc-900 text-zinc-100' : 'bg-white text-slate-900'}>All Statuses</option>
+                          <option value="Ready to Enter" className={isDarkMode ? 'bg-zinc-900 text-emerald-400 font-bold' : 'bg-white text-emerald-600 font-bold'}>Ready to Enter</option>
+                          <option value="Setup Forming" className={isDarkMode ? 'bg-zinc-900 text-sky-400 font-bold' : 'bg-white text-sky-600 font-bold'}>Setup Forming</option>
+                          <option value="Watching" className={isDarkMode ? 'bg-zinc-900 text-amber-400 font-bold' : 'bg-white text-amber-600 font-bold'}>Watching</option>
+                          <option value="Triggered" className={isDarkMode ? 'bg-zinc-900 text-purple-400 font-bold' : 'bg-white text-purple-600 font-bold'}>Triggered</option>
+                          <option value="Invalidated" className={isDarkMode ? 'bg-zinc-900 text-zinc-400' : 'bg-white text-slate-500'}>Invalidated</option>
+                        </select>
+                        <ChevronDown className="h-3 w-3 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 dark:text-zinc-500" />
+                      </div>
 
                       {/* Search Bar */}
                       <div className="relative flex items-center min-w-[170px]">
@@ -6322,14 +6344,29 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                                 </div>
 
                                 {/* Bias Badge */}
-                                <span className={`text-xs px-2.5 py-0.5 rounded-md font-semibold shrink-0 ${
+                                <span className={`inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-md font-semibold shrink-0 ${
                                   isBull 
                                     ? 'bg-emerald-500/10 text-emerald-400' 
                                     : isBear 
                                       ? 'bg-rose-500/10 text-rose-400' 
                                       : 'bg-zinc-800 text-zinc-300'
                                 }`}>
-                                  {isBull ? '▲ Bullish' : isBear ? '▼ Bearish' : item.bias}
+                                  {isBull ? (
+                                    <>
+                                      <TrendingUp className="h-3 w-3 shrink-0" />
+                                      <span>Bullish</span>
+                                    </>
+                                  ) : isBear ? (
+                                    <>
+                                      <TrendingDown className="h-3 w-3 shrink-0" />
+                                      <span>Bearish</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Minus className="h-3 w-3 shrink-0" />
+                                      <span>{item.bias}</span>
+                                    </>
+                                  )}
                                 </span>
                               </div>
 
@@ -6337,59 +6374,53 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                               <div className={`relative flex items-center justify-between text-xs py-1.5 px-3 rounded-xl border transition-all ${
                                 isDarkMode ? 'bg-zinc-950/60 border-zinc-800/40' : 'bg-slate-50 border-slate-200/80'
                               }`}>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">Status:</span>
-                                  <div className="relative inline-flex items-center">
-                                    <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all border ${
-                                      item.status === 'Ready to Enter'
-                                        ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 shadow-xs'
-                                        : item.status === 'Setup Forming'
-                                          ? 'bg-sky-500/15 text-sky-400 border-sky-500/30 shadow-xs'
-                                          : item.status === 'Watching'
-                                            ? 'bg-amber-500/15 text-amber-400 border-amber-500/30 shadow-xs'
-                                            : item.status === 'Triggered'
-                                              ? 'bg-purple-500/15 text-purple-400 border-purple-500/30 shadow-xs'
-                                              : 'bg-zinc-800/80 text-zinc-400 border-zinc-700/50'
-                                    }`}>
-                                      {item.status === 'Ready to Enter' && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />}
-                                      {item.status === 'Setup Forming' && <span className="h-1.5 w-1.5 rounded-full bg-sky-400" />}
-                                      {item.status === 'Watching' && <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />}
-                                      {item.status === 'Triggered' && <span className="h-1.5 w-1.5 rounded-full bg-purple-400" />}
-                                      {item.status === 'Invalidated' && <span className="h-1.5 w-1.5 rounded-full bg-zinc-500" />}
-                                      <span>{item.status}</span>
-                                      <ChevronDown className="h-3 w-3 opacity-60 ml-0.5" />
-                                    </div>
-                                    <select
-                                      value={item.status}
-                                      onChange={(e) => {
-                                        e.stopPropagation();
-                                        handleQuickWatchlistStatus(item, e.target.value as any);
-                                      }}
-                                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer text-xs"
-                                      title="Status ပြောင်းလဲရန် နှိပ်ပါ (Change Status)"
-                                    >
-                                      <option value="Ready to Enter" className={isDarkMode ? 'bg-zinc-900 text-emerald-400' : 'bg-white text-emerald-600'}>
-                                        Ready to Enter (Confirmed & Ready)
-                                      </option>
-                                      <option value="Setup Forming" className={isDarkMode ? 'bg-zinc-900 text-sky-400' : 'bg-white text-sky-600'}>
-                                        Setup Forming (Building Structure)
-                                      </option>
-                                      <option value="Watching" className={isDarkMode ? 'bg-zinc-900 text-amber-400' : 'bg-white text-amber-600'}>
-                                        Watching (Waiting for POI)
-                                      </option>
-                                      <option value="Triggered" className={isDarkMode ? 'bg-zinc-900 text-purple-400' : 'bg-white text-purple-600'}>
-                                        Triggered (Active / Running)
-                                      </option>
-                                      <option value="Invalidated" className={isDarkMode ? 'bg-zinc-900 text-zinc-400' : 'bg-white text-slate-500'}>
-                                        Invalidated (Voided / Broken)
-                                      </option>
-                                    </select>
+                                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Status:</span>
+                                <div className="relative inline-flex items-center shrink-0">
+                                  <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all border ${
+                                    item.status === 'Ready to Enter'
+                                      ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 shadow-xs'
+                                      : item.status === 'Setup Forming'
+                                        ? 'bg-sky-500/15 text-sky-400 border-sky-500/30 shadow-xs'
+                                        : item.status === 'Watching'
+                                          ? 'bg-amber-500/15 text-amber-400 border-amber-500/30 shadow-xs'
+                                          : item.status === 'Triggered'
+                                            ? 'bg-purple-500/15 text-purple-400 border-purple-500/30 shadow-xs'
+                                            : 'bg-zinc-800/80 text-zinc-400 border-zinc-700/50'
+                                  }`}>
+                                    {item.status === 'Ready to Enter' && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />}
+                                    {item.status === 'Setup Forming' && <span className="h-1.5 w-1.5 rounded-full bg-sky-400" />}
+                                    {item.status === 'Watching' && <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />}
+                                    {item.status === 'Triggered' && <span className="h-1.5 w-1.5 rounded-full bg-purple-400" />}
+                                    {item.status === 'Invalidated' && <span className="h-1.5 w-1.5 rounded-full bg-zinc-500" />}
+                                    <span>{item.status}</span>
+                                    <ChevronDown className="h-3 w-3 opacity-70 shrink-0 ml-0.5" />
                                   </div>
+                                  <select
+                                    value={item.status}
+                                    onChange={(e) => {
+                                      e.stopPropagation();
+                                      handleQuickWatchlistStatus(item, e.target.value as any);
+                                    }}
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer text-xs"
+                                    title="Status ပြောင်းလဲရန် နှိပ်ပါ (Change Status)"
+                                  >
+                                    <option value="Ready to Enter" className={isDarkMode ? 'bg-zinc-900 text-emerald-400' : 'bg-white text-emerald-600'}>
+                                      Ready to Enter (Confirmed & Ready)
+                                    </option>
+                                    <option value="Setup Forming" className={isDarkMode ? 'bg-zinc-900 text-sky-400' : 'bg-white text-sky-600'}>
+                                      Setup Forming (Building Structure)
+                                    </option>
+                                    <option value="Watching" className={isDarkMode ? 'bg-zinc-900 text-amber-400' : 'bg-white text-amber-600'}>
+                                      Watching (Waiting for POI)
+                                    </option>
+                                    <option value="Triggered" className={isDarkMode ? 'bg-zinc-900 text-purple-400' : 'bg-white text-purple-600'}>
+                                      Triggered (Active / Running)
+                                    </option>
+                                    <option value="Invalidated" className={isDarkMode ? 'bg-zinc-900 text-zinc-400' : 'bg-white text-slate-500'}>
+                                      Invalidated (Voided / Broken)
+                                    </option>
+                                  </select>
                                 </div>
-
-                                <span className="text-[10px] text-zinc-500 font-mono">
-                                  Click to switch
-                                </span>
                               </div>
 
                               {/* Key Levels Box */}
@@ -7825,18 +7856,21 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                     <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
                       Category
                     </label>
-                    <select
-                      value={watchlistCategory}
-                      onChange={(e) => setWatchlistCategory(e.target.value as any)}
-                      className={`w-full px-3 py-2 rounded-xl border text-xs font-medium cursor-pointer focus:outline-hidden ${
-                        isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-800'
-                      }`}
-                    >
-                      <option value="Crypto">Crypto</option>
-                      <option value="Forex">Forex</option>
-                      <option value="Commodity">Commodity (Gold, Silver, Oil)</option>
-                      <option value="Index">Index (US30, NAS100, SPX)</option>
-                    </select>
+                    <div className="relative">
+                      <select
+                        value={watchlistCategory}
+                        onChange={(e) => setWatchlistCategory(e.target.value as any)}
+                        className={`appearance-none w-full pl-3 pr-8 py-2 rounded-xl border text-xs font-medium cursor-pointer focus:outline-hidden ${
+                          isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-800'
+                        }`}
+                      >
+                        <option value="Crypto">Crypto</option>
+                        <option value="Forex">Forex</option>
+                        <option value="Commodity">Commodity (Gold, Silver, Oil)</option>
+                        <option value="Index">Index (US30, NAS100, SPX)</option>
+                      </select>
+                      <ChevronDown className="h-3.5 w-3.5 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400" />
+                    </div>
                   </div>
 
                   {/* Timeframe */}
@@ -7844,20 +7878,23 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                     <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
                       Timeframe
                     </label>
-                    <select
-                      value={watchlistTimeframe}
-                      onChange={(e) => setWatchlistTimeframe(e.target.value)}
-                      className={`w-full px-3 py-2 rounded-xl border text-xs font-medium cursor-pointer focus:outline-hidden ${
-                        isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-800'
-                      }`}
-                    >
-                      <option value="15M">15M (Scalping / Execution)</option>
-                      <option value="30M">30M (Short-Term)</option>
-                      <option value="1H">1H (Intraday Setup)</option>
-                      <option value="4H">4H (Swing / Trend)</option>
-                      <option value="Daily">Daily (HTF Direction)</option>
-                      <option value="Weekly">Weekly (Macro Bias)</option>
-                    </select>
+                    <div className="relative">
+                      <select
+                        value={watchlistTimeframe}
+                        onChange={(e) => setWatchlistTimeframe(e.target.value)}
+                        className={`appearance-none w-full pl-3 pr-8 py-2 rounded-xl border text-xs font-medium cursor-pointer focus:outline-hidden ${
+                          isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-800'
+                        }`}
+                      >
+                        <option value="15M">15M (Scalping / Execution)</option>
+                        <option value="30M">30M (Short-Term)</option>
+                        <option value="1H">1H (Intraday Setup)</option>
+                        <option value="4H">4H (Swing / Trend)</option>
+                        <option value="Daily">Daily (HTF Direction)</option>
+                        <option value="Weekly">Weekly (Macro Bias)</option>
+                      </select>
+                      <ChevronDown className="h-3.5 w-3.5 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400" />
+                    </div>
                   </div>
                 </div>
 
@@ -7874,7 +7911,7 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                           type="button"
                           key={b}
                           onClick={() => setWatchlistBias(b)}
-                          className={`py-2 rounded-xl text-xs font-medium transition-all cursor-pointer text-center ${
+                          className={`inline-flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer text-center ${
                             watchlistBias === b 
                               ? (b === 'Bullish' ? 'bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40' :
                                  b === 'Bearish' ? 'bg-rose-500/20 text-rose-300 font-bold border border-rose-500/40' :
@@ -7882,7 +7919,22 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                               : isDarkMode ? 'bg-zinc-950 border border-zinc-800/80 text-zinc-400' : 'bg-slate-50 border border-slate-200 text-slate-600'
                           }`}
                         >
-                          {b === 'Bullish' ? '▲ Bullish' : b === 'Bearish' ? '▼ Bearish' : 'Neutral'}
+                          {b === 'Bullish' ? (
+                            <>
+                              <TrendingUp className="h-3.5 w-3.5 shrink-0" />
+                              <span>Bullish</span>
+                            </>
+                          ) : b === 'Bearish' ? (
+                            <>
+                              <TrendingDown className="h-3.5 w-3.5 shrink-0" />
+                              <span>Bearish</span>
+                            </>
+                          ) : (
+                            <>
+                              <Minus className="h-3.5 w-3.5 shrink-0" />
+                              <span>Neutral</span>
+                            </>
+                          )}
                         </button>
                       ))}
                     </div>
@@ -8133,9 +8185,22 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                       selectedWatchlistItem.bias === 'Bullish' ? 'text-emerald-400' :
                       selectedWatchlistItem.bias === 'Bearish' ? 'text-rose-400' : 'text-zinc-300'
                     }`}>
-                      {selectedWatchlistItem.bias === 'Bullish' ? '▲ Bullish (အဝယ်ဘက် အသာစီး)' :
-                       selectedWatchlistItem.bias === 'Bearish' ? '▼ Bearish (အရောင်းဘက် အသာစီး)' :
-                       selectedWatchlistItem.bias}
+                      {selectedWatchlistItem.bias === 'Bullish' ? (
+                        <>
+                          <TrendingUp className="h-4 w-4 shrink-0 text-emerald-400" />
+                          <span>Bullish (အဝယ်ဘက် အသာစီး)</span>
+                        </>
+                      ) : selectedWatchlistItem.bias === 'Bearish' ? (
+                        <>
+                          <TrendingDown className="h-4 w-4 shrink-0 text-rose-400" />
+                          <span>Bearish (အရောင်းဘက် အသာစီး)</span>
+                        </>
+                      ) : (
+                        <>
+                          <Minus className="h-4 w-4 shrink-0 text-zinc-400" />
+                          <span>{selectedWatchlistItem.bias}</span>
+                        </>
+                      )}
                     </span>
                   </div>
 
