@@ -1749,7 +1749,7 @@ function resolveSheetColumnIndices(headers: any[]) {
               category: row[2] || 'Forex',
               bias: row[3] || 'Bullish',
               status: row[4] || 'Watching',
-              timeframe: row[5] || '4H',
+              timeframe: row[5] || 'D1',
               keyLevels: row[6] || '',
               notes: row[7] || '',
               imageUrl: row[8] || '',

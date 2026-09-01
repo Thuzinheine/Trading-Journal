@@ -4180,7 +4180,7 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                                 <td className={`px-2 py-2 text-left w-24 whitespace-nowrap font-bold ${isDarkMode ? 'text-zinc-200' : 'text-slate-900'}`}>
                                   {trade.pair || '-'}
                                 </td>
-                                <td className={`px-2 py-2 text-left w-20 whitespace-nowrap font-medium font-mono ${isDarkMode ? 'text-zinc-300' : 'text-slate-600'}`}>
+                                <td className={`px-2 py-2 text-left w-20 whitespace-nowrap font-bold font-mono ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
                                   {trade.entryPrice ? `${trade.entryPrice.toLocaleString()}` : '-'}
                                 </td>
                                 <td className={`px-2 py-2 text-left w-20 whitespace-nowrap font-medium font-mono ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
@@ -4190,8 +4190,8 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                                   {trade.tp ? trade.tp.toLocaleString() : '-'}
                                 </td>
                                 <td className="px-2 py-2 text-center w-16 whitespace-nowrap">
-                                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold font-mono ${
-                                    isDarkMode ? 'bg-zinc-800 text-zinc-300 border border-zinc-700' : 'bg-slate-100 text-slate-700 border border-slate-200'
+                                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold font-mono ${
+                                    isDarkMode ? 'bg-zinc-800 text-white border border-zinc-700' : 'bg-slate-100 text-slate-900 border border-slate-200'
                                   }`}>
                                     {formatCleanRR(trade.rr)}
                                   </span>
@@ -4419,8 +4419,8 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                                 }`}>
                                   {trade.pnl || '-'}
                                 </span>
-                                <div className={`text-[10px] font-medium mt-1 ${isDarkMode ? 'text-zinc-500' : 'text-slate-400'}`}>
-                                  R:R: {formatCleanRR(trade.rr)}
+                                <div className={`text-[10px] font-medium mt-1 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                                  <span>R:R:</span> <span className={`font-bold font-mono ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{formatCleanRR(trade.rr)}</span>
                                 </div>
                               </div>
                             </div>
@@ -4430,10 +4430,10 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                               isDarkMode ? 'text-zinc-400' : 'text-slate-600'
                             }`}>
                               <div className="grid grid-cols-2 gap-2 text-xs">
-                                <div className="text-left"><span className="opacity-60 font-medium">Entry:</span> <span className="font-bold text-slate-900 dark:text-zinc-100">{trade.entryPrice ? trade.entryPrice.toLocaleString() : '-'}</span></div>
-                                <div className="text-right"><span className="opacity-60 font-medium">R:R:</span> <span className="font-bold text-slate-900 dark:text-zinc-100">{formatCleanRR(trade.rr)}</span></div>
-                                <div className="text-left"><span className="opacity-60 font-medium">SL:</span> <span className="font-bold text-rose-500">{trade.sl ? trade.sl.toLocaleString() : '-'}</span></div>
-                                <div className="text-right"><span className="opacity-60 font-medium">TP:</span> <span className="font-bold text-emerald-500">{trade.tp ? trade.tp.toLocaleString() : '-'}</span></div>
+                                <div className="text-left"><span className="opacity-70 font-medium">Entry:</span> <span className={`font-bold font-mono ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{trade.entryPrice ? trade.entryPrice.toLocaleString() : '-'}</span></div>
+                                <div className="text-right"><span className="opacity-70 font-medium">R:R:</span> <span className={`font-bold font-mono ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{formatCleanRR(trade.rr)}</span></div>
+                                <div className="text-left"><span className="opacity-70 font-medium">SL:</span> <span className="font-bold font-mono text-rose-500">{trade.sl ? trade.sl.toLocaleString() : '-'}</span></div>
+                                <div className="text-right"><span className="opacity-70 font-medium">TP:</span> <span className="font-bold font-mono text-emerald-500">{trade.tp ? trade.tp.toLocaleString() : '-'}</span></div>
                               </div>
                               
                               {trade.watchlist && (
@@ -6701,7 +6701,7 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                     </div>
                     <div className="flex items-center text-xs">
                       <span className={`w-32 shrink-0 font-semibold ${isDarkMode ? 'text-zinc-500' : 'text-slate-400'}`}>Entry Price</span>
-                      <span className="font-mono font-semibold">{selectedTrade.entryPrice ? selectedTrade.entryPrice.toLocaleString() : '-'}</span>
+                      <span className={`font-mono font-bold ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{selectedTrade.entryPrice ? selectedTrade.entryPrice.toLocaleString() : '-'}</span>
                     </div>
                   </div>
 
@@ -6716,8 +6716,8 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                     </div>
                     <div className="flex items-center text-xs">
                       <span className={`w-32 shrink-0 font-semibold ${isDarkMode ? 'text-zinc-500' : 'text-slate-400'}`}>Risk to Reward (R:R)</span>
-                      <span className={`inline-flex px-2 py-0.5 rounded-md text-xs font-semibold ${
-                        isDarkMode ? 'bg-zinc-800 text-zinc-300 border border-zinc-700' : 'bg-slate-100 text-slate-700 border border-slate-200'
+                      <span className={`inline-flex px-2 py-0.5 rounded-md text-xs font-bold font-mono ${
+                        isDarkMode ? 'bg-zinc-800 text-white border border-zinc-700' : 'bg-slate-100 text-slate-900 border border-slate-200'
                       }`}>{formatCleanRR(selectedTrade.rr)}</span>
                     </div>
                     <div className="flex items-center text-xs">
