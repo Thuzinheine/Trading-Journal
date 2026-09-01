@@ -15,7 +15,9 @@ async function driveFetch(token: string, path: string, options: RequestInit = {}
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Drive API Error (${res.status}): ${text}`);
+    const err: any = new Error(`Drive API Error (${res.status}): ${text}`);
+    err.status = res.status;
+    throw err;
   }
 
   return await res.json();
@@ -34,7 +36,9 @@ async function sheetsFetch(token: string, path: string, options: RequestInit = {
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Sheets API Error (${res.status}): ${text}`);
+    const err: any = new Error(`Sheets API Error (${res.status}): ${text}`);
+    err.status = res.status;
+    throw err;
   }
 
   return await res.json();
@@ -53,7 +57,9 @@ async function docsFetch(token: string, path: string, options: RequestInit = {})
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Docs API Error (${res.status}): ${text}`);
+    const err: any = new Error(`Docs API Error (${res.status}): ${text}`);
+    err.status = res.status;
+    throw err;
   }
 
   return await res.json();
@@ -1749,7 +1755,7 @@ function resolveSheetColumnIndices(headers: any[]) {
               category: row[2] || 'Forex',
               bias: row[3] || 'Bullish',
               status: row[4] || 'Watching',
-              timeframe: row[5] || 'D1',
+              timeframe: row[5] || '4H',
               keyLevels: row[6] || '',
               notes: row[7] || '',
               imageUrl: row[8] || '',
@@ -2011,10 +2017,15 @@ function resolveSheetColumnIndices(headers: any[]) {
         return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });
     }
   } catch (error: any) {
+    const isAuth = error?.status === 401 || error?.message?.includes('(401)') || error?.message?.includes('UNAUTHENTICATED') || error?.message?.includes('Invalid Credentials') || error?.message?.includes('authError');
+    const status = isAuth ? 401 : (error?.status || 500);
     console.error('Google Proxy Error:', error);
     return NextResponse.json(
-      { error: error.message || 'An error occurred on the server proxy' },
-      { status: 500 }
+      { 
+        error: error.message || 'An error occurred on the server proxy',
+        isAuthError: isAuth
+      },
+      { status }
     );
   }
 }

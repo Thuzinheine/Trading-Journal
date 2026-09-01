@@ -179,6 +179,7 @@ export default function Home() {
   const [mounted, setMounted] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [isTokenExpired, setIsTokenExpired] = useState(false);
   const [needsAuth, setNeedsAuth] = useState(true);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -773,8 +774,12 @@ export default function Home() {
       if (typeof window !== 'undefined') {
         localStorage.setItem('trading_trades', JSON.stringify(fetched));
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching trades:', error);
+      if (error?.isAuthError || error?.status === 401 || error?.message?.includes('401') || error?.message?.includes('UNAUTHENTICATED') || error?.message?.includes('Invalid Credentials')) {
+        setIsTokenExpired(true);
+        setToken(null);
+      }
     } finally {
       setIsLoadingTrades(false);
     }
@@ -789,8 +794,12 @@ export default function Home() {
       if (typeof window !== 'undefined') {
         localStorage.setItem('trading_doc_text', content.text);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading document:', error);
+      if (error?.isAuthError || error?.status === 401 || error?.message?.includes('401') || error?.message?.includes('UNAUTHENTICATED') || error?.message?.includes('Invalid Credentials')) {
+        setIsTokenExpired(true);
+        setToken(null);
+      }
     } finally {
       setIsDocLoading(false);
     }
@@ -812,8 +821,12 @@ export default function Home() {
       if (typeof window !== 'undefined') {
         localStorage.setItem('trading_available_docs', JSON.stringify(uniqueDocs));
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading available docs:', error);
+      if (error?.isAuthError || error?.status === 401 || error?.message?.includes('401') || error?.message?.includes('UNAUTHENTICATED') || error?.message?.includes('Invalid Credentials')) {
+        setIsTokenExpired(true);
+        setToken(null);
+      }
     }
   };
 
@@ -850,8 +863,12 @@ export default function Home() {
     try {
       const logs = await fetchGoogleMicroLogs(accessToken, sId);
       setMicroLogs(logs);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching micro logs:', error);
+      if (error?.isAuthError || error?.status === 401 || error?.message?.includes('401') || error?.message?.includes('UNAUTHENTICATED') || error?.message?.includes('Invalid Credentials')) {
+        setIsTokenExpired(true);
+        setToken(null);
+      }
     } finally {
       setIsLoadingMicro(false);
     }
@@ -862,8 +879,12 @@ export default function Home() {
     try {
       const logs = await fetchGoogleMacroLogs(accessToken, sId);
       setMacroLogs(logs);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching macro logs:', error);
+      if (error?.isAuthError || error?.status === 401 || error?.message?.includes('401') || error?.message?.includes('UNAUTHENTICATED') || error?.message?.includes('Invalid Credentials')) {
+        setIsTokenExpired(true);
+        setToken(null);
+      }
     } finally {
       setIsLoadingMacro(false);
     }
@@ -1157,12 +1178,26 @@ export default function Home() {
       await loadGoogleMacroLogs(accessToken, sheetId);
       await loadWatchlist(user?.uid || 'user', true, accessToken, sheetId);
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error bootstrapping Google Files:', error);
+      if (error?.isAuthError || error?.status === 401 || error?.message?.includes('401') || error?.message?.includes('UNAUTHENTICATED') || error?.message?.includes('Invalid Credentials')) {
+        setIsTokenExpired(true);
+        setToken(null);
+      }
     } finally {
       setIsConnectingDrive(false);
     }
   };
+
+  // Listen for global auth expired events
+  useEffect(() => {
+    const handleAuthExpired = () => {
+      setIsTokenExpired(true);
+      setToken(null);
+    };
+    window.addEventListener('google-auth-expired', handleAuthExpired);
+    return () => window.removeEventListener('google-auth-expired', handleAuthExpired);
+  }, []);
 
   // Initialize auth
   useEffect(() => {
@@ -1170,6 +1205,7 @@ export default function Home() {
       (user, cachedToken) => {
         setUser(user);
         setToken(cachedToken);
+        setIsTokenExpired(!cachedToken);
         setNeedsAuth(false);
         setIsAuthLoading(false);
         setIsMobileMenuOpen(false);
@@ -1186,6 +1222,7 @@ export default function Home() {
       () => {
         setUser(null);
         setToken(null);
+        setIsTokenExpired(false);
         setNeedsAuth(true);
         setIsAuthLoading(false);
         setIsMobileMenuOpen(false);
@@ -1224,6 +1261,7 @@ export default function Home() {
       if (result) {
         setToken(result.accessToken);
         setUser(result.user);
+        setIsTokenExpired(false);
         setNeedsAuth(false);
         setIsMobileMenuOpen(false);
         if (typeof window !== 'undefined') {
@@ -1234,6 +1272,9 @@ export default function Home() {
             photoURL: result.user.photoURL,
           };
           localStorage.setItem('trading_cached_user', JSON.stringify(serializableUser));
+        }
+        if (result.accessToken) {
+          bootstrapGoogleFiles(result.accessToken);
         }
       }
     } catch (err: any) {
@@ -1339,6 +1380,10 @@ export default function Home() {
       }
     } catch (error: any) {
       console.error('Error fetching learning notes:', error);
+      if (error?.isAuthError || error?.status === 401 || error?.message?.includes('401') || error?.message?.includes('UNAUTHENTICATED') || error?.message?.includes('Invalid Credentials')) {
+        setIsTokenExpired(true);
+        setToken(null);
+      }
       setLearningError('သင်ခန်းစာများဆွဲယူရာတွင် အမှားအယွင်းရှိနေပါသည်။');
     } finally {
       setIsLearningNotesLoading(false);
@@ -1582,6 +1627,10 @@ export default function Home() {
       }
     } catch (err: any) {
       console.error('Error fetching watchlist from Google:', err);
+      if (err?.isAuthError || err?.status === 401 || err?.message?.includes('401') || err?.message?.includes('UNAUTHENTICATED') || err?.message?.includes('Invalid Credentials')) {
+        setIsTokenExpired(true);
+        setToken(null);
+      }
       setWatchlistError('Watchlist ဒေတာများ ဆွဲယူရာတွင် အမှားအယွင်းရှိနေပါသည်။');
     } finally {
       setIsWatchlistLoading(false);
@@ -3268,6 +3317,26 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
               </button>
             </div>
           </header>
+        )}
+
+        {/* Google Session Expired / Reconnect Banner */}
+        {!needsAuth && user && (!token || isTokenExpired) && (
+          <div className="bg-amber-500/10 border-b border-amber-500/30 px-4 sm:px-6 py-3 text-xs flex flex-wrap items-center justify-between gap-3 text-amber-300 transition-all z-20">
+            <div className="flex items-center space-x-2.5">
+              <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0" />
+              <span>
+                <strong>Google Session Expired:</strong> Google Drive နှင့် Sheets သို့ ချိတ်ဆက်မှု သက်တမ်းကုန်သွားပါသည် (401 Auth)။ Data များကို ဆက်လက် Sync ပြုလုပ်နိုင်ရန် Google Account ကို ပြန်လည်ချိတ်ဆက်ပေးပါ။
+              </span>
+            </div>
+            <button
+              onClick={handleLogin}
+              disabled={isAuthLoading}
+              className="px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold transition-all flex items-center space-x-1.5 cursor-pointer shadow-xs active:scale-95 text-xs shrink-0"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${isAuthLoading ? 'animate-spin' : ''}`} />
+              <span>{isAuthLoading ? 'ချိတ်ဆက်နေသည်...' : 'Google Drive ပြန်လည်ချိတ်ဆက်ရန်'}</span>
+            </button>
+          </div>
         )}
 
         <main className={`flex-1 w-full py-6 sm:py-8 transition-all ${

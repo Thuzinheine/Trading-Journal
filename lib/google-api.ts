@@ -25,6 +25,16 @@ export interface Trade {
 
 // Global helper for calling the local API proxy
 async function callProxy(accessToken: string, action: string, payload: any = {}) {
+  if (!accessToken || accessToken.trim() === '') {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('google-auth-expired'));
+    }
+    const err: any = new Error('No Google OAuth access token provided. Please connect your Google Account.');
+    err.isAuthError = true;
+    err.status = 401;
+    throw err;
+  }
+
   const res = await fetch('/api/google', {
     method: 'POST',
     headers: {
@@ -39,15 +49,22 @@ async function callProxy(accessToken: string, action: string, payload: any = {})
 
   if (!res.ok) {
     let errMsg = `Google Proxy API failed with status ${res.status}`;
+    let is401 = res.status === 401;
     try {
       const errText = await res.text();
       try {
         const errJson = JSON.parse(errText);
         if (errJson && errJson.error) {
           errMsg = errJson.error;
+          if (errJson.isAuthError || errMsg.includes('401') || errMsg.includes('UNAUTHENTICATED') || errMsg.includes('Invalid Credentials') || errMsg.includes('authError')) {
+            is401 = true;
+          }
         }
       } catch (jsonErr) {
         if (errText) {
+          if (errText.includes('401') || errText.includes('UNAUTHENTICATED') || errText.includes('Invalid Credentials') || errText.includes('authError')) {
+            is401 = true;
+          }
           if (errText.includes('<html>') || errText.includes('<html')) {
             errMsg = `Access restricted or denied (Status ${res.status}). Google Workspace permissions or credentials might be restricted for this service.`;
           } else {
@@ -56,7 +73,19 @@ async function callProxy(accessToken: string, action: string, payload: any = {})
         }
       }
     } catch (e) {}
-    throw new Error(errMsg);
+
+    if (is401) {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('google_oauth_access_token');
+        localStorage.removeItem('google_oauth_token_expiry');
+        window.dispatchEvent(new CustomEvent('google-auth-expired'));
+      }
+    }
+
+    const customErr: any = new Error(errMsg);
+    customErr.isAuthError = is401;
+    customErr.status = is401 ? 401 : res.status;
+    throw customErr;
   }
 
   return await res.json();

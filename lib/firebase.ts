@@ -23,17 +23,27 @@ export const initAuth = (
 ) => {
   return onAuthStateChanged(auth, async (user: User | null) => {
     if (user) {
-      // Restore access token from localStorage upon page refresh if available
-      if (!cachedAccessToken && typeof window !== 'undefined') {
+      let activeToken = cachedAccessToken;
+      // Restore access token from localStorage upon page refresh if available and not expired
+      if (!activeToken && typeof window !== 'undefined') {
         const storedToken = localStorage.getItem('google_oauth_access_token');
-        if (storedToken) {
+        const expiryStr = localStorage.getItem('google_oauth_token_expiry');
+        const expiry = expiryStr ? parseInt(expiryStr, 10) : 0;
+        
+        if (storedToken && expiry && Date.now() > expiry) {
+          // Token is expired!
+          localStorage.removeItem('google_oauth_access_token');
+          localStorage.removeItem('google_oauth_token_expiry');
+          activeToken = null;
+        } else if (storedToken) {
+          activeToken = storedToken;
           cachedAccessToken = storedToken;
         }
       }
 
-      // Maintain user login state permanently in UI
+      // Maintain user login state in UI
       if (onAuthSuccess) {
-        onAuthSuccess(user, cachedAccessToken || '');
+        onAuthSuccess(user, activeToken || '');
       }
     } else {
       cachedAccessToken = null;
@@ -53,11 +63,11 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
     const credential = GoogleAuthProvider.credentialFromResult(result);
     if (credential?.accessToken) {
       cachedAccessToken = credential.accessToken;
-    }
-    
-    // Persist token in localStorage
-    if (typeof window !== 'undefined' && cachedAccessToken) {
-      localStorage.setItem('google_oauth_access_token', cachedAccessToken);
+      if (typeof window !== 'undefined') {
+        const expiry = Date.now() + 3500 * 1000; // ~58 minutes
+        localStorage.setItem('google_oauth_access_token', cachedAccessToken);
+        localStorage.setItem('google_oauth_token_expiry', expiry.toString());
+      }
     }
     
     return { user: result.user, accessToken: cachedAccessToken || '' };
