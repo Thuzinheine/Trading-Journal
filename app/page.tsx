@@ -3246,14 +3246,14 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                 <span className="font-mono text-[11px] font-bold text-zinc-400 whitespace-nowrap">{marketSessions.timeStr}</span>
                 <span className="text-zinc-300 dark:text-zinc-700">|</span>
                 
-                {/* NY */}
+                {/* Tokyo */}
                 <span className={`inline-flex items-center space-x-1 text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                  marketSessions.nyOpen 
+                  marketSessions.tokyoOpen 
                     ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20' 
                     : isDarkMode ? 'text-zinc-500' : 'text-slate-400'
                 }`}>
-                  <span className={`h-1.5 w-1.5 rounded-full ${marketSessions.nyOpen ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-500'}`} />
-                  <span>NY</span>
+                  <span className={`h-1.5 w-1.5 rounded-full ${marketSessions.tokyoOpen ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-500'}`} />
+                  <span>TKO</span>
                 </span>
 
                 {/* London */}
@@ -3266,14 +3266,14 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                   <span>LDN</span>
                 </span>
 
-                {/* Tokyo */}
+                {/* NY */}
                 <span className={`inline-flex items-center space-x-1 text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                  marketSessions.tokyoOpen 
+                  marketSessions.nyOpen 
                     ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20' 
                     : isDarkMode ? 'text-zinc-500' : 'text-slate-400'
                 }`}>
-                  <span className={`h-1.5 w-1.5 rounded-full ${marketSessions.tokyoOpen ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-500'}`} />
-                  <span>TKO</span>
+                  <span className={`h-1.5 w-1.5 rounded-full ${marketSessions.nyOpen ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-500'}`} />
+                  <span>NY</span>
                 </span>
               </div>
 
@@ -5716,7 +5716,7 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                         }
 
                         return (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6 mt-6">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mt-6">
                             {filtered.map((note, idx) => (
                               <div
                                 key={note.id ? `note-${note.id}-${note.row || idx}` : `note-idx-${idx}`}
@@ -6392,16 +6392,15 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                     </button>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4.5">
                     {filteredWatchlistItems.map((item) => {
                       const isBull = item.bias === 'Bullish';
                       const isBear = item.bias === 'Bearish';
                       const isReady = item.status === 'Ready to Enter';
-
                       return (
                         <div
                           key={item.id}
-                          className={`rounded-2xl border flex flex-col justify-between transition-all duration-200 overflow-hidden ${
+                          className={`rounded-2xl border flex flex-col justify-between transition-all duration-200 overflow-hidden shadow-xs ${
                             isDarkMode 
                               ? 'border-zinc-800/70 bg-zinc-900/40 hover:border-zinc-700/80 hover:bg-zinc-900/60' 
                               : 'border-slate-200 bg-white hover:border-slate-300'
@@ -6412,7 +6411,7 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                             {item.imageUrl ? (
                               <div 
                                 onClick={() => setLightboxImage(item.imageUrl || null)}
-                                className="relative h-40 w-full overflow-hidden bg-zinc-950 cursor-zoom-in border-b border-zinc-800/40 group/img"
+                                className="relative aspect-[16/9] w-full overflow-hidden bg-zinc-950 cursor-zoom-in border-b border-zinc-800/40 group/img"
                                 title="ပုံကို အပြည့်ချဲ့ကြည့်ရန် (Click to view full image)"
                               >
                                 <img
