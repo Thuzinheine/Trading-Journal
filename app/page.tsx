@@ -3239,11 +3239,11 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
             {/* Right side: Market Sessions & Quick Actions */}
             <div className="flex items-center space-x-3">
               {/* Live Market Sessions */}
-              <div className={`hidden xl:flex items-center space-x-2 px-3 py-1.5 rounded-xl border text-xs font-semibold ${
+              <div className={`flex items-center space-x-1.5 sm:space-x-2 px-2 sm:px-3 py-1.5 rounded-xl border text-xs font-semibold ${
                 isDarkMode ? 'bg-zinc-900/60 border-zinc-800 text-zinc-300' : 'bg-slate-50 border-slate-200 text-slate-700'
               }`}>
-                <Clock className="h-3.5 w-3.5 text-emerald-500" />
-                <span className="font-mono text-[11px] font-bold text-zinc-400">{marketSessions.timeStr}</span>
+                <Clock className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                <span className="font-mono text-[11px] font-bold text-zinc-400 whitespace-nowrap">{marketSessions.timeStr}</span>
                 <span className="text-zinc-300 dark:text-zinc-700">|</span>
                 
                 {/* NY */}
