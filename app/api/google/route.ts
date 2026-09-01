@@ -566,13 +566,25 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
 }
 
 function resolveSheetColumnIndices(headers: any[]) {
-  const normHeaders = (headers || []).map((h: any) => (h || '').toString().toLowerCase().replace(/[^a-z0-9]/g, ''));
+  const rawHeaders = (headers || []).map((h: any) => (h || '').toString().trim());
+  const normHeaders = rawHeaders.map((h: string) => h.toLowerCase().replace(/[^a-z0-9]/g, ''));
   const assigned = new Set<number>();
 
   const findCol = (exactPatterns: string[], fuzzyPatterns: string[], fallbackIdx: number): number => {
+    // 0. Raw symbol / exact string check (e.g. '#', 'no.')
+    for (let i = 0; i < rawHeaders.length; i++) {
+      if (assigned.has(i)) continue;
+      const raw = rawHeaders[i].toLowerCase();
+      if (exactPatterns.includes(raw) || exactPatterns.includes(rawHeaders[i])) {
+        assigned.add(i);
+        return i;
+      }
+    }
     // 1. Exact match against normalized header
     for (const p of exactPatterns) {
-      const idx = normHeaders.indexOf(p);
+      const normP = p.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (!normP) continue;
+      const idx = normHeaders.indexOf(normP);
       if (idx !== -1 && !assigned.has(idx)) {
         assigned.add(idx);
         return idx;
@@ -580,17 +592,23 @@ function resolveSheetColumnIndices(headers: any[]) {
     }
     // 2. Strict prefix or substring with guard against conflicting short terms
     for (const p of fuzzyPatterns) {
+      const normP = p.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (!normP) continue;
       for (let i = 0; i < normHeaders.length; i++) {
         if (assigned.has(i)) continue;
         const nh = normHeaders[i];
         if (!nh) continue;
-        if (nh === p || (p.length >= 3 && nh.includes(p)) || (nh.length >= 3 && p.includes(nh))) {
+        if (nh === normP || (normP.length >= 3 && nh.includes(normP)) || (nh.length >= 3 && normP.includes(nh))) {
           assigned.add(i);
           return i;
         }
       }
     }
-    return fallbackIdx;
+    // Only return fallback if not already assigned
+    if (fallbackIdx >= 0 && !assigned.has(fallbackIdx)) {
+      return fallbackIdx;
+    }
+    return -1;
   };
 
   // Explicit patterns: Match Result (TP/SL) first so 'sl' and 'tp' won't collide with it
@@ -599,15 +617,15 @@ function resolveSheetColumnIndices(headers: any[]) {
     ['result', 'winloss', 'tpsl', 'outcome'],
     8
   );
-  const colTradeNumber = findCol(
-    ['tradenumber', 'tradeno', 'trade#', 'tradenum', 'number', 'no'],
-    ['tradenumber', 'tradeno', 'tradenum'],
-    0
-  );
   const colDate = findCol(
-    ['date', 'entrydate', 'time', 'datetime'],
+    ['date', 'entrydate', 'time', 'datetime', 'tradedate'],
     ['date', 'datetime'],
     1
+  );
+  const colTradeNumber = findCol(
+    ['#', 'no', 'no.', 'trade#', 'trade #', 'tradenumber', 'tradeno', 'trade number', 'tradenum', 'number', 'seq'],
+    ['tradenumber', 'tradeno', 'tradenum'],
+    0
   );
   const colPair = findCol(
     ['pairasset', 'pair', 'asset', 'symbol', 'pair/asset', 'instrument'],
@@ -662,8 +680,11 @@ function resolveSheetColumnIndices(headers: any[]) {
 
   const maxIndex = Math.max(12, ...Array.from(assigned), headers.length - 1);
 
+  // If trade number resolved to the exact same column as Date, clear trade number column index
+  const safeTradeNumberCol = (colTradeNumber === colDate) ? -1 : colTradeNumber;
+
   return {
-    colTradeNumber,
+    colTradeNumber: safeTradeNumberCol,
     colDate,
     colPair,
     colEntry,
@@ -715,16 +736,46 @@ function resolveSheetColumnIndices(headers: any[]) {
 
         const trades = data.values.slice(1).map((row: any[], index: number) => {
           const rowIndex = index + 2; // Rows start at 2 (Row 1 is header)
+          const rawDate = row[colDate] || '';
+          let rawTradeNum = (colTradeNumber !== -1 && row[colTradeNumber] !== undefined) ? String(row[colTradeNumber]).trim() : '';
+
+          // If tradeNumber is empty, equal to date, or contains a date format, replace with clean padded index
+          if (!rawTradeNum || rawTradeNum === rawDate || /^\d{4}[-/]\d{1,2}[-/]\d{1,2}/.test(rawTradeNum)) {
+            rawTradeNum = String(rowIndex - 1).padStart(3, '0');
+          } else {
+            const parsed = parseInt(rawTradeNum, 10);
+            if (!isNaN(parsed) && String(parsed) === rawTradeNum) {
+              rawTradeNum = String(parsed).padStart(3, '0');
+            }
+          }
+
+          // Format R:R without decimal places (e.g. 1:10 instead of 1:10.0 or 1:6.27 -> 1:6)
+          let rawRR = row[colRR] ? String(row[colRR]).trim() : '';
+          if (rawRR && rawRR !== '-') {
+            const rrMatch = rawRR.match(/^1\s*:\s*([\d.]+)/i);
+            if (rrMatch) {
+              const val = parseFloat(rrMatch[1]);
+              if (!isNaN(val)) {
+                rawRR = `1:${Math.round(val)}`;
+              }
+            } else {
+              const numVal = parseFloat(rawRR);
+              if (!isNaN(numVal) && /^[0-9.]+$/.test(rawRR)) {
+                rawRR = `1:${Math.round(numVal)}`;
+              }
+            }
+          }
+
           return {
             row: rowIndex,
             id: `trade-${rowIndex}`,
-            tradeNumber: (colTradeNumber !== -1 && row[colTradeNumber] !== undefined) ? row[colTradeNumber] : `${rowIndex - 1}`,
-            date: row[colDate] || '',
+            tradeNumber: rawTradeNum,
+            date: rawDate,
             pair: row[colPair] || '', // Pair / Asset
             entryPrice: (row[colEntry] !== undefined && row[colEntry] !== '') ? (parseFloat(row[colEntry]) || 0) : 0,
             sl: (row[colSL] !== undefined && row[colSL] !== '') ? (parseFloat(row[colSL]) || 0) : 0,
             tp: (row[colTP] !== undefined && row[colTP] !== '') ? (parseFloat(row[colTP]) || 0) : 0,
-            rr: row[colRR] || '',
+            rr: rawRR,
             watchlist: row[colWatchlist] || '', // Watchlist Details/ Setup
             winLoss: normalizeResultStatus(row[colResult]), // Result (TP/SL)
             pnl: row[colPnL] || '', // P&L in $

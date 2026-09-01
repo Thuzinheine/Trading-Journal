@@ -129,8 +129,50 @@ function getDirectDriveImageUrl(url: string | undefined): string {
   if (idMatch && idMatch[1]) {
     return `https://drive.google.com/thumbnail?id=${idMatch[1]}&sz=w1600`;
   }
+
+  // Try to match /d/{id} links
+  const dMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  if (dMatch && dMatch[1]) {
+    return `https://drive.google.com/thumbnail?id=${dMatch[1]}&sz=w1600`;
+  }
   
   return url;
+}
+
+function formatCleanRR(rr: string | undefined | null): string {
+  if (!rr || rr === '-' || rr.trim() === '') return '-';
+  const trimmed = rr.trim();
+  const match = trimmed.match(/^1\s*:\s*([\d.]+)/i);
+  if (match) {
+    const val = parseFloat(match[1]);
+    if (!isNaN(val)) {
+      return `1:${Math.round(val)}`;
+    }
+  }
+  const num = parseFloat(trimmed);
+  if (!isNaN(num) && /^[0-9.]+$/.test(trimmed)) {
+    return `1:${Math.round(num)}`;
+  }
+  return trimmed;
+}
+
+function getDisplayTradeNumber(trade: Trade | null | undefined, fallbackIndex?: number): string {
+  if (!trade) return '-';
+  const num = (trade.tradeNumber || '').toString().trim();
+  if (!num || num === (trade.date || '') || /^\d{4}[-/]\d{1,2}[-/]\d{1,2}/.test(num)) {
+    if (trade.row && trade.row > 1) {
+      return String(trade.row - 1).padStart(3, '0');
+    }
+    if (fallbackIndex !== undefined) {
+      return String(fallbackIndex + 1).padStart(3, '0');
+    }
+    return '001';
+  }
+  const parsed = parseInt(num, 10);
+  if (!isNaN(parsed) && String(parsed) === num) {
+    return String(parsed).padStart(3, '0');
+  }
+  return num;
 }
 
 export default function Home() {
@@ -444,7 +486,7 @@ export default function Home() {
       category: 'Crypto',
       bias: 'Bullish',
       status: 'Ready to Enter',
-      timeframe: '4H',
+      timeframe: 'D1',
       keyLevels: 'Key POI: $63,200 - $63,800 (Bullish Orderblock + 4H FVG) | Target: $66,000 | Invalidation: $62,400',
       notes: 'Clean liquidity sweep below previous 4H swing low followed by bullish market structure shift on 15m. Waiting for tap into 4H Fair Value Gap with volume surge.',
       imageUrl: '',
@@ -456,7 +498,7 @@ export default function Home() {
       category: 'Forex',
       bias: 'Bearish',
       status: 'Setup Forming',
-      timeframe: '1H',
+      timeframe: 'D1',
       keyLevels: 'Supply Zone: 1.0880 - 1.0900 | Target: 1.0790 (Weekly Low) | Invalidation: 1.0930',
       notes: 'Higher timeframe daily bias is bearish. Asian session liquidity swept, price testing London mitigation block. Looking for lower timeframe CHoCH during NY open session.',
       imageUrl: '',
@@ -468,7 +510,7 @@ export default function Home() {
       category: 'Crypto',
       bias: 'Bullish',
       status: 'Watching',
-      timeframe: '1D',
+      timeframe: 'D1',
       keyLevels: 'Major Demand Zone: $138.50 - $142.00 | Targets: $155.00 / $170.00 | Invalidation: $134.00',
       notes: 'Daily Bullish Breaker combined with Discount Golden Pocket Fibonacci 0.618. Accumulation phase forming with declining seller volume.',
       imageUrl: '',
@@ -480,7 +522,7 @@ export default function Home() {
       category: 'Forex',
       bias: 'Bullish',
       status: 'Ready to Enter',
-      timeframe: '15M',
+      timeframe: 'D1',
       keyLevels: 'POI: $2,410 - $2,414 FVG | Target: $2,435 (NY High) | Stop: $2,402',
       notes: 'Strong rejection candle from $2,400 psychological support. High volume displacement leaving clean imbalance on 15m.',
       imageUrl: '',
@@ -503,7 +545,7 @@ export default function Home() {
   const [watchlistCategory, setWatchlistCategory] = useState<'Crypto' | 'Forex' | 'Commodity' | 'Index'>('Crypto');
   const [watchlistBias, setWatchlistBias] = useState<'Bullish' | 'Bearish' | 'Neutral' | 'Monitoring'>('Bullish');
   const [watchlistStatus, setWatchlistStatus] = useState<'Watching' | 'Setup Forming' | 'Ready to Enter' | 'Triggered' | 'Invalidated'>('Watching');
-  const [watchlistTimeframe, setWatchlistTimeframe] = useState('4H');
+  const [watchlistTimeframe, setWatchlistTimeframe] = useState('D1');
   const [watchlistKeyLevels, setWatchlistKeyLevels] = useState('');
   const [watchlistNotes, setWatchlistNotes] = useState('');
   const [watchlistImage, setWatchlistImage] = useState('');
@@ -2049,21 +2091,18 @@ export default function Home() {
     // TradingView & Binance standard formula:
     // Risk : Reward Ratio = 1 : (Reward Distance / Risk Distance)
     const ratio = reward / risk;
-    const formattedRatio = (ratio % 1 === 0) 
-      ? ratio.toFixed(0) 
-      : ((ratio * 10) % 1 === 0) 
-        ? ratio.toFixed(1) 
-        : ratio.toFixed(2);
+    const roundedRatio = Math.round(ratio);
+    const formattedRatio = roundedRatio.toString();
 
-    const rrStr = `1:${formattedRatio}`;
-    const suggestedPnlWin = `+${formattedRatio}R`;
+    const rrStr = `1:${roundedRatio}`;
+    const suggestedPnlWin = `+${roundedRatio}R`;
     const suggestedPnlLoss = `-1R`;
     const direction = isLong ? 'LONG (BUY)' : isShort ? 'SHORT (SELL)' : '';
 
     return { 
       rr: rrStr, 
       direction, 
-      ratio, 
+      ratio: roundedRatio, 
       formattedRatio, 
       suggestedPnlWin, 
       suggestedPnlLoss, 
@@ -2108,12 +2147,12 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
     setEditingTrade(trade);
     setFormData({
       date: trade.date,
-      tradeNumber: trade.tradeNumber || '',
+      tradeNumber: getDisplayTradeNumber(trade),
       pair: trade.pair || '', // Pair / Asset
       entryPrice: trade.entryPrice ? trade.entryPrice.toString() : '',
       sl: trade.sl ? trade.sl.toString() : '',
       tp: trade.tp ? trade.tp.toString() : '',
-      rr: trade.rr || '',
+      rr: formatCleanRR(trade.rr),
       watchlist: trade.watchlist || '', // Watchlist Details/ Setup
       winLoss: normalizeResultStatus(trade.winLoss), // Result (TP/SL)
       pnl: trade.pnl || '',
@@ -2256,11 +2295,11 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
           row: editingTrade.row,
           id: editingTrade.id || `trade-${editingTrade.row}`,
           date: formData.date,
-          tradeNumber: formData.tradeNumber.trim(),
+          tradeNumber: formData.tradeNumber.trim() || getDisplayTradeNumber(editingTrade),
           entryPrice: entry,
           sl: slVal,
           tp: tpVal,
-          rr: formData.rr || calculatedSuggestions.rr || '',
+          rr: formatCleanRR(formData.rr || calculatedSuggestions.rr || ''),
           pair: formData.pair.toUpperCase(),
           watchlist: formData.watchlist,
           winLoss: normalizeResultStatus(formData.winLoss),
@@ -2296,11 +2335,11 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
         const newTrade: Omit<Trade, 'row'> = {
           id: `trade-${Date.now()}`,
           date: formData.date,
-          tradeNumber: formData.tradeNumber.trim(),
+          tradeNumber: formData.tradeNumber.trim() || '001',
           entryPrice: entry,
           sl: slVal,
           tp: tpVal,
-          rr: formData.rr || calculatedSuggestions.rr || '',
+          rr: formatCleanRR(formData.rr || calculatedSuggestions.rr || ''),
           pair: formData.pair.toUpperCase(),
           watchlist: formData.watchlist,
           winLoss: normalizeResultStatus(formData.winLoss),
@@ -4086,25 +4125,25 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                   isDarkMode ? 'bg-zinc-900/40 border-zinc-800/80' : 'bg-white border-slate-200 shadow-xs'
                 }`}>
                   <div className="hidden md:block overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
+                    <table className="w-full text-left border-collapse table-auto">
                       <thead>
                         <tr className={`border-b text-[11px] font-bold tracking-wider transition-colors ${
                           isDarkMode ? 'bg-zinc-900/60 border-zinc-800/80 text-zinc-400' : 'bg-slate-50 border-slate-200 text-slate-400'
                         }`}>
-                          <th className="px-1.5 py-2 text-center w-[50px] whitespace-nowrap">#</th>
-                          <th className="px-1.5 py-2 text-left w-[85px] whitespace-nowrap">Date</th>
-                          <th className="px-1.5 py-2 text-left w-[80px] whitespace-nowrap">Pair / Asset</th>
-                          <th className="px-1.5 py-2 text-right w-[75px] whitespace-nowrap">Entry</th>
-                          <th className="px-1.5 py-2 text-right w-[75px] whitespace-nowrap">SL</th>
-                          <th className="px-1.5 py-2 text-right w-[75px] whitespace-nowrap">TP</th>
-                          <th className="px-1.5 py-2 text-center w-[60px] whitespace-nowrap">R:R</th>
-                          <th className="px-1.5 py-2 text-left w-[120px] whitespace-nowrap max-w-[120px]">Watchlist / Setup</th>
-                          <th className="px-1.5 py-2 text-center w-[85px] whitespace-nowrap">Result</th>
-                          <th className="px-1.5 py-2 text-right w-[80px] whitespace-nowrap">P&L ($)</th>
-                          <th className="px-1.5 py-2 text-left w-[100px] whitespace-nowrap max-w-[100px]">Remarks</th>
-                          <th className="px-1.5 py-2 text-left w-[100px] whitespace-nowrap max-w-[100px]">Commitment</th>
-                          <th className="px-1.5 py-2 text-center w-[75px] whitespace-nowrap">SS (B&F)</th>
-                          <th className="px-1.5 py-2 text-center w-[65px] whitespace-nowrap">Actions</th>
+                          <th className="px-2 py-2.5 text-center w-12 shrink-0 whitespace-nowrap">#</th>
+                          <th className="px-2 py-2.5 text-left w-24 shrink-0 whitespace-nowrap">Date</th>
+                          <th className="px-2 py-2.5 text-left w-24 shrink-0 whitespace-nowrap">Pair / Asset</th>
+                          <th className="px-2 py-2.5 text-left w-20 shrink-0 whitespace-nowrap">Entry</th>
+                          <th className="px-2 py-2.5 text-left w-20 shrink-0 whitespace-nowrap">SL</th>
+                          <th className="px-2 py-2.5 text-left w-20 shrink-0 whitespace-nowrap">TP</th>
+                          <th className="px-2 py-2.5 text-center w-16 shrink-0 whitespace-nowrap">R:R</th>
+                          <th className="px-2 py-2.5 text-left min-w-[140px] max-w-[200px]">Watchlist / Setup</th>
+                          <th className="px-2.5 py-2.5 text-center w-24 shrink-0 whitespace-nowrap">Result</th>
+                          <th className="px-3.5 py-2.5 text-right w-28 pr-4 shrink-0 whitespace-nowrap">P&L ($)</th>
+                          <th className="pl-4 pr-3 py-2.5 text-left min-w-[150px] max-w-[220px]">Remarks</th>
+                          <th className="px-3 py-2.5 text-left min-w-[130px] max-w-[200px]">Commitment</th>
+                          <th className="px-2 py-2.5 text-center w-16 shrink-0 whitespace-nowrap">SS (B&F)</th>
+                          <th className="px-2 py-2.5 text-center w-16 shrink-0 whitespace-nowrap">Actions</th>
                         </tr>
                       </thead>
                       <tbody className={`divide-y text-sm transition-colors ${
@@ -4132,31 +4171,35 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                                 }`}
                                 onClick={() => setSelectedTrade(trade)}
                               >
-                                <td className={`px-1.5 py-1.5 text-center w-[50px] whitespace-nowrap font-mono font-bold ${isDarkMode ? 'text-zinc-300' : 'text-slate-700'}`}>{trade.tradeNumber || '-'}</td>
-                                <td className={`px-1.5 py-1.5 text-left w-[85px] whitespace-nowrap font-semibold ${isDarkMode ? 'text-zinc-500' : 'text-slate-500'}`}>{trade.date}</td>
-                                <td className={`px-1.5 py-1.5 text-left w-[80px] whitespace-nowrap font-bold ${isDarkMode ? 'text-zinc-200' : 'text-slate-900'}`}>
+                                <td className={`px-2 py-2 text-center w-12 whitespace-nowrap font-mono font-bold ${isDarkMode ? 'text-zinc-300' : 'text-slate-700'}`}>
+                                  {getDisplayTradeNumber(trade, idx)}
+                                </td>
+                                <td className={`px-2 py-2 text-left w-24 whitespace-nowrap font-semibold ${isDarkMode ? 'text-zinc-500' : 'text-slate-500'}`}>
+                                  {trade.date}
+                                </td>
+                                <td className={`px-2 py-2 text-left w-24 whitespace-nowrap font-bold ${isDarkMode ? 'text-zinc-200' : 'text-slate-900'}`}>
                                   {trade.pair || '-'}
                                 </td>
-                                <td className={`px-1.5 py-1.5 text-right w-[75px] whitespace-nowrap font-medium ${isDarkMode ? 'text-zinc-300' : 'text-slate-600'}`}>
+                                <td className={`px-2 py-2 text-left w-20 whitespace-nowrap font-medium font-mono ${isDarkMode ? 'text-zinc-300' : 'text-slate-600'}`}>
                                   {trade.entryPrice ? `${trade.entryPrice.toLocaleString()}` : '-'}
                                 </td>
-                                <td className={`px-1.5 py-1.5 text-right w-[75px] whitespace-nowrap font-medium ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                                <td className={`px-2 py-2 text-left w-20 whitespace-nowrap font-medium font-mono ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
                                   {trade.sl ? trade.sl.toLocaleString() : '-'}
                                 </td>
-                                <td className={`px-1.5 py-1.5 text-right w-[75px] whitespace-nowrap font-medium ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                                <td className={`px-2 py-2 text-left w-20 whitespace-nowrap font-medium font-mono ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
                                   {trade.tp ? trade.tp.toLocaleString() : '-'}
                                 </td>
-                                <td className="px-1.5 py-1.5 text-center w-[60px] whitespace-nowrap">
-                                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold ${
+                                <td className="px-2 py-2 text-center w-16 whitespace-nowrap">
+                                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold font-mono ${
                                     isDarkMode ? 'bg-zinc-800 text-zinc-300 border border-zinc-700' : 'bg-slate-100 text-slate-700 border border-slate-200'
                                   }`}>
-                                    {trade.rr || '-'}
+                                    {formatCleanRR(trade.rr)}
                                   </span>
                                 </td>
-                                <td className={`px-1.5 py-1.5 text-left w-[120px] max-w-[120px] truncate font-medium ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`} title={trade.watchlist}>
+                                <td className={`px-2 py-2 text-left min-w-[140px] max-w-[200px] truncate font-medium ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`} title={trade.watchlist}>
                                   {trade.watchlist || '-'}
                                 </td>
-                                <td className="px-1.5 py-1.5 text-center w-[85px] whitespace-nowrap">
+                                <td className="px-2 py-2 text-center w-24 whitespace-nowrap">
                                   <button
                                     type="button"
                                     onClick={(e) => cycleTradeResult(trade, e)}
@@ -4197,18 +4240,18 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                                     )}
                                   </button>
                                 </td>
-                                <td className={`px-1.5 py-1.5 text-right w-[80px] whitespace-nowrap font-extrabold ${
+                                <td className={`px-3.5 py-2 text-right w-28 pr-4 whitespace-nowrap font-extrabold font-mono ${
                                   isWin ? 'text-emerald-500' : isLoss ? 'text-rose-500' : 'text-slate-400'
                                 }`}>
                                   {trade.pnl || '-'}
                                 </td>
-                                <td className={`px-1.5 py-1.5 text-left w-[100px] max-w-[100px] truncate ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`} title={trade.notes}>
+                                <td className={`pl-4 pr-3 py-2 text-left min-w-[150px] max-w-[220px] truncate ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`} title={trade.notes}>
                                   {trade.notes || '-'}
                                 </td>
-                                <td className={`px-1.5 py-1.5 text-left w-[100px] max-w-[100px] truncate font-medium ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`} title={trade.commitment}>
+                                <td className={`px-3 py-2 text-left min-w-[130px] max-w-[200px] truncate font-medium ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`} title={trade.commitment}>
                                   {trade.commitment || '-'}
                                 </td>
-                                <td className="px-1.5 py-1.5 text-center w-[75px] whitespace-nowrap text-xs">
+                                <td className="px-2 py-2 text-center w-16 whitespace-nowrap text-xs">
                                   <div className="flex justify-center gap-1">
                                     {(() => {
                                       const photos = (trade.tradePhoto || '').split(',');
@@ -4260,7 +4303,7 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                                     })()}
                                   </div>
                                 </td>
-                                <td className="px-1.5 py-1.5 text-center w-[65px] whitespace-nowrap">
+                                <td className="px-2 py-2 text-center w-16 whitespace-nowrap">
                                   <div className="flex justify-center items-center space-x-1.5">
                                     <button
                                       onClick={(e) => { e.stopPropagation(); handleEditClick(trade); }}
@@ -4363,7 +4406,7 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                             <div className="flex justify-between items-start pt-1">
                               <div>
                                 <div className={`text-[10px] font-extrabold uppercase tracking-widest ${isDarkMode ? 'text-zinc-500' : 'text-slate-400'}`}>
-                                  Trade #{trade.tradeNumber || '-'}
+                                  Trade #{getDisplayTradeNumber(trade, idx)}
                                 </div>
                                 <h4 className={`font-extrabold text-sm tracking-tight mt-0.5 ${isDarkMode ? 'text-zinc-100' : 'text-slate-900'}`}>
                                   {trade.pair}
@@ -4377,7 +4420,7 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                                   {trade.pnl || '-'}
                                 </span>
                                 <div className={`text-[10px] font-medium mt-1 ${isDarkMode ? 'text-zinc-500' : 'text-slate-400'}`}>
-                                  R:R: {trade.rr || '-'}
+                                  R:R: {formatCleanRR(trade.rr)}
                                 </div>
                               </div>
                             </div>
@@ -4388,7 +4431,7 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                             }`}>
                               <div className="grid grid-cols-2 gap-2 text-xs">
                                 <div className="text-left"><span className="opacity-60 font-medium">Entry:</span> <span className="font-bold text-slate-900 dark:text-zinc-100">{trade.entryPrice ? trade.entryPrice.toLocaleString() : '-'}</span></div>
-                                <div className="text-right"><span className="opacity-60 font-medium">R:R:</span> <span className="font-bold text-slate-900 dark:text-zinc-100">{trade.rr || '-'}</span></div>
+                                <div className="text-right"><span className="opacity-60 font-medium">R:R:</span> <span className="font-bold text-slate-900 dark:text-zinc-100">{formatCleanRR(trade.rr)}</span></div>
                                 <div className="text-left"><span className="opacity-60 font-medium">SL:</span> <span className="font-bold text-rose-500">{trade.sl ? trade.sl.toLocaleString() : '-'}</span></div>
                                 <div className="text-right"><span className="opacity-60 font-medium">TP:</span> <span className="font-bold text-emerald-500">{trade.tp ? trade.tp.toLocaleString() : '-'}</span></div>
                               </div>
@@ -6222,7 +6265,7 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                           setWatchlistCategory('Crypto');
                           setWatchlistBias('Bullish');
                           setWatchlistStatus('Watching');
-                          setWatchlistTimeframe('4H');
+                          setWatchlistTimeframe('D1');
                           setWatchlistKeyLevels('');
                           setWatchlistNotes('');
                           setWatchlistImage('');
@@ -6265,7 +6308,7 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                         setWatchlistCategory('Crypto');
                         setWatchlistBias('Bullish');
                         setWatchlistStatus('Watching');
-                        setWatchlistTimeframe('4H');
+                        setWatchlistTimeframe('D1');
                         setWatchlistKeyLevels('');
                         setWatchlistNotes('');
                         setWatchlistImage('');
@@ -6305,6 +6348,7 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                                   src={getDirectDriveImageUrl(item.imageUrl)}
                                   alt={item.pair}
                                   className="h-full w-full object-cover transition-transform duration-300 group-hover/img:scale-103"
+                                  referrerPolicy="no-referrer"
                                 />
                                 <div className="absolute inset-0 bg-black/30 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center">
                                   <span className="bg-zinc-900/90 text-zinc-200 text-[11px] font-medium px-2.5 py-1 rounded-lg backdrop-blur-xs flex items-center gap-1.5 shadow-sm border border-zinc-700/50">
@@ -6607,7 +6651,7 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-200/40 dark:border-zinc-800/60">
                   <div>
                     <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight flex items-center space-x-2">
-                      <span className={isDarkMode ? 'text-zinc-400' : 'text-slate-400'}>#{selectedTrade.tradeNumber}</span>
+                      <span className={isDarkMode ? 'text-zinc-400' : 'text-slate-400'}>#{getDisplayTradeNumber(selectedTrade)}</span>
                       <span>{selectedTrade.pair || 'Asset Name'}</span>
                     </h2>
                     <p className={`text-xs mt-1 font-medium ${isDarkMode ? 'text-zinc-500' : 'text-slate-500'}`}>
@@ -6645,7 +6689,7 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                   <div className="space-y-3">
                     <div className="flex items-center text-xs">
                       <span className={`w-32 shrink-0 font-semibold ${isDarkMode ? 'text-zinc-500' : 'text-slate-400'}`}>Trade Number</span>
-                      <span className="font-mono font-bold text-sm">{selectedTrade.tradeNumber}</span>
+                      <span className="font-mono font-bold text-sm">#{getDisplayTradeNumber(selectedTrade)}</span>
                     </div>
                     <div className="flex items-center text-xs">
                       <span className={`w-32 shrink-0 font-semibold ${isDarkMode ? 'text-zinc-500' : 'text-slate-400'}`}>Date</span>
@@ -6674,7 +6718,7 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                       <span className={`w-32 shrink-0 font-semibold ${isDarkMode ? 'text-zinc-500' : 'text-slate-400'}`}>Risk to Reward (R:R)</span>
                       <span className={`inline-flex px-2 py-0.5 rounded-md text-xs font-semibold ${
                         isDarkMode ? 'bg-zinc-800 text-zinc-300 border border-zinc-700' : 'bg-slate-100 text-slate-700 border border-slate-200'
-                      }`}>{selectedTrade.rr || '-'}</span>
+                      }`}>{formatCleanRR(selectedTrade.rr)}</span>
                     </div>
                     <div className="flex items-center text-xs">
                       <span className={`w-32 shrink-0 font-semibold ${isDarkMode ? 'text-zinc-500' : 'text-slate-400'}`}>P&L in $</span>
@@ -7856,44 +7900,39 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                     <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
                       Category
                     </label>
-                    <div className="relative">
-                      <select
-                        value={watchlistCategory}
-                        onChange={(e) => setWatchlistCategory(e.target.value as any)}
-                        className={`appearance-none w-full pl-3 pr-8 py-2 rounded-xl border text-xs font-medium cursor-pointer focus:outline-hidden ${
-                          isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-800'
-                        }`}
-                      >
-                        <option value="Crypto">Crypto</option>
-                        <option value="Forex">Forex</option>
-                        <option value="Commodity">Commodity (Gold, Silver, Oil)</option>
-                        <option value="Index">Index (US30, NAS100, SPX)</option>
-                      </select>
-                      <ChevronDown className="h-3.5 w-3.5 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400" />
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                      {(['Crypto', 'Forex', 'Commodity', 'Index'] as const).map((cat) => (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => setWatchlistCategory(cat)}
+                          className={`py-2 px-2 rounded-xl text-xs font-semibold transition-all cursor-pointer text-center truncate ${
+                            watchlistCategory === cat
+                              ? (isDarkMode ? 'bg-zinc-100 text-zinc-950 font-bold shadow-xs' : 'bg-slate-900 text-white font-bold shadow-xs')
+                              : (isDarkMode ? 'bg-zinc-950 border border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700' : 'bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100')
+                          }`}
+                        >
+                          {cat}
+                        </button>
+                      ))}
                     </div>
                   </div>
 
-                  {/* Timeframe */}
+                  {/* Timeframe - Fixed to D1 Only */}
                   <div>
                     <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
                       Timeframe
                     </label>
-                    <div className="relative">
-                      <select
-                        value={watchlistTimeframe}
-                        onChange={(e) => setWatchlistTimeframe(e.target.value)}
-                        className={`appearance-none w-full pl-3 pr-8 py-2 rounded-xl border text-xs font-medium cursor-pointer focus:outline-hidden ${
-                          isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-800'
-                        }`}
-                      >
-                        <option value="15M">15M (Scalping / Execution)</option>
-                        <option value="30M">30M (Short-Term)</option>
-                        <option value="1H">1H (Intraday Setup)</option>
-                        <option value="4H">4H (Swing / Trend)</option>
-                        <option value="Daily">Daily (HTF Direction)</option>
-                        <option value="Weekly">Weekly (Macro Bias)</option>
-                      </select>
-                      <ChevronDown className="h-3.5 w-3.5 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400" />
+                    <div className={`py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-between ${
+                      isDarkMode ? 'bg-zinc-950/80 border-zinc-800 text-zinc-200' : 'bg-slate-50 border-slate-200 text-slate-700'
+                    }`}>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 font-mono text-[11px] font-bold border border-emerald-500/30">
+                          D1
+                        </span>
+                        <span className="text-zinc-400 text-xs">Daily HTF Only</span>
+                      </div>
+                      <span className="text-[10px] text-zinc-500 font-mono font-normal">Fixed</span>
                     </div>
                   </div>
                 </div>
@@ -8021,16 +8060,17 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                     Chart Screenshot / Analysis Photo
                   </label>
                   {watchlistImage ? (
-                    <div className="relative rounded-xl overflow-hidden border border-zinc-800 max-h-56 bg-zinc-950 group">
+                    <div className="relative rounded-xl overflow-hidden border border-zinc-800 max-h-64 bg-zinc-950 group flex items-center justify-center p-2">
                       <img
-                        src={watchlistImage}
+                        src={getDirectDriveImageUrl(watchlistImage)}
                         alt="Watchlist Chart Preview"
-                        className="h-full w-full object-contain max-h-48 mx-auto"
+                        className="h-full w-full object-contain max-h-56 mx-auto rounded-lg"
+                        referrerPolicy="no-referrer"
                       />
                       <button
                         type="button"
                         onClick={() => setWatchlistImage('')}
-                        className="absolute top-2 right-2 bg-rose-600/90 hover:bg-rose-700 text-white p-1.5 rounded-lg shadow-md transition-colors cursor-pointer"
+                        className="absolute top-3 right-3 bg-rose-600 hover:bg-rose-700 text-white p-2 rounded-xl shadow-lg transition-all cursor-pointer active:scale-95"
                         title="Remove Image"
                       >
                         <Trash2 className="h-4 w-4" />
