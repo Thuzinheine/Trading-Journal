@@ -5039,11 +5039,157 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                         )}
 
                         {selectedEdgeTab === 5 && (
-                          <div className="space-y-2">
-                            <h4 className="text-sm font-black text-amber-400">✳️ Edge 5: SMA (MEZ's The Last Engagement)</h4>
-                            <p className="text-xs text-zinc-300 dark:text-zinc-400 leading-relaxed">
-                              Simple Moving Average (SMA) key period ပေါ်တွင် နောက်ဆုံး engagement candle အနေအထားကို စောင့်ကြည့်ပြီး institution flow အတိုင်း trend continuation လိုက်ပါစီးနင်းခြင်း။
-                            </p>
+                          <div className="space-y-4">
+                            <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3 border-zinc-800/80">
+                              <div>
+                                <h4 className="text-sm font-black text-amber-400">✳️ Edge 5: ▪️MEZ&apos;s Big Shadow Strategy (Education) &amp; TLE</h4>
+                                <p className="text-xs font-semibold text-sky-400 mt-0.5">
+                                  | A D1 Trend → Breakout → Flip Immediate → Retest Strategy
+                                </p>
+                              </div>
+                              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                                D1 Execution Edge
+                              </span>
+                            </div>
+
+                            {/* ProjectX Trade Types & Requirements */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                              {/* Left: ProjectX Trade Type (3) */}
+                              <div className={`p-3.5 rounded-xl border space-y-2.5 ${isDarkMode ? 'bg-zinc-900/60 border-zinc-800' : 'bg-white border-slate-200'}`}>
+                                <div className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                                  <span>ProjectX Trade Type (3)</span>
+                                </div>
+                                <div className="space-y-1.5 text-xs font-semibold">
+                                  <div className={`p-2 rounded-lg border flex items-center gap-2 ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800 text-zinc-200' : 'bg-slate-50 border-slate-200 text-slate-700'}`}>
+                                    <span className="h-5 w-5 rounded-full bg-amber-500/20 text-amber-400 text-[10px] font-bold flex items-center justify-center shrink-0">1</span>
+                                    <span>Grab &amp; Go</span>
+                                  </div>
+                                  <div className={`p-2 rounded-lg border flex items-center gap-2 ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800 text-zinc-200' : 'bg-slate-50 border-slate-200 text-slate-700'}`}>
+                                    <span className="h-5 w-5 rounded-full bg-sky-500/20 text-sky-400 text-[10px] font-bold flex items-center justify-center shrink-0">2</span>
+                                    <span>Swing Trade</span>
+                                  </div>
+                                  <div className={`p-2 rounded-lg border flex items-center gap-2 ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800 text-zinc-200' : 'bg-slate-50 border-slate-200 text-slate-700'}`}>
+                                    <span className="h-5 w-5 rounded-full bg-indigo-500/20 text-indigo-400 text-[10px] font-bold flex items-center justify-center shrink-0">3</span>
+                                    <span>Position Trade</span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Right: Requirements (3) */}
+                              <div className={`p-3.5 rounded-xl border space-y-2.5 ${isDarkMode ? 'bg-zinc-900/60 border-zinc-800' : 'bg-white border-slate-200'}`}>
+                                <div className="text-xs font-bold text-rose-400 flex items-center gap-1.5">
+                                  <span>📌 လိုအပ်ချက် (3) ချက်</span>
+                                </div>
+                                <div className="space-y-1.5 text-xs">
+                                  <div className={`p-2 rounded-lg border leading-relaxed ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800 text-zinc-300' : 'bg-slate-50 border-slate-200 text-slate-700'}`}>
+                                    <strong className="text-rose-400">1/</strong> Market ဟာ Trending Market ဖြစ်ရမယ်။
+                                  </div>
+                                  <div className={`p-2 rounded-lg border leading-relaxed ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800 text-zinc-300' : 'bg-slate-50 border-slate-200 text-slate-700'}`}>
+                                    <strong className="text-rose-400">2/</strong> ကြိုတင် သတ်မှတ်ထားတဲ့ S/R Level ရှိရမယ်။
+                                  </div>
+                                  <div className={`p-2 rounded-lg border leading-relaxed ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800 text-zinc-300' : 'bg-slate-50 border-slate-200 text-slate-700'}`}>
+                                    <strong className="text-rose-400">3/</strong> အဲဒီ S/R Level ကို Big Shadow (Breakout Bar Candle) နှင့် Breakout လုပ်ရမယ်။
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* One Fixed chain. Zero chasing */}
+                            <div className={`p-3.5 rounded-xl border space-y-2.5 ${isDarkMode ? 'bg-zinc-900/40 border-zinc-800' : 'bg-slate-50 border-slate-200'}`}>
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <span className="text-xs font-bold text-emerald-400">One Fixed chain. Zero chasing.</span>
+                                <span className="text-[11px] font-semibold text-zinc-400">Qualify first. Execute second. Never reverse the order.</span>
+                              </div>
+                              
+                              <div className={`p-2.5 rounded-lg border text-xs font-mono font-bold text-center flex items-center justify-center flex-wrap gap-2 ${
+                                isDarkMode ? 'bg-zinc-950 border-zinc-800 text-amber-300' : 'bg-white border-slate-200 text-amber-700'
+                              }`}>
+                                <span>Trend</span>
+                                <span>→</span>
+                                <span>Level</span>
+                                <span>→</span>
+                                <span>Big Shadow</span>
+                                <span>→</span>
+                                <span>Flip Retest</span>
+                                <span>→</span>
+                                <span className="text-emerald-400">Outcome</span>
+                              </div>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 text-[11px]">
+                                <div className={`p-2 rounded-lg border ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800 text-zinc-300' : 'bg-white border-slate-200 text-slate-700'}`}>
+                                  <strong className="text-amber-400 block">1. Trend</strong>
+                                  Major Trend or relief rally
+                                </div>
+                                <div className={`p-2 rounded-lg border ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800 text-zinc-300' : 'bg-white border-slate-200 text-slate-700'}`}>
+                                  <strong className="text-sky-400 block">2. Level</strong>
+                                  pre-mapped S/R
+                                </div>
+                                <div className={`p-2 rounded-lg border ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800 text-zinc-300' : 'bg-white border-slate-200 text-slate-700'}`}>
+                                  <strong className="text-purple-400 block">3. Big Shadow</strong>
+                                  Decisive D1 breakout
+                                </div>
+                                <div className={`p-2 rounded-lg border ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800 text-zinc-300' : 'bg-white border-slate-200 text-slate-700'}`}>
+                                  <strong className="text-indigo-400 block">4. Flip Retest</strong>
+                                  Limit order or alert
+                                </div>
+                                <div className={`p-2 rounded-lg border ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800 text-zinc-300' : 'bg-white border-slate-200 text-slate-700'}`}>
+                                  <strong className="text-emerald-400 block">5. Outcome</strong>
+                                  -1R or &gt; 2R အထက်
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Entry Levels, SL & Flip Concepts */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 text-xs">
+                              {/* Entry Levels */}
+                              <div className={`p-3.5 rounded-xl border space-y-2.5 ${isDarkMode ? 'bg-zinc-900/60 border-zinc-800' : 'bg-white border-slate-200'}`}>
+                                <div className="text-xs font-bold text-sky-400">
+                                  Big Shadow တစ်ခုမှာ အရေးကြီးတဲ့ Entry Level (2) ခု
+                                </div>
+                                <div className="space-y-1.5">
+                                  <div className={`p-2 rounded-lg border ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800 text-zinc-300' : 'bg-slate-50 border-slate-200 text-slate-700'}`}>
+                                    <strong>1. 50%</strong> (Equilibrium / Midpoint)
+                                  </div>
+                                  <div className={`p-2 rounded-lg border ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800 text-zinc-300' : 'bg-slate-50 border-slate-200 text-slate-700'}`}>
+                                    <strong>2. အဲဒီ Big Shadow ရဲ့ Open (အခြေ)</strong>
+                                    <div className="text-[11px] text-zinc-400 mt-0.5 font-normal">
+                                      (အဲဒီ 2 နေရာမှာ institution တွေဟာ ဝယ်လေ့ရှိ)
+                                    </div>
+                                  </div>
+                                  <p className="text-[11px] text-zinc-400 leading-relaxed pt-1">
+                                    နောက်ပိုင်းမှာ Support ဖြစ်ခဲ့တဲ့ Zone တစ်ခုဟာ Resistance ဖြစ်လာတဲ့ Area ကို <strong className="text-zinc-200">Flip Area</strong> လို့ခေါ်။ <span className="text-amber-400 font-semibold">Candle တစ်ခုဟာ ဘယ်နေရာမှာ ပေါ်လည်းဆိုတာက အသက်ပါ။</span> Buy Zone (Entry) ကတော့ အရင်က New S/ Flips ဖြစ်လာတဲ့ နေရာပါ။
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* SL & Recommendations */}
+                              <div className={`p-3.5 rounded-xl border space-y-2.5 ${isDarkMode ? 'bg-zinc-900/60 border-zinc-800' : 'bg-white border-slate-200'}`}>
+                                <div className="text-xs font-bold text-emerald-400">
+                                  SL Rules &amp; Recommendations
+                                </div>
+                                <div className="space-y-2">
+                                  <div className={`p-2.5 rounded-lg border leading-relaxed ${isDarkMode ? 'bg-rose-500/10 border-rose-500/20 text-rose-300' : 'bg-rose-50 border-rose-200 text-rose-900'}`}>
+                                    <div className="font-bold text-[11px] text-rose-400">
+                                      Trade တစ်ခုကို ဝင်တော့မယ်ဆိုရင် ဘယ်နေရာမှာ SL ထားမှာလည်းဆိုတာအသက်
+                                    </div>
+                                    <div className="text-xs mt-1">
+                                      Big Shadow Strategy မှာဆိုရင် အဲဒီ Big Shadow အောက် <strong>2/3 Pip လောက်</strong> သင့်တင့်တဲ့ ပမာဏ။
+                                    </div>
+                                  </div>
+                                  
+                                  <div className={`p-2.5 rounded-lg border leading-relaxed ${isDarkMode ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300' : 'bg-emerald-50 border-emerald-200 text-emerald-900'}`}>
+                                    <div className="font-bold text-[11px] text-emerald-400">
+                                      📌 Recommendations
+                                    </div>
+                                    <div className="text-xs mt-1 space-y-1">
+                                      <div>• <strong>Entry:</strong> (Buy Limit) Entry ကိုသုံးပါ။</div>
+                                      <div>• <strong>Trade Type:</strong> Grab &amp; Go ပါ။</div>
+                                      <div>• <strong>Reward (R):</strong> &gt; 2R and &gt; 2R Above</div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         )}
 
@@ -5063,7 +5209,7 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                         <div className={`p-4 rounded-xl border space-y-2.5 ${isDarkMode ? 'bg-zinc-950/40 border-zinc-800' : 'bg-slate-50 border-slate-200'}`}>
                           <h4 className="text-xs font-bold text-sky-400 flex items-center gap-1.5">
                             <Check className="h-3.5 w-3.5" />
-                            Associated Technical (အထောက်အကူပြု ကိရိယာများ)
+                            Associated Technical
                           </h4>
                           <div className="flex flex-wrap gap-2 text-xs">
                             {['Market Imbalance', 'FVG (Fair Value Gap)', 'BISI / SIBI', 'Order Block (OB)'].map(tech => (
@@ -5080,7 +5226,7 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                         <div className={`p-4 rounded-xl border space-y-2.5 ${isDarkMode ? 'bg-zinc-950/40 border-zinc-800' : 'bg-slate-50 border-slate-200'}`}>
                           <h4 className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
                             <Check className="h-3.5 w-3.5" />
-                            Candle Selection (အဓိက နှင့် အဆင့်မြင့် တိုင်များ)
+                            Candle Selection
                           </h4>
                           <div className="grid grid-cols-2 gap-2 text-xs">
                             <div className={`p-2 rounded-lg border font-semibold ${isDarkMode ? 'bg-zinc-900 border-zinc-800 text-emerald-400' : 'bg-white border-slate-200 text-emerald-800'}`}>
@@ -8816,20 +8962,35 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                       </div>
                       <div className="space-y-2">
                         {learningNoteImage ? (
-                          <div className="relative rounded-xl overflow-hidden border border-zinc-750/50 max-h-56 bg-zinc-950 group">
+                          <div className="relative rounded-xl overflow-hidden border border-zinc-750/50 max-h-64 bg-zinc-950 group p-2 flex flex-col items-center justify-center">
                             <img 
-                              src={learningNoteImage} 
-                              alt="Preview" 
-                              className="h-full w-full object-contain max-h-48 mx-auto"
+                              src={getDirectDriveImageUrl(learningNoteImage)} 
+                              alt="Cover Preview" 
+                              className="h-full w-full object-contain max-h-56 mx-auto rounded-lg"
+                              referrerPolicy="no-referrer"
                             />
-                            <button
-                              type="button"
-                              onClick={() => setLearningNoteImage('')}
-                              className="absolute top-2 right-2 bg-red-600/90 hover:bg-red-700 text-white p-1.5 rounded-lg shadow-md transition-colors cursor-pointer"
-                              title="ပုံကို ဖယ်ရှားရန်"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
+                            <div className="absolute top-3 right-3 flex items-center gap-2">
+                              <label 
+                                className="bg-zinc-900/90 hover:bg-zinc-800 text-zinc-200 p-1.5 rounded-lg shadow-md transition-colors cursor-pointer border border-zinc-700 flex items-center justify-center"
+                                title="ပုံအသစ် လဲလှယ်တင်ရန်"
+                              >
+                                <RefreshCw className="h-3.5 w-3.5" />
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={handleImageChange}
+                                  className="hidden"
+                                />
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => setLearningNoteImage('')}
+                                className="bg-red-600/90 hover:bg-red-700 text-white p-1.5 rounded-lg shadow-md transition-colors cursor-pointer"
+                                title="ပုံကို ဖယ်ရှားရန်"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
                           </div>
                         ) : (
                           <div className={`border border-dashed rounded-xl p-4 text-center transition-all relative group ${
