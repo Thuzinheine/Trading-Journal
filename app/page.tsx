@@ -110,7 +110,9 @@ import {
   Compass,
   BookmarkCheck,
   Play,
-  Save
+  Save,
+  ShieldAlert,
+  RotateCcw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -218,16 +220,48 @@ export default function Home() {
   }[]>([]);
   const [isMicroLoaded, setIsMicroLoaded] = useState(false);
 
+  // ProjectX D1 Mechanical Trading System States
+  const [microTab, setMicroTab] = useState<'blueprint' | 'execution' | 'protection' | 'discipline' | 'checklist' | 'commitment'>('blueprint');
+  const [microAssetClass, setMicroAssetClass] = useState<'forex' | 'crypto'>('forex');
+  const [selectedEdgeTab, setSelectedEdgeTab] = useState<number>(1);
+  const [selectedExitMethod, setSelectedExitMethod] = useState<'40/60' | '100%' | '50/50' | '60/40'>('40/60');
+  const [emergencyTab, setEmergencyTab] = useState<'crash' | 'outage' | 'gap' | 'news'>('crash');
+  const [forcedResetStep, setForcedResetStep] = useState<number>(0);
+  
+  // Interactive 12-Point Pre-Trade Checklist State
+  const [preTradeChecks, setPreTradeChecks] = useState({
+    dcc: false,
+    edge: false,
+    candle: false,
+    rr2R: false,
+    riskCalc: false,
+    noDouble: false,
+    noMonday: false,
+    noNews: false,
+    maxOk: false,
+    epicNotes: false,
+    fit: false,
+    noConflicts: false,
+  });
+
+  // Setup Evaluator States
+  const [evalAsset, setEvalAsset] = useState('EURUSD');
+  const [evalEdge, setEvalEdge] = useState('Horizontal S/R');
+  const [evalDirection, setEvalDirection] = useState<'Buy' | 'Sell'>('Buy');
+  const [evalCandle, setEvalCandle] = useState('Hammer / Shooting Star');
+  const [evalPnlR, setEvalPnlR] = useState(2.0);
+  const [evalNotes, setEvalNotes] = useState('');
+  
   const [microAsset, setMicroAsset] = useState('EURUSD');
-  const [microSetupType, setMicroSetupType] = useState('Order Block');
+  const [microSetupType, setMicroSetupType] = useState('Horizontal S/R (Edge 1)');
   const [microEntryNotes, setMicroEntryNotes] = useState('');
-  const [microPnlR, setMicroPnlR] = useState(1);
+  const [microPnlR, setMicroPnlR] = useState(2);
   const [microChecklist, setMicroChecklist] = useState({
     structureAligned: true,
     liquiditySwept: true,
-    fvgTested: false,
-    blockRefined: false,
-    volumeConfirmed: false,
+    fvgTested: true,
+    blockRefined: true,
+    volumeConfirmed: true,
   });
 
   // Macro Analysis Type Definitions & States
@@ -3215,7 +3249,7 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                     {activeTab === 'alignment' && 'Position Alignment Calculator'}
                     {activeTab === 'journal' && 'Trading Journal'}
                     {activeTab === 'learning' && 'Learning Notes & Strategy Vault'}
-                    {activeTab === 'micro' && 'Micro Framework (LTF Checklist)'}
+                    {activeTab === 'micro' && 'D1 Mechanical Trading System (ProjectX Framework)'}
                     {activeTab === 'macro' && 'Macro Framework (HTF Matrix & FOMC)'}
                   </h1>
                   <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
@@ -3230,7 +3264,7 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                   {activeTab === 'alignment' && 'Precision position sizing, isolated leverage alignment & SL distance engine'}
                   {activeTab === 'journal' && `${filteredTrades.length} Trades recorded • Synced with Google Sheets`}
                   {activeTab === 'learning' && `${learningNotes.length} Lessons & Case Studies stored in Google Drive`}
-                  {activeTab === 'micro' && 'Lower Timeframe execution triggers, FVG & liquidity sweeps'}
+                  {activeTab === 'micro' && 'D1 Fixed Timeframe • 16 Forex & 16 Crypto • 6 Market Edges • Risk, BE & Emergency Protocols'}
                   {activeTab === 'macro' && 'Higher Timeframe bias, demand/supply zones & FOMC Fed Watch'}
                 </p>
               </div>
@@ -4587,295 +4621,1446 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
               </div>
             )}
 
-            {/* MICRO ANALYSIS VIEW */}
+            {/* MICRO ANALYSIS VIEW (ProjectX Complete D1 Trading System) */}
             {activeTab === 'micro' && (
               <div className="space-y-6">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                  {/* Left Column: Create Setup Log / Entry Evaluation Form */}
-                  <div className={`p-6 rounded-2xl border transition-all lg:col-span-1 h-fit ${
-                    isDarkMode ? 'bg-zinc-900/40 border-zinc-800/80 text-zinc-100' : 'bg-white border-slate-200/80 shadow-xs text-slate-800'
-                  }`}>
-                    <div className="flex items-center space-x-3 mb-5 pb-4 border-b border-zinc-200/30 dark:border-zinc-800/80">
-                      <div className="bg-emerald-500/10 p-2 rounded-xl text-emerald-500">
-                        <Target className="h-6 w-6" />
+                {/* 1. MASTER BLUEPRINT HEADER & TRADER COMMITMENT BANNER */}
+                <div className={`p-6 rounded-2xl border transition-all ${
+                  isDarkMode 
+                    ? 'bg-linear-to-r from-zinc-900 via-zinc-900/90 to-zinc-950 border-zinc-800/80 text-zinc-100' 
+                    : 'bg-linear-to-r from-slate-900 via-slate-800 to-indigo-950 text-white border-slate-700 shadow-md'
+                }`}>
+                  <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-5">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                        <span className="bg-amber-500/20 text-amber-300 text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full tracking-wider border border-amber-500/30 flex items-center gap-1">
+                          <Zap className="h-3 w-3" />
+                          ProjectX System v1.0
+                        </span>
+                        <span className="bg-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full tracking-wider border border-emerald-500/30 flex items-center gap-1">
+                          <Award className="h-3 w-3" />
+                          Phase: Trading Paper Money ($500)
+                        </span>
+                        <span className="text-[11px] text-zinc-300 font-semibold">
+                          Trader: <span className="text-white font-bold underline decoration-amber-400/60 underline-offset-4">Thu Zin Heine</span>
+                        </span>
                       </div>
-                      <div>
-                        <h4 className="text-md font-bold">New Setup Evaluation</h4>
-                        <p className="text-xs text-zinc-500 mt-0.5">အသေးစိတ် setup အရည်အသွေး ဆန်းစစ်ရန်</p>
-                      </div>
+                      <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2.5">
+                        <span>D1 Mechanical Trading System</span>
+                      </h2>
+                      <p className="text-xs text-zinc-300 dark:text-zinc-400 mt-1 max-w-2xl leading-relaxed">
+                        Daily Timeframe Core Framework • 16 Forex & 16 Crypto Pairs • 6 Master Edges • Strict 3-Step BE, Drawdown & Emergency Protocols
+                      </p>
                     </div>
 
-                    <form onSubmit={handleAddMicroLog} className="space-y-4">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className={`block text-[11px] font-bold uppercase tracking-wider mb-1.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
-                            Asset Pair
-                          </label>
-                          <input
-                            type="text"
-                            value={microAsset}
-                            onChange={(e) => setMicroAsset(e.target.value)}
-                            placeholder="EURUSD, Gold..."
-                            required
-                            className={`w-full p-2.5 rounded-xl text-xs font-semibold border focus:outline-hidden transition-all ${
-                              isDarkMode 
-                                ? 'bg-zinc-900 border-zinc-800 focus:border-slate-500/50 focus:ring-2 focus:ring-slate-500/10 text-zinc-100' 
-                                : 'bg-slate-50 border-slate-200 focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 text-slate-800'
-                            }`}
-                          />
+                    {/* Quick Vital Parameter Badges */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+                      <div className="bg-white/5 border border-white/10 p-2.5 rounded-xl text-center">
+                        <span className="block text-[10px] text-zinc-400 font-bold uppercase">Timeframe</span>
+                        <span className="font-black text-amber-400">D1 (Daily Fixed)</span>
+                      </div>
+                      <div className="bg-white/5 border border-white/10 p-2.5 rounded-xl text-center">
+                        <span className="block text-[10px] text-zinc-400 font-bold uppercase">Training Risk</span>
+                        <span className="font-black text-rose-400">5% ($500 Account)</span>
+                      </div>
+                      <div className="bg-white/5 border border-white/10 p-2.5 rounded-xl text-center">
+                        <span className="block text-[10px] text-zinc-400 font-bold uppercase">Leverage</span>
+                        <span className="font-black text-sky-400">1:100 FX / 20x Crypto</span>
+                      </div>
+                      <div className="bg-white/5 border border-white/10 p-2.5 rounded-xl text-center">
+                        <span className="block text-[10px] text-zinc-400 font-bold uppercase">Exit Method</span>
+                        <span className="font-black text-emerald-400">40/60% Runner</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. SUB-NAVIGATION TABS */}
+                <div className={`p-1.5 rounded-2xl border flex flex-wrap gap-1 ${
+                  isDarkMode ? 'bg-zinc-900/60 border-zinc-800/80' : 'bg-slate-100 border-slate-200'
+                }`}>
+                  <button
+                    onClick={() => setMicroTab('blueprint')}
+                    className={`flex-1 min-w-[130px] py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-2 cursor-pointer ${
+                      microTab === 'blueprint'
+                        ? isDarkMode ? 'bg-zinc-800 text-white shadow-sm' : 'bg-white text-slate-900 shadow-sm'
+                        : isDarkMode ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+                    }`}
+                  >
+                    <Layers className="h-3.5 w-3.5 text-amber-500" />
+                    <span>1. Blueprint & Edges</span>
+                  </button>
+
+                  <button
+                    onClick={() => setMicroTab('execution')}
+                    className={`flex-1 min-w-[130px] py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-2 cursor-pointer ${
+                      microTab === 'execution'
+                        ? isDarkMode ? 'bg-zinc-800 text-white shadow-sm' : 'bg-white text-slate-900 shadow-sm'
+                        : isDarkMode ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+                    }`}
+                  >
+                    <SlidersHorizontal className="h-3.5 w-3.5 text-sky-500" />
+                    <span>2. Execution & 3-Step BE</span>
+                  </button>
+
+                  <button
+                    onClick={() => setMicroTab('protection')}
+                    className={`flex-1 min-w-[130px] py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-2 cursor-pointer ${
+                      microTab === 'protection'
+                        ? isDarkMode ? 'bg-zinc-800 text-white shadow-sm' : 'bg-white text-slate-900 shadow-sm'
+                        : isDarkMode ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+                    }`}
+                  >
+                    <Shield className="h-3.5 w-3.5 text-rose-500" />
+                    <span>3. Reset & Emergency</span>
+                  </button>
+
+                  <button
+                    onClick={() => setMicroTab('discipline')}
+                    className={`flex-1 min-w-[130px] py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-2 cursor-pointer ${
+                      microTab === 'discipline'
+                        ? isDarkMode ? 'bg-zinc-800 text-white shadow-sm' : 'bg-white text-slate-900 shadow-sm'
+                        : isDarkMode ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+                    }`}
+                  >
+                    <Calendar className="h-3.5 w-3.5 text-indigo-400" />
+                    <span>4. Ritual & Discipline</span>
+                  </button>
+
+                  <button
+                    onClick={() => setMicroTab('checklist')}
+                    className={`flex-1 min-w-[130px] py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-2 cursor-pointer ${
+                      microTab === 'checklist'
+                        ? isDarkMode ? 'bg-zinc-800 text-white shadow-sm' : 'bg-white text-slate-900 shadow-sm'
+                        : isDarkMode ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+                    }`}
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                    <span>5. 12-Point Checklist</span>
+                  </button>
+
+                  <button
+                    onClick={() => setMicroTab('commitment')}
+                    className={`flex-1 min-w-[130px] py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-2 cursor-pointer ${
+                      microTab === 'commitment'
+                        ? isDarkMode ? 'bg-zinc-800 text-white shadow-sm' : 'bg-white text-slate-900 shadow-sm'
+                        : isDarkMode ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+                    }`}
+                  >
+                    <Award className="h-3.5 w-3.5 text-purple-400" />
+                    <span>6. Commitment & Evaluator</span>
+                  </button>
+                </div>
+
+                {/* ========================================================================= */}
+                {/* SUB-TAB 1: BLUEPRINT, TIMEFRAME, 16 PAIRS & 6 EDGES */}
+                {/* ========================================================================= */}
+                {microTab === 'blueprint' && (
+                  <div className="space-y-6">
+                    {/* Timeframe & Asset Pairs Grid */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                      {/* 1. Timeframe Blueprint Card */}
+                      <div className={`p-6 rounded-2xl border lg:col-span-4 flex flex-col justify-between ${
+                        isDarkMode ? 'bg-zinc-900/40 border-zinc-800/80 text-zinc-100' : 'bg-white border-slate-200/80 shadow-xs text-slate-800'
+                      }`}>
+                        <div className="space-y-4">
+                          <div className="flex items-center space-x-3 pb-3 border-b border-zinc-200/40 dark:border-zinc-800/80">
+                            <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-500">
+                              <Clock className="h-5 w-5" />
+                            </div>
+                            <div>
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-500 block">📅 Timeframe</span>
+                              <h3 className="text-base font-black">D1 (Daily) — Fixed for all</h3>
+                            </div>
+                          </div>
+
+                          <div className={`p-4 rounded-xl border space-y-2.5 ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800' : 'bg-slate-50 border-slate-200'}`}>
+                            <div className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                              <Sparkles className="h-3.5 w-3.5" />
+                              Daily Timeframe အတွေးအခေါ်
+                            </div>
+                            <p className="text-xs leading-relaxed text-zinc-300 dark:text-zinc-400">
+                              Daily timeframe က noise နည်းပြီး clarity ပိုရတယ်။ Lower timeframes (M15, H1) က overtrading နဲ့ emotional decisions ကို ဖြစ်စေတယ်။ D1 ဆို ရက်တိုင်း candle တစ်ခုပဲ analyze လုပ်ရတာမို့ quality decisions ချနိုင်တယ်။
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <label className={`block text-[11px] font-bold uppercase tracking-wider mb-1.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
-                            Setup Type
-                          </label>
-                          <div className="relative">
-                            <select
-                              value={microSetupType}
-                              onChange={(e) => setMicroSetupType(e.target.value)}
-                              className={`appearance-none w-full pl-3 pr-8 py-2.5 rounded-xl text-xs font-semibold border focus:outline-hidden transition-all cursor-pointer ${
-                                isDarkMode 
-                                  ? 'bg-zinc-900 border-zinc-800 text-zinc-100' 
-                                  : 'bg-slate-50 border-slate-200 text-slate-800'
-                              }`}
-                            >
-                              <option value="Order Block">Order Block</option>
-                              <option value="Liquidity Hunt">Liquidity Hunt</option>
-                              <option value="FVG Mitigation">FVG Mitigation</option>
-                              <option value="Break of Structure">Break of Structure</option>
-                              <option value="Silver Bullet">Silver Bullet</option>
-                            </select>
-                            <ChevronDown className="h-3.5 w-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 dark:text-zinc-500" />
+
+                        <div className="pt-4 mt-4 border-t border-zinc-200/30 dark:border-zinc-800/80 grid grid-cols-2 gap-2 text-center text-xs">
+                          <div className={`p-2 rounded-lg border ${isDarkMode ? 'bg-zinc-950/40 border-zinc-800' : 'bg-slate-50 border-slate-100'}`}>
+                            <span className="text-[10px] text-zinc-500 block">Decision Load</span>
+                            <span className="font-black text-emerald-400">1 Candle / Day</span>
+                          </div>
+                          <div className={`p-2 rounded-lg border ${isDarkMode ? 'bg-zinc-950/40 border-zinc-800' : 'bg-slate-50 border-slate-100'}`}>
+                            <span className="text-[10px] text-zinc-500 block">Noise Level</span>
+                            <span className="font-black text-sky-400">Ultra-Low Noise</span>
                           </div>
                         </div>
                       </div>
 
-                      <div>
-                        <div className="flex justify-between items-center mb-1.5">
-                          <label className={`block text-[11px] font-bold uppercase tracking-wider ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
-                            Risk PnL Target (R-Multiple)
-                          </label>
-                          <span className="text-xs font-bold text-emerald-500">{microPnlR}R</span>
-                        </div>
-                        <input
-                          type="range"
-                          min="0.5"
-                          max="15"
-                          step="0.5"
-                          value={microPnlR}
-                          onChange={(e) => setMicroPnlR(parseFloat(e.target.value))}
-                          className="w-full h-1.5 bg-slate-200 dark:bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-                        />
-                      </div>
-
-                      <div className="space-y-2 border-t border-b border-zinc-200/30 dark:border-zinc-800/80 py-3 my-2">
-                        <span className={`block text-[10px] font-bold uppercase tracking-wider ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
-                          LTF Checklist (Lower Timeframe Validation)
-                        </span>
-
-                        <label className="flex items-center space-x-3 cursor-pointer text-xs">
-                          <input
-                            type="checkbox"
-                            checked={microChecklist.structureAligned}
-                            onChange={(e) => setMicroChecklist({ ...microChecklist, structureAligned: e.target.checked })}
-                            className="rounded-sm border-slate-300 dark:border-zinc-750 text-emerald-600 focus:ring-emerald-500 h-4 w-4"
-                          />
-                          <span className={isDarkMode ? 'text-zinc-300' : 'text-slate-700'}>Structure Aligned with HTF Trend</span>
-                        </label>
-
-                        <label className="flex items-center space-x-3 cursor-pointer text-xs">
-                          <input
-                            type="checkbox"
-                            checked={microChecklist.liquiditySwept}
-                            onChange={(e) => setMicroChecklist({ ...microChecklist, liquiditySwept: e.target.checked })}
-                            className="rounded-sm border-slate-300 dark:border-zinc-750 text-emerald-600 focus:ring-emerald-500 h-4 w-4"
-                          />
-                          <span className={isDarkMode ? 'text-zinc-300' : 'text-slate-700'}>Liquidity Hunt / Sweep Confirmed</span>
-                        </label>
-
-                        <label className="flex items-center space-x-3 cursor-pointer text-xs">
-                          <input
-                            type="checkbox"
-                            checked={microChecklist.fvgTested}
-                            onChange={(e) => setMicroChecklist({ ...microChecklist, fvgTested: e.target.checked })}
-                            className="rounded-sm border-slate-300 dark:border-zinc-750 text-emerald-600 focus:ring-emerald-500 h-4 w-4"
-                          />
-                          <span className={isDarkMode ? 'text-zinc-300' : 'text-slate-700'}>FVG Mitigation (Fair Value Gap)</span>
-                        </label>
-
-                        <label className="flex items-center space-x-3 cursor-pointer text-xs">
-                          <input
-                            type="checkbox"
-                            checked={microChecklist.blockRefined}
-                            onChange={(e) => setMicroChecklist({ ...microChecklist, blockRefined: e.target.checked })}
-                            className="rounded-sm border-slate-300 dark:border-zinc-750 text-emerald-600 focus:ring-emerald-500 h-4 w-4"
-                          />
-                          <span className={isDarkMode ? 'text-zinc-300' : 'text-slate-700'}>Order Block Refined on LTF (1m/5m)</span>
-                        </label>
-
-                        <label className="flex items-center space-x-3 cursor-pointer text-xs">
-                          <input
-                            type="checkbox"
-                            checked={microChecklist.volumeConfirmed}
-                            onChange={(e) => setMicroChecklist({ ...microChecklist, volumeConfirmed: e.target.checked })}
-                            className="rounded-sm border-slate-300 dark:border-zinc-750 text-emerald-600 focus:ring-emerald-500 h-4 w-4"
-                          />
-                          <span className={isDarkMode ? 'text-zinc-300' : 'text-slate-700'}>Volume / Delta Surge Confirmed</span>
-                        </label>
-                      </div>
-
-                      <div>
-                        <label className={`block text-[11px] font-bold uppercase tracking-wider mb-1.5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
-                          Entry Evaluation Notes
-                        </label>
-                        <textarea
-                          value={microEntryNotes}
-                          onChange={(e) => setMicroEntryNotes(e.target.value)}
-                          placeholder="အဝင် trade ၏ အခြေအနေ၊ စိတ်ခံစားမှု သို့မဟုတ် analysis အသေးစိတ်များကို ရေးသားပါ..."
-                          rows={4}
-                          className={`w-full p-2.5 rounded-xl text-xs border focus:outline-hidden transition-all leading-relaxed ${
-                            isDarkMode 
-                              ? 'bg-zinc-900 border-zinc-800 focus:border-slate-500/50 focus:ring-2 focus:ring-slate-500/10 text-zinc-100' 
-                              : 'bg-slate-50 border-slate-200 focus:border-slate-500 focus:ring-2 focus:ring-slate-500/10 text-slate-800'
-                          }`}
-                        />
-                      </div>
-
-                      <button
-                        type="submit"
-                        className="w-full inline-flex items-center justify-center space-x-2 bg-slate-900 hover:bg-slate-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 text-white dark:text-zinc-950 font-bold text-xs px-4 py-3 rounded-xl transition-all cursor-pointer shadow-xs"
-                      >
-                        <Plus className="h-4 w-4" />
-                        <span>Save Setup Log (မှတ်တမ်းသိမ်းရန်)</span>
-                      </button>
-                    </form>
-                  </div>
-
-                  {/* Right Column: Setup Quality Scoring and Log List */}
-                  <div className={`p-6 rounded-2xl border transition-all lg:col-span-2 ${
-                    isDarkMode ? 'bg-zinc-900/40 border-zinc-800/80' : 'bg-white border-slate-200/80 shadow-xs'
-                  }`}>
-                    {/* Setup Analytics cards */}
-                    <div className="grid grid-cols-3 gap-3 mb-6">
-                      <div className={`p-3.5 rounded-xl border ${
-                        isDarkMode ? 'bg-zinc-950/40 border-zinc-800' : 'bg-slate-50/50 border-slate-100'
+                      {/* 2. Asset Universe: 16 Forex & 16 Crypto Pairs */}
+                      <div className={`p-6 rounded-2xl border lg:col-span-8 space-y-4 ${
+                        isDarkMode ? 'bg-zinc-900/40 border-zinc-800/80 text-zinc-100' : 'bg-white border-slate-200/80 shadow-xs text-slate-800'
                       }`}>
-                        <span className="text-[10px] uppercase font-bold text-slate-400">Total Setup</span>
-                        <div className="text-xl font-black mt-0.5">{microLogs.length}</div>
-                      </div>
-                      <div className={`p-3.5 rounded-xl border ${
-                        isDarkMode ? 'bg-zinc-950/40 border-zinc-800' : 'bg-slate-50/50 border-slate-100'
-                      }`}>
-                        <span className="text-[10px] uppercase font-bold text-slate-400">Avg Setup Quality</span>
-                        <div className="text-xl font-black mt-0.5 text-emerald-500">
-                          {microLogs.length > 0 
-                            ? Math.round(microLogs.reduce((acc, log) => acc + log.score, 0) / microLogs.length) 
-                            : 0}%
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-200/40 dark:border-zinc-800/80">
+                          <div className="flex items-center space-x-3">
+                            <div className="p-2.5 rounded-xl bg-sky-500/10 text-sky-500">
+                              <Coins className="h-5 w-5" />
+                            </div>
+                            <div>
+                              <h3 className="text-base font-black">Tradeable Asset Universe</h3>
+                              <p className="text-xs text-zinc-500">Fixed 16 Forex Pairs & Fixed 16 Digital Commodities</p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center space-x-1.5 bg-zinc-200/50 dark:bg-zinc-950/60 p-1 rounded-xl border border-zinc-300/40 dark:border-zinc-800/80">
+                            <button
+                              onClick={() => setMicroAssetClass('forex')}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                microAssetClass === 'forex'
+                                  ? 'bg-amber-500 text-slate-950 shadow-xs'
+                                  : isDarkMode ? 'text-zinc-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                              }`}
+                            >
+                              💱 Forex Pairs (16)
+                            </button>
+                            <button
+                              onClick={() => setMicroAssetClass('crypto')}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                microAssetClass === 'crypto'
+                                  ? 'bg-amber-500 text-slate-950 shadow-xs'
+                                  : isDarkMode ? 'text-zinc-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                              }`}
+                            >
+                              🪙 Crypto Pairs (16)
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                      <div className={`p-3.5 rounded-xl border ${
-                        isDarkMode ? 'bg-zinc-950/40 border-zinc-800' : 'bg-slate-50/50 border-slate-100'
-                      }`}>
-                        <span className="text-[10px] uppercase font-bold text-slate-400">Target Total Reward</span>
-                        <div className="text-xl font-black mt-0.5 text-teal-500">
-                          {microLogs.reduce((acc, log) => acc + log.pnlR, 0).toFixed(1)}R
-                        </div>
+
+                        {/* Forex 16 Pairs Display */}
+                        {microAssetClass === 'forex' && (
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-sky-400 flex items-center gap-1.5">
+                                <DollarSign className="h-3.5 w-3.5" />
+                                Selected: 16 Forex Pairs (USD Majors priority. 5-10 recommended)
+                              </span>
+                              <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                                1:100 Leverage
+                              </span>
+                            </div>
+
+                            {/* USD Majors */}
+                            <div>
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block mb-1.5">USD Majors (7 Pairs)</span>
+                              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2">
+                                {['EURUSD', 'GBPUSD', 'USDJPY', 'USDCHF', 'USDCAD', 'AUDUSD', 'NZDUSD'].map(pair => (
+                                  <div key={pair} className={`p-2.5 rounded-xl border text-center font-mono font-bold text-xs ${
+                                    isDarkMode ? 'bg-zinc-950/60 border-zinc-800 text-emerald-400' : 'bg-slate-50 border-slate-200 text-emerald-700'
+                                  }`}>
+                                    {pair}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* JPY Crosses */}
+                            <div>
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block mb-1.5">JPY Crosses (6 Pairs)</span>
+                              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
+                                {['EURJPY', 'GBPJPY', 'AUDJPY', 'CADJPY', 'CHFJPY', 'NZDJPY'].map(pair => (
+                                  <div key={pair} className={`p-2.5 rounded-xl border text-center font-mono font-bold text-xs ${
+                                    isDarkMode ? 'bg-zinc-950/60 border-zinc-800 text-sky-400' : 'bg-slate-50 border-slate-200 text-sky-700'
+                                  }`}>
+                                    {pair}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Other & Commodities */}
+                            <div>
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block mb-1.5">Exotics & Commodities (3 Pairs)</span>
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                {['USDSGD', 'XAUUSD (Gold)', 'USOIL (Crude Oil)'].map(pair => (
+                                  <div key={pair} className={`p-2.5 rounded-xl border text-center font-mono font-bold text-xs ${
+                                    isDarkMode ? 'bg-zinc-950/60 border-zinc-800 text-amber-400' : 'bg-slate-50 border-slate-200 text-amber-700'
+                                  }`}>
+                                    {pair}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Crypto 16 Commodities Display */}
+                        {microAssetClass === 'crypto' && (
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                                <Coins className="h-3.5 w-3.5" />
+                                Selected: 16 Crypto Pairs (Named 16 = SEC-CFTC digital commodities)
+                              </span>
+                              <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                                20x Max Leverage
+                              </span>
+                            </div>
+
+                            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2">
+                              {['BTC', 'ETH', 'SOL', 'ADA', 'LINK', 'AVAX', 'DOT', 'XLM', 'HBAR', 'LTC', 'DOGE', 'SHIB', 'XTZ', 'BCH', 'APT', 'ALGO'].map(coin => (
+                                <div key={coin} className={`p-2.5 rounded-xl border text-center font-mono font-black text-xs ${
+                                  isDarkMode ? 'bg-zinc-950/60 border-zinc-800 text-amber-300' : 'bg-slate-50 border-slate-200 text-amber-800'
+                                }`}>
+                                  {coin}
+                                </div>
+                              ))}
+                            </div>
+                            <p className="text-[11px] text-zinc-500 italic mt-1">
+                              * Spot/Futures SEC-CFTC standard compliant assets with robust liquidity and low manipulation risk.
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between mb-4 border-b pb-3 border-zinc-200/30 dark:border-zinc-800/80">
-                      <h4 className="text-sm font-bold flex items-center gap-2">
-                        <BookOpen className="h-4 w-4 text-emerald-500" />
-                        Setup Evaluation Records
-                      </h4>
-                    </div>
+                    {/* 3. Market Edge Selector (1 Edge Only rule) */}
+                    <div className={`p-6 rounded-2xl border space-y-6 ${
+                      isDarkMode ? 'bg-zinc-900/40 border-zinc-800/80 text-zinc-100' : 'bg-white border-slate-200/80 shadow-xs text-slate-800'
+                    }`}>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-zinc-200/40 dark:border-zinc-800/80">
+                        <div className="flex items-center space-x-3">
+                          <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-500">
+                            <Target className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-base font-black">⚡ Market Edge</h3>
+                              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                                1 edge only. Master one before integrating.
+                              </span>
+                            </div>
+                            <p className="text-xs text-zinc-500 mt-0.5">အခြေခံ စနစ် (၆) မျိုးထဲမှ မိမိကျွမ်းကျင်ရာ ၁ မျိုးကိုသာ အာရုံစိုက် အသုံးပြုရန်</p>
+                          </div>
+                        </div>
+                      </div>
 
-                    {microLogs.length > 0 ? (
-                      <div className="space-y-4 max-h-[500px] overflow-y-auto pr-1">
-                        {microLogs.map((log) => (
-                          <div 
-                            key={log.id}
-                            className={`p-4 rounded-xl border transition-all ${
-                              isDarkMode 
-                                ? 'bg-zinc-950/20 border-zinc-800/80 text-zinc-100 hover:border-zinc-700/80' 
-                                : 'bg-slate-50 border-slate-200/70 text-slate-800 hover:bg-slate-100/50'
+                      {/* 6 Edge Pill Selector */}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                        {[
+                          { id: 1, name: '1. Horizontal S/R', desc: 'Breakout & Retest Levels' },
+                          { id: 2, name: '2. Trendline', desc: 'Diagonal Structure Alignment' },
+                          { id: 3, name: '3. Fibonacci', desc: 'Impulse Retracement 38-61.8%' },
+                          { id: 4, name: '4. EMA', desc: '1ABC / 2ABC Mean Reversion' },
+                          { id: 5, name: "5. SMA (MEZ's TLE)", desc: 'The Last Engagement Strategy' },
+                          { id: 6, name: '6. Gap', desc: 'Weekend & Daily Fair Imbalance' },
+                        ].map(edge => (
+                          <button
+                            key={edge.id}
+                            onClick={() => setSelectedEdgeTab(edge.id)}
+                            className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                              selectedEdgeTab === edge.id
+                                ? 'bg-amber-500 border-amber-500 text-slate-950 shadow-sm'
+                                : isDarkMode
+                                  ? 'bg-zinc-950/60 border-zinc-800 hover:border-zinc-700 text-zinc-300'
+                                  : 'bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-700'
                             }`}
                           >
-                            <div className="flex justify-between items-start gap-4 mb-2.5">
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <span className="font-bold text-sm text-slate-700 dark:text-zinc-200">{log.asset}</span>
-                                  <span className={`text-[10px] px-2 py-0.5 rounded-md font-semibold ${
-                                    isDarkMode ? 'bg-zinc-800 text-zinc-300' : 'bg-slate-200/60 text-slate-700'
-                                  }`}>{log.setupType}</span>
-                                  <span className="text-xs font-bold text-emerald-500">+{log.pnlR}R</span>
+                            <span className="font-bold text-xs block">{edge.name}</span>
+                            <span className={`text-[10px] block mt-0.5 ${selectedEdgeTab === edge.id ? 'text-slate-900/80 font-medium' : 'text-zinc-500'}`}>
+                              {edge.desc}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Selected Edge Details Card */}
+                      <div className={`p-5 rounded-2xl border ${isDarkMode ? 'bg-zinc-950/70 border-zinc-800' : 'bg-slate-50/90 border-slate-200'}`}>
+                        {selectedEdgeTab === 1 && (
+                          <div className="space-y-3">
+                            <h4 className="text-sm font-black text-amber-400 flex items-center gap-2">
+                              <span>✳️ Edge 1: Horizontal Support & Resistance</span>
+                            </h4>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                              <div className={`p-3 rounded-xl border ${isDarkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-200'}`}>
+                                <span className="font-bold text-amber-400 block mb-1">! Initial Level</span>
+                                <p className="text-zinc-400">ထိချက် တစ်ခု ရှိရမည်။</p>
+                              </div>
+                              <div className={`p-3 rounded-xl border ${isDarkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-200'}`}>
+                                <span className="font-bold text-emerald-400 block mb-1">! Strong Level</span>
+                                <p className="text-zinc-400">ထိချက် ၂ ခု၊ အကြား အနည်းဆုံး <strong>Candle 22 တိုင်</strong> ရှိရမည်။</p>
+                              </div>
+                              <div className={`p-3 rounded-xl border ${isDarkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-200'}`}>
+                                <span className="font-bold text-indigo-400 block mb-1">! Key Level</span>
+                                <p className="text-zinc-400">ထိချက် ၃ ခု၊ ထိချက်အကြား အနည်းဆုံး <strong>Candle 22 တိုင်</strong> ရှိရမည်။</p>
+                              </div>
+                            </div>
+                            <p className="text-[11px] text-zinc-400 mt-2">
+                              * Breakout & Retest ကြား အနည်းဆုံး Candle 4 တိုင် (Total 6)၊ Room to the Left အနည်းဆုံး Candle 4 တိုင် လိုအပ်သည်။
+                            </p>
+                          </div>
+                        )}
+
+                        {selectedEdgeTab === 2 && (
+                          <div className="space-y-2">
+                            <h4 className="text-sm font-black text-amber-400">✳️ Edge 2: Trendline Strategy</h4>
+                            <p className="text-xs text-zinc-300 dark:text-zinc-400 leading-relaxed">
+                              Trendline ပေါ်တွင် Higher Lows သို့မဟုတ် Lower Highs တည်ဆောက်ပြီး Breakout / Retest ဖြစ်ပေါ်ချိန်တွင် D1 Candle Trigger ဖြင့် Entry ဝင်ရောက်ခြင်း။
+                            </p>
+                          </div>
+                        )}
+
+                        {selectedEdgeTab === 3 && (
+                          <div className="space-y-3">
+                            <h4 className="text-sm font-black text-amber-400">✳️ Edge 3: Fibonacci Retracement to Extension</h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                              <div className={`p-3 rounded-xl border flex justify-between items-center ${isDarkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-200'}`}>
+                                <span className="font-bold text-amber-400">38% Retracement</span>
+                                <span className="font-mono font-bold text-emerald-400">= 261.8% Extension</span>
+                              </div>
+                              <div className={`p-3 rounded-xl border flex justify-between items-center ${isDarkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-200'}`}>
+                                <span className="font-bold text-sky-400">50% Retracement</span>
+                                <span className="font-mono font-bold text-emerald-400">= 161.8% Extension</span>
+                              </div>
+                              <div className={`p-3 rounded-xl border flex justify-between items-center ${isDarkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-200'}`}>
+                                <span className="font-bold text-indigo-400">61.8% Retracement</span>
+                                <span className="font-mono font-bold text-emerald-400">= 161.8% Extension</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {selectedEdgeTab === 4 && (
+                          <div className="space-y-2">
+                            <h4 className="text-sm font-black text-amber-400">✳️ Edge 4: EMA Mean Reversion (1ABC & 2ABC)</h4>
+                            <p className="text-xs text-zinc-300 dark:text-zinc-400 leading-relaxed">
+                              Golden Cross ပြီးပါက Buy, Dead Cross ပြီးပါက Sell။ Price သည် Extension (1A, 1B, 1C) သို့မဟုတ် Over Extension (2A, 2B, 2C) မှ Mean Area သို့ ပြန်လာပြီး Candle ပေါ်ပါက Entry ယူရမည်။ (Room to the Left အနည်းဆုံး ၃ တိုင်)။
+                            </p>
+                          </div>
+                        )}
+
+                        {selectedEdgeTab === 5 && (
+                          <div className="space-y-2">
+                            <h4 className="text-sm font-black text-amber-400">✳️ Edge 5: SMA (MEZ's The Last Engagement)</h4>
+                            <p className="text-xs text-zinc-300 dark:text-zinc-400 leading-relaxed">
+                              Simple Moving Average (SMA) key period ပေါ်တွင် နောက်ဆုံး engagement candle အနေအထားကို စောင့်ကြည့်ပြီး institution flow အတိုင်း trend continuation လိုက်ပါစီးနင်းခြင်း။
+                            </p>
+                          </div>
+                        )}
+
+                        {selectedEdgeTab === 6 && (
+                          <div className="space-y-2">
+                            <h4 className="text-sm font-black text-amber-400">✳️ Edge 6: Gap Analysis</h4>
+                            <p className="text-xs text-zinc-300 dark:text-zinc-400 leading-relaxed">
+                              Weekend Gap နှင့် Daily Opening Gap များအား Fill ပြန်လုပ်ခြင်း သို့မဟုတ် Gap အား Support/Resistance အဖြစ် အသုံးချပြီး D1 DCC confirmation ဖြင့် ကုန်သွယ်ခြင်း။
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 4. Associated Technical & Candlesticks Matrix */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Associated Technical */}
+                        <div className={`p-4 rounded-xl border space-y-2.5 ${isDarkMode ? 'bg-zinc-950/40 border-zinc-800' : 'bg-slate-50 border-slate-200'}`}>
+                          <h4 className="text-xs font-bold text-sky-400 flex items-center gap-1.5">
+                            <Check className="h-3.5 w-3.5" />
+                            Associated Technical (အထောက်အကူပြု ကိရိယာများ)
+                          </h4>
+                          <div className="flex flex-wrap gap-2 text-xs">
+                            {['Market Imbalance', 'FVG (Fair Value Gap)', 'BISI / SIBI', 'Order Block (OB)'].map(tech => (
+                              <span key={tech} className={`px-2.5 py-1 rounded-lg border font-semibold ${
+                                isDarkMode ? 'bg-zinc-900 border-zinc-800 text-zinc-300' : 'bg-white border-slate-200 text-slate-700'
+                              }`}>
+                                ✓ {tech}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Candlestick Selection */}
+                        <div className={`p-4 rounded-xl border space-y-2.5 ${isDarkMode ? 'bg-zinc-950/40 border-zinc-800' : 'bg-slate-50 border-slate-200'}`}>
+                          <h4 className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                            <Check className="h-3.5 w-3.5" />
+                            Candle Selection (အဓိက နှင့် အဆင့်မြင့် တိုင်များ)
+                          </h4>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div className={`p-2 rounded-lg border font-semibold ${isDarkMode ? 'bg-zinc-900 border-zinc-800 text-emerald-400' : 'bg-white border-slate-200 text-emerald-800'}`}>
+                              <span className="text-[10px] text-zinc-500 block">Core Selection</span>
+                              Shooting Star / Hammer • Engulfing
+                            </div>
+                            <div className={`p-2 rounded-lg border font-semibold ${isDarkMode ? 'bg-zinc-900 border-zinc-800 text-purple-400' : 'bg-white border-slate-200 text-purple-800'}`}>
+                              <span className="text-[10px] text-zinc-500 block">Advanced Selection</span>
+                              Doji (Long-legged) • Inside Bar
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ========================================================================= */}
+                {/* SUB-TAB 2: EXECUTION, RISK %, 3-STEP BE & EXIT RULES */}
+                {/* ========================================================================= */}
+                {microTab === 'execution' && (
+                  <div className="space-y-6">
+                    {/* Execution Parameters Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {/* Leverage */}
+                      <div className={`p-5 rounded-2xl border ${isDarkMode ? 'bg-zinc-900/40 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 shadow-xs'}`}>
+                        <span className="text-[10px] font-bold uppercase text-zinc-500 block">Leverage Limits</span>
+                        <div className="mt-2 space-y-1">
+                          <div className="flex justify-between items-center text-xs font-bold">
+                            <span>Forex</span>
+                            <span className="font-mono text-sky-400">1:100</span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs font-bold">
+                            <span>Crypto</span>
+                            <span className="font-mono text-amber-400">20x Max</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Risk % */}
+                      <div className={`p-5 rounded-2xl border ${isDarkMode ? 'bg-zinc-900/40 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 shadow-xs'}`}>
+                        <span className="text-[10px] font-bold uppercase text-zinc-500 block">🎯 Risk % Per Trade</span>
+                        <div className="mt-2 space-y-1">
+                          <div className="flex justify-between items-center text-xs font-bold">
+                            <span>Phase 1 & 2 (Training)</span>
+                            <span className="font-mono text-rose-400">5% ($500)</span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs font-bold">
+                            <span>Phase 3+ MA (Real)</span>
+                            <span className="font-mono text-emerald-400">1 - 3%</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Max Trades */}
+                      <div className={`p-5 rounded-2xl border ${isDarkMode ? 'bg-zinc-900/40 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 shadow-xs'}`}>
+                        <span className="text-[10px] font-bold uppercase text-zinc-500 block">Max Ongoing Trades</span>
+                        <div className="mt-2 space-y-1">
+                          <div className="flex justify-between items-center text-xs font-bold">
+                            <span>Forex Maximum</span>
+                            <span className="font-mono text-emerald-400">3 Trades</span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs font-bold">
+                            <span>Crypto Maximum</span>
+                            <span className="font-mono text-amber-400">5 Trades</span>
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-zinc-500 mt-1">*(1 BE/Trailing ရမှ +1 trade earn)*</p>
+                      </div>
+
+                      {/* RR Minimum */}
+                      <div className={`p-5 rounded-2xl border ${isDarkMode ? 'bg-zinc-900/40 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 shadow-xs'}`}>
+                        <span className="text-[10px] font-bold uppercase text-zinc-500 block">📊 Risk : Reward Minimum</span>
+                        <div className="mt-2 space-y-1">
+                          <div className="flex justify-between items-center text-xs font-bold">
+                            <span>Forex Target</span>
+                            <span className="font-mono text-emerald-400">Min 2R</span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs font-bold">
+                            <span>Crypto Target</span>
+                            <span className="font-mono text-amber-400">Min 3R</span>
+                          </div>
+                        </div>
+                        <p className="text-[10px] font-bold text-rose-400 mt-1">2R ထက်နည်းပါက = NO TRADE</p>
+                      </div>
+                    </div>
+
+                    {/* Entry Rules, SL Placement & Daily Workflow */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* Entry & SL Placement */}
+                      <div className={`p-6 rounded-2xl border space-y-4 ${
+                        isDarkMode ? 'bg-zinc-900/40 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 shadow-xs text-slate-800'
+                      }`}>
+                        <h3 className="text-sm font-black flex items-center gap-2">
+                          <Target className="h-4 w-4 text-emerald-500" />
+                          🚪 Entry Rules & 🛡️ SL Placement
+                        </h3>
+
+                        <div className="space-y-3 text-xs">
+                          <div className={`p-3.5 rounded-xl border ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800' : 'bg-slate-50 border-slate-200'}`}>
+                            <span className="font-bold text-emerald-400 block mb-1">Conservative Entry (Default)</span>
+                            <p className="text-zinc-300 dark:text-zinc-400">
+                              2/3 pips/points above candle OR 50% retracement. <strong>DCC (Daily Candle Close) Confirmed required</strong>.
+                            </p>
+                          </div>
+
+                          <div className={`p-3.5 rounded-xl border ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800' : 'bg-slate-50 border-slate-200'}`}>
+                            <span className="font-bold text-rose-400 block mb-1">SL Placement Rules</span>
+                            <ul className="space-y-1 text-zinc-300 dark:text-zinc-400 list-disc pl-4">
+                              <li><strong>Phase 1 & 2 (Forex):</strong> 2/3 pips below/above candle</li>
+                              <li><strong>Phase 1 & 2 (Crypto):</strong> 2/3 points below/above spike</li>
+                              <li><strong>Phase 3+ (Breathing Room):</strong> Initial SL + 0.5 ATR 🔒</li>
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Trading Session Workflow */}
+                      <div className={`p-6 rounded-2xl border space-y-4 ${
+                        isDarkMode ? 'bg-zinc-900/40 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 shadow-xs text-slate-800'
+                      }`}>
+                        <h3 className="text-sm font-black flex items-center gap-2">
+                          <Clock className="h-4 w-4 text-sky-400" />
+                          🕐 Trading Session (Daily Workflow)
+                        </h3>
+
+                        <div className="space-y-3 text-xs">
+                          <div className={`p-3.5 rounded-xl border flex items-center justify-between ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800' : 'bg-slate-50 border-slate-200'}`}>
+                            <div>
+                              <span className="font-bold text-sky-400 block">🌙 ညဘက် လုပ်ဆောင်ချက်</span>
+                              <span className="text-zinc-400">DCC → Edge → Epic Notes စစ်ဆေးရေးသားခြင်း</span>
+                            </div>
+                            <span className="text-[10px] font-bold px-2 py-1 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20">Analysis</span>
+                          </div>
+
+                          <div className={`p-3.5 rounded-xl border flex items-center justify-between ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800' : 'bg-slate-50 border-slate-200'}`}>
+                            <div>
+                              <span className="font-bold text-emerald-400 block">☀️ မနက် ၆:၃၀ / ၇:၀၀</span>
+                              <span className="text-zinc-400">Execute Order ဝင်ရောက်ခြင်း</span>
+                            </div>
+                            <span className="text-[10px] font-bold px-2 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Execute</span>
+                          </div>
+
+                          <div className={`p-3 rounded-xl border text-center font-bold text-amber-400 ${isDarkMode ? 'bg-amber-500/5 border-amber-500/20' : 'bg-amber-50 border-amber-200'}`}>
+                            No trade setup = Move On! (အတင်းရှာမဝင်ရ)
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Exit Strategy & 3-Step BE Rule */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                      {/* 🚀 Exit Strategy Matrix */}
+                      <div className={`p-6 rounded-2xl border lg:col-span-6 space-y-4 ${
+                        isDarkMode ? 'bg-zinc-900/40 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 shadow-xs text-slate-800'
+                      }`}>
+                        <div className="flex items-center justify-between pb-3 border-b border-zinc-200/40 dark:border-zinc-800">
+                          <h3 className="text-sm font-black flex items-center gap-2">
+                            <TrendingUp className="h-4 w-4 text-emerald-400" />
+                            🚀 Exit Strategy (Exit Method)
+                          </h3>
+                          <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            40/60% Default
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          {[
+                            { code: '40/60%', name: '40% Lock, 60% Trail', desc: 'Default: Bigger runner အတွက် အထူးသင့်လျော်သည်', tag: 'Recommended' },
+                            { code: '100%', name: '100% Full Exit', desc: 'TP ထိရင် အကုန်ပိတ်သိမ်းသည်', tag: 'Standard' },
+                            { code: '50/50%', name: '50% Lock, 50% Trail', desc: 'TP1 မှာ 50% profit lock, ကျန် 50% trail', tag: 'Balanced' },
+                            { code: '60/40%', name: '60% Lock, 40% Trail', desc: '60% lock, 40% trail (safer lock)', tag: 'Safe' },
+                          ].map(item => (
+                            <button
+                              key={item.code}
+                              onClick={() => setSelectedExitMethod(item.code as any)}
+                              className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                                selectedExitMethod === item.code
+                                  ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400'
+                                  : isDarkMode ? 'bg-zinc-950/40 border-zinc-800 text-zinc-400' : 'bg-slate-50 border-slate-200 text-slate-600'
+                              }`}
+                            >
+                              <div className="flex justify-between items-center mb-1">
+                                <span className="font-bold text-xs">{item.code}</span>
+                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 font-semibold">{item.tag}</span>
+                              </div>
+                              <p className="text-[11px] leading-tight opacity-90">{item.desc}</p>
+                            </button>
+                          ))}
+                        </div>
+
+                        <p className="text-[11px] text-zinc-400 italic">
+                          * Live market မှာ emotional decision မချရအောင် ကြိုရွေးထားပါ။
+                        </p>
+                      </div>
+
+                      {/* 🔄 Simplified BE Rule (3 Steps) */}
+                      <div className={`p-6 rounded-2xl border lg:col-span-6 space-y-4 ${
+                        isDarkMode ? 'bg-zinc-900/40 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 shadow-xs text-slate-800'
+                      }`}>
+                        <div className="flex items-center justify-between pb-3 border-b border-zinc-200/40 dark:border-zinc-800">
+                          <h3 className="text-sm font-black flex items-center gap-2">
+                            <Shield className="h-4 w-4 text-sky-400" />
+                            🔄 Simplified BE Rule (Phase 1 & 2)
+                          </h3>
+                          <span className="text-[10px] font-bold text-zinc-400">Strict Protocol</span>
+                        </div>
+
+                        <div className="space-y-2.5 text-xs">
+                          <div className={`p-2.5 rounded-xl border flex items-center gap-3 ${isDarkMode ? 'bg-zinc-950/50 border-zinc-800' : 'bg-slate-50 border-slate-200'}`}>
+                            <span className="h-6 w-6 rounded-full bg-sky-500/20 text-sky-400 font-black text-xs flex items-center justify-center shrink-0">1</span>
+                            <span><strong>Step 1:</strong> Price reached minimum <strong>1R</strong> in your direction</span>
+                          </div>
+                          <div className={`p-2.5 rounded-xl border flex items-center gap-3 ${isDarkMode ? 'bg-zinc-950/50 border-zinc-800' : 'bg-slate-50 border-slate-200'}`}>
+                            <span className="h-6 w-6 rounded-full bg-amber-500/20 text-amber-400 font-black text-xs flex items-center justify-center shrink-0">2</span>
+                            <span><strong>Step 2:</strong> Price pulled back but didn't hit SL</span>
+                          </div>
+                          <div className={`p-2.5 rounded-xl border flex items-center gap-3 ${isDarkMode ? 'bg-zinc-950/50 border-zinc-800' : 'bg-slate-50 border-slate-200'}`}>
+                            <span className="h-6 w-6 rounded-full bg-emerald-500/20 text-emerald-400 font-black text-xs flex items-center justify-center shrink-0">3</span>
+                            <span><strong>Step 3:</strong> New D1 candle closes in your direction</span>
+                          </div>
+                        </div>
+
+                        <div className={`p-3 rounded-xl border space-y-1 text-xs ${isDarkMode ? 'bg-sky-500/5 border-sky-500/20 text-sky-200' : 'bg-sky-50 border-sky-200 text-sky-900'}`}>
+                          <div className="font-bold flex items-center gap-1 text-sky-400">
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            → Move SL to entry price
+                          </div>
+                          <p className="text-[11px] leading-relaxed opacity-90">
+                            3 steps မပြည့်ခင် BE မရွှေ့ရ — Premature BE ကြောင့် good trade ကနေ shake out မဖြစ်ရအောင်။ Price action က BE ကို earn လုပ်ပေးရတယ်, arbitrary decision မဟုတ်ဘူး။
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Holding Period Card */}
+                    <div className={`p-5 rounded-2xl border space-y-3 ${
+                      isDarkMode ? 'bg-zinc-900/40 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 shadow-xs text-slate-800'
+                    }`}>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <h4 className="text-sm font-black flex items-center gap-2 text-amber-400">
+                          <Clock className="h-4 w-4" />
+                          ⏳ Holding Period: Open-Ended (TP / SL ထိသည်အထိ)
+                        </h4>
+                        <div className="flex items-center gap-2 text-[11px] font-bold">
+                          <span className="text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">✅ BE/Trail only</span>
+                          <span className="text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded">❌ Emotional close</span>
+                          <span className="text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded">❌ SL widening</span>
+                          <span className="text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded">❌ TP shortening</span>
+                        </div>
+                      </div>
+                      <p className="text-xs text-zinc-300 dark:text-zinc-400 leading-relaxed">
+                        D1 trades က days to weeks ကြာနိုင်တယ်။ Set and forget until TP/SL hit — chart ကို constantly ကြည့်ပြီး emotional exit လုပ်ခြင်းမှ ရှောင်ကြဉ်ပါ။ မ trade ခင် အသေအလဲ စဉ်းစား, trade ပြီးရင် စောင့်နိုင်စွမ်း ရှိရမယ်။
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* ========================================================================= */}
+                {/* SUB-TAB 3: RESET, 20% DRAWDOWN & EMERGENCY PROTOCOL */}
+                {/* ========================================================================= */}
+                {microTab === 'protection' && (
+                  <div className="space-y-6">
+                    {/* Forced Reset Protocol Card */}
+                    <div className={`p-6 rounded-2xl border space-y-4 ${
+                      isDarkMode ? 'bg-zinc-900/40 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 shadow-xs text-slate-800'
+                    }`}>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-zinc-200/40 dark:border-zinc-800">
+                        <div className="flex items-center space-x-3">
+                          <div className="p-2 rounded-xl bg-rose-500/10 text-rose-500">
+                            <ShieldAlert className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <h3 className="text-base font-black text-rose-400">🔴 Forced Reset (Loss Streak Prevention Protocol)</h3>
+                            <p className="text-xs text-zinc-500">Losing streak တွင် revenge trading ကို mechanically ကာကွယ်ပေးသော စနစ်</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Interactive Reset Sequence Flow */}
+                      <div className="grid grid-cols-1 sm:grid-cols-5 gap-2.5 text-xs font-semibold">
+                        <div className={`p-3 rounded-xl border text-center space-y-1 ${isDarkMode ? 'bg-rose-500/10 border-rose-500/30 text-rose-300' : 'bg-rose-50 border-rose-200 text-rose-900'}`}>
+                          <span className="text-[10px] font-bold block uppercase text-rose-400">Trigger</span>
+                          <div className="font-black">3 Consecutive SL</div>
+                          <span className="text-[10px] opacity-80">ဆက်တိုက် ၃ ကြိမ်ရှုံး</span>
+                        </div>
+                        <div className={`p-3 rounded-xl border text-center space-y-1 ${isDarkMode ? 'bg-amber-500/10 border-amber-500/30 text-amber-300' : 'bg-amber-50 border-amber-200 text-amber-900'}`}>
+                          <span className="text-[10px] font-bold block uppercase text-amber-400">Step 1</span>
+                          <div className="font-black">5 Days Rest</div>
+                          <span className="text-[10px] opacity-80">၅ ရက် လုံးဝနားရန်</span>
+                        </div>
+                        <div className={`p-3 rounded-xl border text-center space-y-1 ${isDarkMode ? 'bg-sky-500/10 border-sky-500/30 text-sky-300' : 'bg-sky-50 border-sky-200 text-sky-900'}`}>
+                          <span className="text-[10px] font-bold block uppercase text-sky-400">Step 2</span>
+                          <div className="font-black">1 Trade Back</div>
+                          <span className="text-[10px] opacity-80">၁ Trade သာ ပြန်စရန်</span>
+                        </div>
+                        <div className={`p-3 rounded-xl border text-center space-y-1 ${isDarkMode ? 'bg-purple-500/10 border-purple-500/30 text-purple-300' : 'bg-purple-50 border-purple-200 text-purple-900'}`}>
+                          <span className="text-[10px] font-bold block uppercase text-purple-400">If SL Again</span>
+                          <div className="font-black">3 Days Rest → 1 Trade</div>
+                          <span className="text-[10px] opacity-80">TP ရသည်အထိ ထပ်ခါလုပ်</span>
+                        </div>
+                        <div className={`p-3 rounded-xl border text-center space-y-1 ${isDarkMode ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-emerald-50 border-emerald-200 text-emerald-900'}`}>
+                          <span className="text-[10px] font-bold block uppercase text-emerald-400">Recovery</span>
+                          <div className="font-black">TP = Normal 3 ✅</div>
+                          <span className="text-[10px] opacity-80">ပုံမှန်ပြန်ခွင့်ရ</span>
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-zinc-300 dark:text-zinc-400 leading-relaxed">
+                        Losing streak မှာ revenge trading ကို mechanically prevent လုပ်ပေးတယ်။ 5 days rest = emotional reset။ Recovery sequence = slowly re-engage — trust ကို ပြန် earn လုပ်ရတယ်။ TP ရမှ full capacity ပြန်ရတယ်။
+                      </p>
+                    </div>
+
+                    {/* 20% Drawdown & Risk of Ruin Grid */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                      {/* 20% Drawdown Circuit Breaker */}
+                      <div className={`p-6 rounded-2xl border lg:col-span-6 space-y-4 ${
+                        isDarkMode ? 'bg-zinc-900/40 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 shadow-xs text-slate-800'
+                      }`}>
+                        <div className="flex items-center space-x-3 pb-3 border-b border-zinc-200/40 dark:border-zinc-800">
+                          <div className="p-2 rounded-xl bg-rose-500/10 text-rose-500">
+                            <AlertTriangle className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <h3 className="text-base font-black text-rose-400">📉 20% Drawdown Circuit Breaker</h3>
+                            <span className="text-[10px] font-bold text-zinc-400 uppercase">Emergency Account Pause</span>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3 text-xs">
+                          <div className={`p-3 rounded-xl border ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800' : 'bg-slate-50 border-slate-200'}`}>
+                            <span className="text-[10px] text-zinc-500 block">ProjectX Program</span>
+                            <span className="font-black text-amber-400 text-sm">Coach Review</span>
+                          </div>
+                          <div className={`p-3 rounded-xl border ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800' : 'bg-slate-50 border-slate-200'}`}>
+                            <span className="text-[10px] text-zinc-500 block">MA Program</span>
+                            <span className="font-black text-rose-400 text-sm">MEZ Review</span>
+                          </div>
+                        </div>
+
+                        <p className="text-xs text-zinc-300 dark:text-zinc-400 leading-relaxed">
+                          20% drawdown ဆိုတာ account ရဲ့ 1/5 ဆုံးရှုံးတာ — ပြန်တက်ဖို့ 25% profit လိုတယ်။ ဒီ level ရောက်ရင် system or psychology ပြဿနာ ရှိနေပြီ — ကိုယ့်ဘာသာ ဆက်မ trade ဘဲ review ခံယူပါ။
+                        </p>
+                      </div>
+
+                      {/* ☠️ Risk of Ruin Matrix */}
+                      <div className={`p-6 rounded-2xl border lg:col-span-6 space-y-4 ${
+                        isDarkMode ? 'bg-zinc-900/40 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 shadow-xs text-slate-800'
+                      }`}>
+                        <div className="flex items-center space-x-3 pb-3 border-b border-zinc-200/40 dark:border-zinc-800">
+                          <div className="p-2 rounded-xl bg-purple-500/10 text-purple-500">
+                            <Scale className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <h3 className="text-base font-black">☠️ Risk of Ruin (ရှင်သန်မှု တွက်ချက်မှု)</h3>
+                            <span className="text-[10px] font-bold text-zinc-400">Numbers တွေက ဘယ်တော့မှ မလိမ်တတ်ဘူး</span>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div className={`p-2.5 rounded-xl border ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800' : 'bg-slate-50 border-slate-200'}`}>
+                            <span className="text-[10px] text-zinc-500 block font-bold">Disciplined 1%</span>
+                            <span className="font-black text-emerald-400">100+ Trades Survival</span>
+                          </div>
+                          <div className={`p-2.5 rounded-xl border ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800' : 'bg-slate-50 border-slate-200'}`}>
+                            <span className="text-[10px] text-zinc-500 block font-bold">Standard 3%</span>
+                            <span className="font-black text-sky-400">33 Trades Survival</span>
+                          </div>
+                          <div className={`p-2.5 rounded-xl border ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800' : 'bg-slate-50 border-slate-200'}`}>
+                            <span className="text-[10px] text-zinc-500 block font-bold">Training 5%</span>
+                            <span className="font-black text-amber-400">20 Trades Survival</span>
+                          </div>
+                          <div className={`p-2.5 rounded-xl border ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800' : 'bg-slate-50 border-slate-200'}`}>
+                            <span className="text-[10px] text-zinc-500 block font-bold">Reckless 10%</span>
+                            <span className="font-black text-rose-500">7 Trades to Ruin 💥</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 🚨 Emergency Protocol Detailed Drilldown */}
+                    <div className={`p-6 rounded-2xl border space-y-4 ${
+                      isDarkMode ? 'bg-zinc-900/40 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 shadow-xs text-slate-800'
+                    }`}>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-200/40 dark:border-zinc-800">
+                        <div className="flex items-center space-x-3">
+                          <div className="p-2 rounded-xl bg-amber-500/10 text-amber-500">
+                            <ShieldAlert className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <h3 className="text-base font-black">🚨 Emergency Protocol (အရေးပေါ် တုံ့ပြန်မှု လုပ်ထုံးလုပ်နည်း)</h3>
+                            <p className="text-xs text-zinc-500">မမျှော်လင့်ထားတဲ့ အခြေအနေမျိုး ကြုံရင် ဘယ်လို react လုပ်မလဲ — ကြိုသတ်မှတ်ထားပါ</p>
+                          </div>
+                        </div>
+
+                        {/* Emergency Tabs */}
+                        <div className="flex flex-wrap gap-1.5">
+                          {[
+                            { id: 'crash', label: '💥 Flash Crash / Spike' },
+                            { id: 'outage', label: '🔌 Broker Outage' },
+                            { id: 'gap', label: '📊 Weekend Gap' },
+                            { id: 'news', label: '⚡ Unexpected News' },
+                          ].map(tab => (
+                            <button
+                              key={tab.id}
+                              onClick={() => setEmergencyTab(tab.id as any)}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                emergencyTab === tab.id
+                                  ? 'bg-amber-500 text-slate-950 shadow-xs'
+                                  : isDarkMode ? 'bg-zinc-950/60 text-zinc-400 hover:text-zinc-200' : 'bg-slate-100 text-slate-600 hover:text-slate-900'
+                              }`}
+                            >
+                              {tab.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Emergency Content Card */}
+                      <div className={`p-5 rounded-2xl border ${isDarkMode ? 'bg-zinc-950/70 border-zinc-800' : 'bg-slate-50 border-slate-200'}`}>
+                        {emergencyTab === 'crash' && (
+                          <div className="space-y-2.5 text-xs">
+                            <h4 className="font-black text-amber-400 text-sm">💥 Flash Crash / Sudden Spike ဖြစ်ပေါ်ချိန်</h4>
+                            <ul className="space-y-2 text-zinc-300 dark:text-zinc-400">
+                              <li className="flex items-start gap-2">
+                                <span className="text-rose-400 font-bold">☐</span>
+                                <span><strong>Open positions ကို လုံးဝ မကိုင်ရ</strong> — panic close/add မလုပ်ရပါ။</span>
+                              </li>
+                              <li className="flex items-start gap-2">
+                                <span className="text-amber-400 font-bold">☐</span>
+                                <span><strong>SL ရှိပြီးသား ဖြစ်ရမည်</strong> (SL မရှိဘဲ position ဖွင့်ထားခွင့် လုံးဝမရှိ)။</span>
+                              </li>
+                              <li className="flex items-start gap-2">
+                                <span className="text-sky-400 font-bold">☐</span>
+                                <span><strong>SL ထိရင် ထိခွင့်ပေး</strong> — manual intervention ကြားဖြတ်မလုပ်ရပါ။</span>
+                              </li>
+                              <li className="flex items-start gap-2">
+                                <span className="text-emerald-400 font-bold">☐</span>
+                                <span>Market stabilize ဖြစ်ပြီး <strong>D1 candle close ကျမှ reassess</strong> ပြန်လည်သုံးသပ်ပါ။</span>
+                              </li>
+                            </ul>
+                          </div>
+                        )}
+
+                        {emergencyTab === 'outage' && (
+                          <div className="space-y-2.5 text-xs">
+                            <h4 className="font-black text-sky-400 text-sm">🔌 Exchange / Broker Outage (လိုင်းပြတ်တောက်ခြင်း)</h4>
+                            <ul className="space-y-2 text-zinc-300 dark:text-zinc-400">
+                              <li className="flex items-start gap-2">
+                                <span className="text-sky-400 font-bold">☐</span>
+                                <span>Backup device (phone/laptop) အမြဲ ready ဖြစ်ရမည်။</span>
+                              </li>
+                              <li className="flex items-start gap-2">
+                                <span className="text-amber-400 font-bold">☐</span>
+                                <span>Access မရရင် — <strong>do nothing</strong>, restoration ကို စောင့်ပါ။</span>
+                              </li>
+                              <li className="flex items-start gap-2">
+                                <span className="text-emerald-400 font-bold">☐</span>
+                                <span>Outage ပြီးရင် open positions check ရုံပဲ, new trades အသစ်မယူရပါ။</span>
+                              </li>
+                            </ul>
+                          </div>
+                        )}
+
+                        {emergencyTab === 'gap' && (
+                          <div className="space-y-2.5 text-xs">
+                            <h4 className="font-black text-purple-400 text-sm">📊 Weekend Gap (Forex)</h4>
+                            <ul className="space-y-2 text-zinc-300 dark:text-zinc-400">
+                              <li className="flex items-start gap-2">
+                                <span className="text-purple-400 font-bold">☐</span>
+                                <span>Friday close မတိုင်ခင် open positions များကို ကြိုတင် review လုပ်ရမည်။</span>
+                              </li>
+                              <li className="flex items-start gap-2">
+                                <span className="text-emerald-400 font-bold">☐</span>
+                                <span>Gap ပေါ်ရင် — <strong>SL ကို adjust မလုပ်ရ</strong>, system ကို ယုံကြည်ရမည်။</span>
+                              </li>
+                            </ul>
+                          </div>
+                        )}
+
+                        {emergencyTab === 'news' && (
+                          <div className="space-y-2.5 text-xs">
+                            <h4 className="font-black text-rose-400 text-sm">⚡ Unexpected High Impact News (မမျှော်လင့်သော သတင်းကြီးများ)</h4>
+                            <ul className="space-y-2 text-zinc-300 dark:text-zinc-400">
+                              <li className="flex items-start gap-2">
+                                <span className="text-rose-400 font-bold">☐</span>
+                                <span>DoD checklist မှာ မပါဘဲ ထွက်လာရင် — <strong>new entries အသစ် လုံးဝမယူရ</strong>။</span>
+                              </li>
+                              <li className="flex items-start gap-2">
+                                <span className="text-amber-400 font-bold">☐</span>
+                                <span>ရှိပြီး positions ကို SL ဆီ ထားခဲ့ရုံ။</span>
+                              </li>
+                              <li className="flex items-start gap-2">
+                                <span className="text-emerald-400 font-bold">☐</span>
+                                <span>News settle ဖြစ်ပြီး next D1 close ကျမှ ပြန်သုံးသပ်ပါ။</span>
+                              </li>
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Golden Rule Callout */}
+                      <div className={`p-4 rounded-xl border text-center font-bold text-xs space-y-1 ${
+                        isDarkMode ? 'bg-amber-500/10 border-amber-500/30 text-amber-300' : 'bg-amber-50 border-amber-300 text-amber-900'
+                      }`}>
+                        <div className="text-sm font-black text-amber-400">
+                          🌟 Golden Rule: "When in doubt, do nothing. The market will be there tomorrow."
+                        </div>
+                        <p className="text-[11px] opacity-90">
+                          ယောင်ယမ်းဖြစ်ရင် ဘာမှ မလုပ်ပါနဲ့, ဈေးကွက်က မနက်ဖြန် ရှိနေဦးမှာပါ။
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ========================================================================= */}
+                {/* SUB-TAB 4: RITUALS, DISCIPLINE & WHEN NOT TO TRADE */}
+                {/* ========================================================================= */}
+                {microTab === 'discipline' && (
+                  <div className="space-y-6">
+                    {/* Sunday Ritual & Monday Rule */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* Sunday Ritual */}
+                      <div className={`p-6 rounded-2xl border space-y-3 ${
+                        isDarkMode ? 'bg-zinc-900/40 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 shadow-xs text-slate-800'
+                      }`}>
+                        <div className="flex items-center space-x-3 pb-3 border-b border-zinc-200/40 dark:border-zinc-800">
+                          <div className="p-2 rounded-xl bg-amber-500/10 text-amber-500">
+                            <Sun className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <h3 className="text-base font-black text-amber-400">☀️ Sunday Ritual</h3>
+                            <span className="text-xs font-bold text-emerald-400">No charts. No trading. Restart & Refresh</span>
+                          </div>
+                        </div>
+
+                        <p className="text-xs text-zinc-300 dark:text-zinc-400 leading-relaxed">
+                          Weekly reset day — burnout prevention + weekly preparation cycle။ Trading ကို ရပ်ထားပြီး Analysis, Reading, Reflection လုပ်ပါ။ Sunday prepare, Monday onwards execute ဆိုတဲ့ Rhythm ဖြစ်ပါစေ။
+                        </p>
+                      </div>
+
+                      {/* Monday Rule */}
+                      <div className={`p-6 rounded-2xl border space-y-3 ${
+                        isDarkMode ? 'bg-zinc-900/40 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 shadow-xs text-slate-800'
+                      }`}>
+                        <div className="flex items-center space-x-3 pb-3 border-b border-zinc-200/40 dark:border-zinc-800">
+                          <div className="p-2 rounded-xl bg-rose-500/10 text-rose-500">
+                            <Calendar className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <h3 className="text-base font-black">📋 Monday Rule</h3>
+                            <span className="text-xs font-bold text-rose-400">Ph 1 & 2: NO ENTRY | Ph 3+: OPTIONAL</span>
+                          </div>
+                        </div>
+
+                        <p className="text-xs text-zinc-300 dark:text-zinc-400 leading-relaxed">
+                          Monday = Correction/Observation Day။ Forex မှာ liquidity နည်း, weekend gap risk ရှိ, D1 candle အသစ် စဖွဲ့ချိန်ဖြစ်တယ်။ Beginners ကို 'ဝင်ချင်စိတ်' ထိန်းခိုင်းတာ Discipline Training ဖြစ်တယ်။
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Routines Grid */}
+                    <div className={`p-6 rounded-2xl border space-y-4 ${
+                      isDarkMode ? 'bg-zinc-900/40 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 shadow-xs text-slate-800'
+                    }`}>
+                      <h3 className="text-sm font-black flex items-center gap-2">
+                        <RotateCcw className="h-4 w-4 text-sky-400" />
+                        🔁 Routines (လုပ်ငန်းစဉ်များ)
+                      </h3>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                        {/* Pre-Market */}
+                        <div className={`p-4 rounded-xl border space-y-2 ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800' : 'bg-slate-50 border-slate-200'}`}>
+                          <span className="font-bold text-sky-400 block">🌅 Pre-Market Checklist</span>
+                          <ul className="space-y-1 text-zinc-300 dark:text-zinc-400">
+                            <li>✓ DCC Confirmation</li>
+                            <li>✓ Valid Edge Identified</li>
+                            <li>✓ Epic Notes Written</li>
+                            <li>✓ Mental & Physical Fit</li>
+                          </ul>
+                        </div>
+
+                        {/* Post-Trade */}
+                        <div className={`p-4 rounded-xl border space-y-2 ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800' : 'bg-slate-50 border-slate-200'}`}>
+                          <span className="font-bold text-emerald-400 block">📝 Post-Trade Checklist</span>
+                          <ul className="space-y-1 text-zinc-300 dark:text-zinc-400">
+                            <li>✓ Journal Entry Completed</li>
+                            <li>✓ Screenshot Attached</li>
+                            <li>✓ Emotion Logged Honestly</li>
+                          </ul>
+                        </div>
+
+                        {/* Weekend */}
+                        <div className={`p-4 rounded-xl border space-y-2 ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800' : 'bg-slate-50 border-slate-200'}`}>
+                          <span className="font-bold text-amber-400 block">🏖️ Weekend Checklist</span>
+                          <ul className="space-y-1 text-zinc-300 dark:text-zinc-400">
+                            <li>✓ Sunday Ritual Observed</li>
+                            <li>✓ Weekly Performance Review</li>
+                            <li>✓ Watchlist & DoD Check</li>
+                            <li>✓ Macro/D1 Analysis</li>
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 🚫 When NOT to Trade & 🗓 Review Cadence */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                      {/* When NOT to Trade */}
+                      <div className={`p-6 rounded-2xl border lg:col-span-8 space-y-4 ${
+                        isDarkMode ? 'bg-zinc-900/40 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 shadow-xs text-slate-800'
+                      }`}>
+                        <h3 className="text-sm font-black text-rose-400 flex items-center gap-2">
+                          <ShieldAlert className="h-4 w-4" />
+                          🚫 When NOT to Trade (ကုန်သွယ်မှု လုံးဝရှောင်ကြဉ်ရမည့် အချိန်များ)
+                        </h3>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                          {/* Market Conditions */}
+                          <div className={`p-3.5 rounded-xl border space-y-2 ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800' : 'bg-slate-50 border-slate-200'}`}>
+                            <span className="font-bold text-amber-400 block">⚠️ Market Factors</span>
+                            <ul className="space-y-1 text-zinc-300 dark:text-zinc-400">
+                              <li>• High Impact News: NFP / FOMC / CPI</li>
+                              <li>• Holidays: Thingyan, Christmas & Year-End</li>
+                            </ul>
+                          </div>
+
+                          {/* Personal Factors */}
+                          <div className={`p-3.5 rounded-xl border space-y-2 ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800' : 'bg-slate-50 border-slate-200'}`}>
+                            <span className="font-bold text-rose-400 block">🚫 Personal & Health Factors</span>
+                            <div className="grid grid-cols-2 gap-1 text-[11px] text-zinc-300 dark:text-zinc-400">
+                              <span>• Travel / Illness</span>
+                              <span>• Stress / Breakup</span>
+                              <span>• Alcohol / Weed</span>
+                              <span>• Financial stress</span>
+                              <span>• Overconfidence</span>
+                              <span>• No sleep / Tired</span>
+                              <span>• Bad connection</span>
+                              <span>• Multi-tasking</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Review Cadence */}
+                      <div className={`p-6 rounded-2xl border lg:col-span-4 space-y-3 ${
+                        isDarkMode ? 'bg-zinc-900/40 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 shadow-xs text-slate-800'
+                      }`}>
+                        <h3 className="text-sm font-black flex items-center gap-2 text-sky-400">
+                          <Calendar className="h-4 w-4" />
+                          🗓 Review Cadence
+                        </h3>
+
+                        <div className="space-y-2 text-xs">
+                          <div className={`p-3 rounded-xl border ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800' : 'bg-slate-50 border-slate-200'}`}>
+                            <span className="text-[10px] text-zinc-500 block font-bold">Sample Size Review</span>
+                            <span className="font-black text-amber-400 text-sm">10 Trades / Review</span>
+                            <p className="text-[11px] text-zinc-400 mt-0.5">Mentor / Coach Review</p>
+                          </div>
+                          <div className={`p-3 rounded-xl border ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800' : 'bg-slate-50 border-slate-200'}`}>
+                            <span className="text-[10px] text-zinc-500 block font-bold">Self Assessment</span>
+                            <span className="font-black text-emerald-400 text-sm">M / Q / Y (Monthly/Quarter/Year)</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ========================================================================= */}
+                {/* SUB-TAB 5: INTERACTIVE 12-POINT PRE-TRADE CHECKLIST */}
+                {/* ========================================================================= */}
+                {microTab === 'checklist' && (
+                  <div className="space-y-6">
+                    {/* Checklist Header & Live Clearance Banner */}
+                    {(() => {
+                      const allChecked = Object.values(preTradeChecks).every(Boolean);
+                      const checkedCount = Object.values(preTradeChecks).filter(Boolean).length;
+                      return (
+                        <div className="space-y-4">
+                          <div className={`p-5 rounded-2xl border transition-all ${
+                            allChecked 
+                              ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-300' 
+                              : isDarkMode ? 'bg-zinc-900/60 border-zinc-800 text-zinc-300' : 'bg-slate-100 border-slate-300 text-slate-800'
+                          }`}>
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                              <div className="flex items-center space-x-3">
+                                <div className={`p-3 rounded-xl ${allChecked ? 'bg-emerald-500 text-slate-950' : 'bg-rose-500/20 text-rose-400'}`}>
+                                  {allChecked ? <CheckCircle2 className="h-6 w-6" /> : <AlertTriangle className="h-6 w-6" />}
                                 </div>
-                                <span className="text-[10px] text-zinc-500">{log.date}</span>
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <h3 className="text-base font-black">
+                                      {allChecked ? '✅ EXECUTION APPROVED: READY TO ENTER ORDER' : '⛔ EXECUTION BLOCKED: 12-POINT COMPLIANCE INCOMPLETE'}
+                                    </h3>
+                                    <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300">
+                                      {checkedCount} / 12 Rules Met
+                                    </span>
+                                  </div>
+                                  <p className="text-xs opacity-90 mt-0.5">
+                                    {allChecked 
+                                      ? 'စည်းမျဉ်း ၁၂ ချက်လုံး ပြည့်စုံပါသည်။ MT4/MT5 တွင် စနစ်တကျ Entry ဝင်ရောက်နိုင်ပါပြီ။' 
+                                      : 'စည်းမျဉ်း အားလုံး (၁၂ ချက်လုံး) ပြည့်စုံမှသာ Trade အသစ် စတင်ခွင့်ရှိမည်။'}
+                                  </p>
+                                </div>
                               </div>
 
-                              <div className="flex items-center gap-2.5">
-                                <div className="text-right">
-                                  <span className="text-[10px] block text-zinc-500 uppercase font-bold">Setup Quality</span>
-                                  <span className={`text-xs font-black px-2 py-0.5 rounded-md ${
-                                    log.score >= 80 ? 'bg-emerald-500/10 text-emerald-400' :
-                                    log.score >= 60 ? 'bg-yellow-500/10 text-yellow-400' :
-                                    'bg-rose-500/10 text-rose-400'
-                                  }`}>
-                                    {log.score >= 100 ? 'A+' : log.score >= 80 ? 'A' : log.score >= 60 ? 'B' : 'C'} ({log.score}%)
-                                  </span>
-                                </div>
+                              <div className="flex items-center space-x-2">
                                 <button
-                                  onClick={() => handleDeleteMicroLog(log.id)}
-                                  className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                                    isDarkMode ? 'text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10' : 'text-slate-400 hover:text-rose-500 hover:bg-rose-50'
-                                  }`}
-                                  title="Delete setup log"
+                                  onClick={() => setPreTradeChecks({
+                                    dcc: true, edge: true, candle: true, rr2R: true, riskCalc: true,
+                                    noDouble: true, noMonday: true, noNews: true, maxOk: true,
+                                    epicNotes: true, fit: true, noConflicts: true
+                                  })}
+                                  className="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 transition-all cursor-pointer"
                                 >
-                                  <Trash2 className="h-4 w-4" />
+                                  Select All
+                                </button>
+                                <button
+                                  onClick={() => setPreTradeChecks({
+                                    dcc: false, edge: false, candle: false, rr2R: false, riskCalc: false,
+                                    noDouble: false, noMonday: false, noNews: false, maxOk: false,
+                                    epicNotes: false, fit: false, noConflicts: false
+                                  })}
+                                  className="px-3 py-1.5 rounded-xl text-xs font-bold bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-all cursor-pointer"
+                                >
+                                  Reset
                                 </button>
                               </div>
                             </div>
-
-                            {/* Checklist items list */}
-                            <div className="flex flex-wrap gap-1.5 mb-2.5">
-                              {Object.entries(log.ltfChecklist).map(([key, value]) => {
-                                const labels: Record<string, string> = {
-                                  structureAligned: 'Structure Aligned',
-                                  liquiditySwept: 'Liquidity Swept',
-                                  fvgTested: 'FVG Tested',
-                                  blockRefined: 'OB Refined',
-                                  volumeConfirmed: 'Volume Confirmed'
-                                };
-                                return (
-                                  <span 
-                                    key={key} 
-                                    className={`text-[9px] px-1.5 py-0.5 rounded-sm font-semibold border ${
-                                      value 
-                                        ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
-                                        : 'bg-zinc-800/10 border-zinc-800/50 text-zinc-500 dark:text-zinc-600 line-through'
-                                    }`}
-                                  >
-                                    {labels[key] || key}
-                                  </span>
-                                );
-                              })}
-                            </div>
-
-                            {log.entryNotes && (
-                              <p className="text-xs leading-relaxed text-zinc-500 dark:text-zinc-400 bg-slate-100/50 dark:bg-zinc-900/40 p-2.5 rounded-lg border border-slate-200/40 dark:border-zinc-800/50 font-sans whitespace-pre-wrap">
-                                {log.entryNotes}
-                              </p>
-                            )}
                           </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="py-24 text-center border border-dashed rounded-xl border-zinc-200/50 dark:border-zinc-800">
-                        <Target className="h-10 w-10 text-zinc-400 dark:text-zinc-700 mx-auto mb-2 stroke-1" />
-                        <p className="text-xs text-zinc-500">သိမ်းဆည်းထားသော setup log မရှိသေးပါ။ setup အသစ်စတင်ဆန်းစစ်နိုင်ပါသည်။</p>
-                      </div>
-                    )}
+
+                          {/* 12 Interactive Checkboxes Grid */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            {[
+                              { key: 'dcc', label: '✓ DCC (Daily Candle Close)', desc: 'D1 Candle ပိတ်ချိန်အတည်ပြုပြီး' },
+                              { key: 'edge', label: '✓ Edge (1 of 6 Edges)', desc: 'ရှင်းလင်းသော Edge တစ်ခုရှိသည်' },
+                              { key: 'candle', label: '✓ Candle Selection', desc: 'Core သို့မဟုတ် Advanced Candle trigger' },
+                              { key: 'rr2R', label: '✓ RR 2R+ Target', desc: 'Forex 2R+ / Crypto 3R+ ပြည့်မီသည်' },
+                              { key: 'riskCalc', label: '✓ Risk Calculation', desc: '5% Training သို့မဟုတ် 1-3% Real တွက်ပြီး' },
+                              { key: 'noDouble', label: '✓ No Double Exposure', desc: 'တူညီသော Currency ၂ ကြိမ်ထက်ပိုမယူ' },
+                              { key: 'noMonday', label: '✓ No Monday Rule', desc: 'Phase 1&2 Monday entry မဟုတ်ပါ' },
+                              { key: 'noNews', label: '✓ No News Risk', desc: 'High impact news ရှေ့မရှိပါ' },
+                              { key: 'maxOk', label: '✓ Max Trades Limit', desc: 'Forex <= 3, Crypto <= 5 ဖြစ်သည်' },
+                              { key: 'epicNotes', label: '✓ Epic Notes', desc: 'Trade rationale သေချာရေးပြီး' },
+                              { key: 'fit', label: '✓ Fit (Mental & Physical)', desc: 'စိတ်ကြည်လင် အနားရပြီး အဆင်သင့်ဖြစ်' },
+                              { key: 'noConflicts', label: '✓ No Conflicts', desc: 'ဆန့်ကျင်ဘက် technical အချက်မရှိပါ' },
+                            ].map(item => {
+                              const isChecked = preTradeChecks[item.key as keyof typeof preTradeChecks];
+                              return (
+                                <label
+                                  key={item.key}
+                                  className={`p-4 rounded-xl border flex items-start space-x-3 cursor-pointer transition-all ${
+                                    isChecked
+                                      ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-300'
+                                      : isDarkMode ? 'bg-zinc-900/40 border-zinc-800 text-zinc-400 hover:border-zinc-700' : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                                  }`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={(e) => setPreTradeChecks({ ...preTradeChecks, [item.key]: e.target.checked })}
+                                    className="mt-0.5 h-4 w-4 rounded-sm border-zinc-700 text-emerald-500 focus:ring-emerald-500 cursor-pointer"
+                                  />
+                                  <div>
+                                    <span className="font-bold text-xs block text-white">{item.label}</span>
+                                    <span className="text-[11px] opacity-80 mt-0.5 block">{item.desc}</span>
+                                  </div>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
-                </div>
+                )}
+
+                {/* ========================================================================= */}
+                {/* SUB-TAB 6: COMMITMENT, DISCLAIMER & SETUP EVALUATOR */}
+                {/* ========================================================================= */}
+                {microTab === 'commitment' && (
+                  <div className="space-y-6">
+                    {/* Trader Commitment & Legal Disclaimer */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* Final Commitment Card */}
+                      <div className={`p-6 rounded-2xl border space-y-4 ${
+                        isDarkMode ? 'bg-zinc-900/60 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 shadow-xs text-slate-800'
+                      }`}>
+                        <div className="flex items-center space-x-3 pb-3 border-b border-zinc-200/40 dark:border-zinc-800">
+                          <div className="p-2 rounded-xl bg-amber-500/10 text-amber-500">
+                            <Award className="h-6 w-6" />
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 block">🏆 Final Commitment</span>
+                            <h3 className="text-base font-black">Phase: Trading Paper Money ($500)</h3>
+                          </div>
+                        </div>
+
+                        <div className={`p-5 rounded-xl border text-center space-y-2 ${
+                          isDarkMode ? 'bg-amber-500/5 border-amber-500/20 text-amber-300' : 'bg-amber-50 border-amber-200 text-amber-900'
+                        }`}>
+                          <span className="text-xs font-bold uppercase tracking-widest text-amber-400 block">Your Sacred Commitment</span>
+                          <div className="text-lg font-black tracking-tight">
+                            "ငါ ဒီ Rule ကို ၁၀၀ ရာခိုင်နှုန်းအပြည့်အဝ လိုက်နာမည်။"
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between text-xs pt-2">
+                          <span className="text-zinc-500">System Version:</span>
+                          <span className="font-mono font-bold text-amber-400">Version v1.0 (Initial system)</span>
+                        </div>
+                      </div>
+
+                      {/* Official Disclaimer */}
+                      <div className={`p-6 rounded-2xl border space-y-4 ${
+                        isDarkMode ? 'bg-zinc-900/60 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 shadow-xs text-slate-800'
+                      }`}>
+                        <div className="flex items-center space-x-3 pb-3 border-b border-zinc-200/40 dark:border-zinc-800">
+                          <div className="p-2 rounded-xl bg-sky-500/10 text-sky-500">
+                            <FileText className="h-6 w-6" />
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-sky-400 block">📜 Official Disclaimer</span>
+                            <h3 className="text-base font-black">Thu Zin Heine Declaration</h3>
+                          </div>
+                        </div>
+
+                        <div className={`p-4 rounded-xl border space-y-2 text-xs leading-relaxed ${
+                          isDarkMode ? 'bg-zinc-950/60 border-zinc-800 text-zinc-300' : 'bg-slate-50 border-slate-200 text-slate-700'
+                        }`}>
+                          <p>
+                            "ကျွန်ုပ် <strong>Thu Zin Heine</strong> သည် ဤ Trading System ကို ကိုယ်တိုင် ရေးဆွဲ/လက်ခံပါသည်။ Trading decisions အတွက် ကိုယ်တိုင် တာဝန်ယူပါသည်။ Rules ချိုးဖောက်ပါက Mentor/Coach review လက်ခံပါမည်။"
+                          </p>
+                        </div>
+
+                        <div className="flex items-center justify-between text-xs pt-2">
+                          <span className="text-zinc-500">Signatory:</span>
+                          <span className="font-bold text-sky-400">Thu Zin Heine (Verified System Owner)</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Setup Compliance Evaluator & Logger Form */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                      {/* Log Form */}
+                      <div className={`p-6 rounded-2xl border lg:col-span-1 space-y-4 ${
+                        isDarkMode ? 'bg-zinc-900/40 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 shadow-xs text-slate-800'
+                      }`}>
+                        <div className="flex items-center space-x-3 pb-3 border-b border-zinc-200/40 dark:border-zinc-800">
+                          <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-500">
+                            <Target className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-black">Setup Compliance Evaluator</h4>
+                            <p className="text-[11px] text-zinc-500">D1 Setup ကို စည်းမျဉ်းများနှင့် ချိန်ထိုးသိမ်းဆည်းရန်</p>
+                          </div>
+                        </div>
+
+                        <form onSubmit={handleAddMicroLog} className="space-y-3 text-xs">
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">Asset Pair</label>
+                            <input
+                              type="text"
+                              value={microAsset}
+                              onChange={(e) => setMicroAsset(e.target.value)}
+                              placeholder="EURUSD, BTC, Gold..."
+                              required
+                              className={`w-full p-2.5 rounded-xl border font-bold focus:outline-hidden ${
+                                isDarkMode ? 'bg-zinc-950 border-zinc-800 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'
+                              }`}
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">Market Edge (1 to 6)</label>
+                            <select
+                              value={microSetupType}
+                              onChange={(e) => setMicroSetupType(e.target.value)}
+                              className={`w-full p-2.5 rounded-xl border font-bold focus:outline-hidden ${
+                                isDarkMode ? 'bg-zinc-950 border-zinc-800 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'
+                              }`}
+                            >
+                              <option value="Horizontal S/R (Edge 1)">1. Horizontal S/R</option>
+                              <option value="Trendline (Edge 2)">2. Trendline</option>
+                              <option value="Fibonacci (Edge 3)">3. Fibonacci</option>
+                              <option value="EMA System (Edge 4)">4. EMA (1ABC / 2ABC)</option>
+                              <option value="SMA TLE (Edge 5)">5. SMA (MEZ's TLE)</option>
+                              <option value="Gap Analysis (Edge 6)">6. Gap</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">Target Reward (R-Multiple)</label>
+                            <input
+                              type="number"
+                              step="0.1"
+                              min="2.0"
+                              value={microPnlR}
+                              onChange={(e) => setMicroPnlR(parseFloat(e.target.value) || 2)}
+                              className={`w-full p-2.5 rounded-xl border font-bold focus:outline-hidden ${
+                                isDarkMode ? 'bg-zinc-950 border-zinc-800 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'
+                              }`}
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">Epic Trade Notes & Rationale</label>
+                            <textarea
+                              rows={3}
+                              value={microEntryNotes}
+                              onChange={(e) => setMicroEntryNotes(e.target.value)}
+                              placeholder="DCC candle အခြေအနေ၊ 2/3 pips buffer နှင့် S/R အချက်အလက်များ..."
+                              className={`w-full p-2.5 rounded-xl border font-medium focus:outline-hidden ${
+                                isDarkMode ? 'bg-zinc-950 border-zinc-800 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'
+                              }`}
+                            />
+                          </div>
+
+                          <button
+                            type="submit"
+                            disabled={isSavingMicro}
+                            className="w-full py-3 rounded-xl font-black text-xs bg-emerald-500 hover:bg-emerald-400 text-slate-950 transition-all cursor-pointer flex items-center justify-center space-x-2"
+                          >
+                            {isSavingMicro ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                            <span>Log D1 Setup Evaluation</span>
+                          </button>
+                        </form>
+                      </div>
+
+                      {/* Log History */}
+                      <div className={`p-6 rounded-2xl border lg:col-span-2 space-y-4 ${
+                        isDarkMode ? 'bg-zinc-900/40 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 shadow-xs text-slate-800'
+                      }`}>
+                        <div className="flex items-center justify-between pb-3 border-b border-zinc-200/40 dark:border-zinc-800">
+                          <h4 className="text-sm font-black">Logged D1 Setups ({microLogs.length})</h4>
+                          <span className="text-[10px] font-bold text-zinc-400">ProjectX Archive</span>
+                        </div>
+
+                        {microLogs.length === 0 ? (
+                          <div className="py-12 text-center text-zinc-500 text-xs">
+                            မှတ်တမ်းတင်ထားသော Setup များ မရှိသေးပါ။ အပေါ်ရှိ Form မှတစ်ဆင့် စတင်သိမ်းဆည်းနိုင်ပါသည်။
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            {microLogs.map(log => (
+                              <div
+                                key={log.id}
+                                className={`p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs ${
+                                  isDarkMode ? 'bg-zinc-950/60 border-zinc-800' : 'bg-slate-50 border-slate-200'
+                                }`}
+                              >
+                                <div>
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="font-black text-white text-sm">{log.asset}</span>
+                                    <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 font-bold border border-amber-500/20">
+                                      {log.setupType}
+                                    </span>
+                                    <span className="text-[10px] text-zinc-500 font-medium">{log.date}</span>
+                                  </div>
+                                  <p className="text-zinc-400 text-[11px]">{log.entryNotes || 'No notes'}</p>
+                                </div>
+
+                                <div className="flex items-center space-x-3 shrink-0">
+                                  <span className="font-mono font-black text-emerald-400 text-sm">+{log.pnlR}R Target</span>
+                                  <button
+                                    onClick={() => handleDeleteMicroLog(log.id)}
+                                    className="p-1.5 rounded-lg text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
