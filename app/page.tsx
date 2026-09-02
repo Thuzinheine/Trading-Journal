@@ -116,6 +116,39 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
+export interface MicroLog {
+  id: string;
+  date: string;
+  asset: string;
+  setupType: string;
+  score: number;
+  ltfChecklist: {
+    structureAligned: boolean;
+    liquiditySwept: boolean;
+    fvgTested: boolean;
+    blockRefined: boolean;
+    volumeConfirmed: boolean;
+  };
+  entryNotes: string;
+  pnlR: number;
+}
+
+export interface MacroLog {
+  id: string;
+  date: string;
+  weeklyBias: 'Bullish' | 'Bearish' | 'Ranging';
+  fundamentalSentiment: string;
+  correlationNotes: string;
+  keyDemandSupply: string;
+  timeframeMatrix: {
+    m1: 'Bullish' | 'Bearish' | 'Ranging';
+    w1: 'Bullish' | 'Bearish' | 'Ranging';
+    d1: 'Bullish' | 'Bearish' | 'Ranging';
+    h4: 'Bullish' | 'Bearish' | 'Ranging';
+    h1: 'Bullish' | 'Bearish' | 'Ranging';
+  };
+}
+
 function getDirectDriveImageUrl(url: string | undefined): string {
   if (!url) return '';
   if (url.startsWith('data:image')) return url;
@@ -612,6 +645,20 @@ export default function Home() {
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [isLearningModalFullPage, setIsLearningModalFullPage] = useState(false);
 
+  // Global Confirmation Modal State (Delete / Sign Out Confirmation)
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    detail?: string;
+    confirmText?: string;
+    cancelText?: string;
+    type?: 'danger' | 'warning' | 'info';
+    icon?: 'delete' | 'logout' | 'reset' | 'warning';
+    onConfirm: () => Promise<void> | void;
+  } | null>(null);
+  const [isConfirmLoading, setIsConfirmLoading] = useState(false);
+
   useEffect(() => {
     if (showLearningModal) {
       setIsLearningModalFullPage(false);
@@ -1071,22 +1118,45 @@ export default function Home() {
     });
   };
 
-  const handleDeleteMicroLog = async (id: string) => {
+  const executeDeleteMicroLog = async (id: string) => {
     if (token && spreadsheetId) {
-      const confirmed = window.confirm('ဤ Setup Log ကို Google Sheet မှ ဖျက်ရန် သေချာပါသလား?');
-      if (!confirmed) return;
       setIsSavingMicro(true);
       try {
         await deleteGoogleMicroLog(token, spreadsheetId, id);
         setMicroLogs(microLogs.filter(log => log.id !== id));
       } catch (err) {
         console.error('Error deleting micro log from Google Sheet:', err);
-        alert('Google Sheets မှ ဖျက်ရန် မအောင်မြင်ပါ!');
       } finally {
         setIsSavingMicro(false);
       }
     } else {
       setMicroLogs(microLogs.filter(log => log.id !== id));
+    }
+  };
+
+  const promptDeleteMicroLog = (log: MicroLog) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Setup Log ဖျက်ရန် သေချာပါသလား?',
+      message: 'ဤ Setup Compliance မှတ်တမ်းကို Google Sheet မှ အပြီးတိုင် ဖျက်ပါမည်။ ဤလုပ်ဆောင်ချက်ကို ပြန်ပြင်၍မရပါ။',
+      detail: `${log.asset} (${log.setupType}) • Score: ${log.score}% • Date: ${log.date}`,
+      confirmText: 'ဖျက်မည် (Delete)',
+      cancelText: 'မဖျက်တော့ပါ',
+      type: 'danger',
+      icon: 'delete',
+      onConfirm: async () => {
+        await executeDeleteMicroLog(log.id);
+        setConfirmDialog(null);
+      }
+    });
+  };
+
+  const handleDeleteMicroLog = async (id: string) => {
+    const target = microLogs.find(l => l.id === id);
+    if (target) {
+      promptDeleteMicroLog(target);
+    } else {
+      await executeDeleteMicroLog(id);
     }
   };
 
@@ -1139,22 +1209,45 @@ export default function Home() {
     setMacroKeyDemandSupply('');
   };
 
-  const handleDeleteMacroLog = async (id: string) => {
+  const executeDeleteMacroLog = async (id: string) => {
     if (token && spreadsheetId) {
-      const confirmed = window.confirm('ဤ Macro Log ကို Google Sheet မှ ဖျက်ရန် သေချာပါသလား?');
-      if (!confirmed) return;
       setIsSavingMacro(true);
       try {
         await deleteGoogleMacroLog(token, spreadsheetId, id);
         setMacroLogs(macroLogs.filter(log => log.id !== id));
       } catch (err) {
         console.error('Error deleting macro log from Google Sheet:', err);
-        alert('Google Sheets မှ ဖျက်ရန် မအောင်မြင်ပါ!');
       } finally {
         setIsSavingMacro(false);
       }
     } else {
       setMacroLogs(macroLogs.filter(log => log.id !== id));
+    }
+  };
+
+  const promptDeleteMacroLog = (log: MacroLog) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Macro Log ဖျက်ရန် သေချာပါသလား?',
+      message: 'ဤ Macro Analysis မှတ်တမ်းကို Google Sheet မှ အပြီးတိုင် ဖျက်ပါမည်။ ဤလုပ်ဆောင်ချက်ကို ပြန်ပြင်၍မရပါ။',
+      detail: `Date: ${log.date} • Weekly Bias: ${log.weeklyBias}`,
+      confirmText: 'ဖျက်မည် (Delete)',
+      cancelText: 'မဖျက်တော့ပါ',
+      type: 'danger',
+      icon: 'delete',
+      onConfirm: async () => {
+        await executeDeleteMacroLog(log.id);
+        setConfirmDialog(null);
+      }
+    });
+  };
+
+  const handleDeleteMacroLog = async (id: string) => {
+    const target = macroLogs.find(l => l.id === id);
+    if (target) {
+      promptDeleteMacroLog(target);
+    } else {
+      await executeDeleteMacroLog(id);
     }
   };
 
@@ -2500,6 +2593,91 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
     }
   };
 
+  // Confirmation Prompters
+  const promptSignOut = () => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Sign Out လုပ်ရန် သေချာပါသလား?',
+      message: 'လက်ရှိအကောင့်မှ ထွက်ခွာပြီး Google OAuth Session ကို အဆုံးသတ်ပါမည်။ အချက်အလက်များအားလုံး လုံခြုံစွာ သိမ်းဆည်းပြီး ဖြစ်ပါသည်။',
+      detail: user?.email ? `အကောင့်: ${user.email}` : undefined,
+      confirmText: 'Sign Out လုပ်မည်',
+      cancelText: 'မထွက်တော့ပါ',
+      type: 'warning',
+      icon: 'logout',
+      onConfirm: async () => {
+        await handleLogout();
+        setConfirmDialog(null);
+      }
+    });
+  };
+
+  const promptDeleteTrade = (trade: Trade) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Trade မှတ်တမ်း ဖျက်ရန် သေချာပါသလား?',
+      message: 'ဤ Trade အရောင်းအဝယ်မှတ်တမ်းကို Google Sheet မှ အပြီးတိုင် ဖျက်ပါမည်။ ဤလုပ်ဆောင်ချက်ကို ပြန်ပြင်၍မရပါ။',
+      detail: `${trade.pair || 'Pair'} (${trade.type || 'BUY/SELL'}) • ${trade.date || ''} • Result: ${trade.winLoss || 'Pending'}`,
+      confirmText: 'ဖျက်မည် (Delete)',
+      cancelText: 'မဖျက်တော့ပါ',
+      type: 'danger',
+      icon: 'delete',
+      onConfirm: async () => {
+        await handleDeleteClick(trade);
+        setConfirmDialog(null);
+      }
+    });
+  };
+
+  const promptDeleteLearningNote = (note: LearningNote) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'သင်ခန်းစာမှတ်စု ဖျက်ရန် သေချာပါသလား?',
+      message: 'ဤ သင်ခန်းစာမှတ်စုနှင့် ဆက်စပ်ဖိုင်များ/ပုံများကို အပြီးတိုင် ဖျက်ပါမည်။',
+      detail: `ခေါင်းစဉ်: "${note.title || 'Note'}"`,
+      confirmText: 'ဖျက်မည် (Delete)',
+      cancelText: 'မဖျက်တော့ပါ',
+      type: 'danger',
+      icon: 'delete',
+      onConfirm: async () => {
+        await handleDeleteLearningNote(note.id);
+        setConfirmDialog(null);
+      }
+    });
+  };
+
+  const promptDeleteWatchlistItem = (item: WatchlistItem) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Watchlist Pair ဖျက်ရန် သေချာပါသလား?',
+      message: 'ဤ စောင့်ကြည့်စာရင်း Pair ကို Google Sheet မှ အပြီးတိုင် ဖျက်ပါမည်။',
+      detail: `${item.pair} (${item.category} • ${item.timeframe}) • Bias: ${item.bias} • Status: ${item.status}`,
+      confirmText: 'ဖျက်မည် (Delete)',
+      cancelText: 'မဖျက်တော့ပါ',
+      type: 'danger',
+      icon: 'delete',
+      onConfirm: async () => {
+        await handleDeleteWatchlistItem(item.id);
+        setConfirmDialog(null);
+      }
+    });
+  };
+
+  const promptClearAndSeed = () => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'ဒေတာအဟောင်းများအားလုံး ဖျက်ရန် သေချာပါသလား?',
+      message: 'လက်ရှိ Trade မှတ်တမ်းများအားလုံးကို ရှင်းလင်းပြီး နမူနာ Sample Data ဖြင့် Reset ပြုလုပ်ပါမည်။ ဤလုပ်ဆောင်ချက်ကို ပြန်ပြင်၍မရပါ။',
+      confirmText: 'အားလုံးရှင်းလင်းမည် (Reset All)',
+      cancelText: 'မလုပ်တော့ပါ',
+      type: 'danger',
+      icon: 'reset',
+      onConfirm: async () => {
+        await handleClearAndSeedClick();
+        setConfirmDialog(null);
+      }
+    });
+  };
+
   // Clear all trades and seed with the requested sample row
   const handleClearAndSeedClick = async () => {
     if (!token || !spreadsheetId) return;
@@ -3012,7 +3190,7 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
               <div className="flex items-center justify-end px-2">
                 {user && (
                   <button
-                    onClick={handleLogout}
+                    onClick={promptSignOut}
                     className={`w-full p-2 rounded-xl transition-all duration-150 flex items-center justify-center space-x-1.5 text-xs font-semibold cursor-pointer ${
                       isDarkMode ? 'text-zinc-400 hover:text-red-400 hover:bg-red-500/10' : 'text-slate-500 hover:text-red-500 hover:bg-red-50'
                     }`}
@@ -3204,7 +3382,10 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                           </div>
                         </div>
                         <button
-                          onClick={handleLogout}
+                          onClick={() => {
+                            setIsMobileMenuOpen(false);
+                            promptSignOut();
+                          }}
                           className={`p-2 rounded-xl transition-all duration-150 cursor-pointer ${
                             isDarkMode ? 'text-zinc-500 hover:text-red-400 hover:bg-red-500/10' : 'text-slate-400 hover:text-red-500 hover:bg-red-50'
                           }`}
@@ -4181,34 +4362,14 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                     {/* Clear & Reset Button */}
                     {token && spreadsheetId && (
                       <div className="relative w-full sm:w-auto">
-                        {!showResetConfirm ? (
-                          <button
-                            onClick={() => setShowResetConfirm(true)}
-                            className="w-full sm:w-auto inline-flex items-center justify-center space-x-1.5 border border-rose-500 hover:bg-rose-500/10 text-rose-500 dark:text-rose-400 font-bold text-xs px-3 py-2.5 rounded-xl transition-all duration-200 cursor-pointer whitespace-nowrap"
-                            title="ဒေတာအဟောင်းများအားလုံးကို ဖျက်ရန်"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                            <span>ဒေတာအဟောင်းများဖျက်ရန်</span>
-                          </button>
-                        ) : (
-                          <div className="flex items-center gap-1.5 bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/50 p-1 rounded-xl whitespace-nowrap">
-                            <span className="text-[10px] sm:text-xs text-rose-700 dark:text-rose-400 font-bold px-1.5">
-                              ဒေတာအဟောင်းအားလုံး ဖျက်မလား?
-                            </span>
-                            <button
-                              onClick={handleClearAndSeedClick}
-                              className="bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-[11px] px-2.5 py-1.5 rounded-lg transition-all cursor-pointer"
-                            >
-                              ဖျက်မည်
-                            </button>
-                            <button
-                              onClick={() => setShowResetConfirm(false)}
-                              className="text-slate-500 hover:text-slate-700 dark:text-zinc-400 dark:hover:text-zinc-200 font-bold text-[11px] px-2 py-1.5 cursor-pointer"
-                            >
-                              မလုပ်တော့ပါ
-                            </button>
-                          </div>
-                        )}
+                        <button
+                          onClick={promptClearAndSeed}
+                          className="w-full sm:w-auto inline-flex items-center justify-center space-x-1.5 border border-rose-500 hover:bg-rose-500/10 text-rose-500 dark:text-rose-400 font-bold text-xs px-3 py-2.5 rounded-xl transition-all duration-200 cursor-pointer whitespace-nowrap"
+                          title="ဒေတာအဟောင်းများအားလုံးကို ဖျက်ရန်"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          <span>ဒေတာအဟောင်းများဖျက်ရန်</span>
+                        </button>
                       </div>
                     )}
 
@@ -4420,7 +4581,7 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                                       <Edit2 className="h-3.5 w-3.5" />
                                     </button>
                                     <button
-                                      onClick={(e) => { e.stopPropagation(); handleDeleteClick(trade); }}
+                                      onClick={(e) => { e.stopPropagation(); promptDeleteTrade(trade); }}
                                       className={`p-1 rounded transition-colors duration-200 ${
                                         isDarkMode ? 'text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10' : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50'
                                       }`}
@@ -4595,7 +4756,7 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                                 <span>Edit</span>
                               </button>
                               <button
-                                onClick={(e) => { e.stopPropagation(); handleDeleteClick(trade); }}
+                                onClick={(e) => { e.stopPropagation(); promptDeleteTrade(trade); }}
                                 className={`inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all duration-150 cursor-pointer ${
                                   isDarkMode 
                                     ? 'bg-zinc-800 text-rose-400 border-zinc-700 hover:bg-zinc-700' 
@@ -7159,7 +7320,7 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                                       <Edit2 className="h-3.5 w-3.5" />
                                     </button>
                                     <button
-                                      onClick={() => handleDeleteLearningNote(note.id)}
+                                      onClick={() => promptDeleteLearningNote(note)}
                                       className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
                                         isDarkMode ? 'text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10' : 'text-slate-400 hover:text-rose-500 hover:bg-rose-50'
                                       }`}
@@ -7958,7 +8119,7 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                               {/* Delete Button */}
                               <button
                                 type="button"
-                                onClick={() => handleDeleteWatchlistItem(item.id)}
+                                onClick={() => promptDeleteWatchlistItem(item)}
                                 className={`p-1.5 rounded-md transition-colors cursor-pointer ${
                                   isDarkMode ? 'text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10' : 'text-slate-500 hover:text-rose-600 hover:bg-rose-50'
                                 }`}
@@ -8021,6 +8182,21 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                   <span className="text-xs text-slate-400 font-medium">Row #{selectedTrade.row}</span>
                 </div>
                 <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => {
+                      const tradeToDelete = selectedTrade;
+                      setSelectedTrade(null);
+                      promptDeleteTrade(tradeToDelete);
+                    }}
+                    className={`p-1.5 rounded-lg border text-xs font-bold transition-all duration-200 cursor-pointer flex items-center space-x-1 ${
+                      isDarkMode 
+                        ? 'bg-zinc-900 hover:bg-zinc-800 text-rose-400 border-zinc-800 hover:border-rose-500/30' 
+                        : 'bg-white hover:bg-rose-50 text-rose-600 border-slate-200 shadow-2xs'
+                    }`}
+                  >
+                    <Trash2 className="h-3.5 w-3.5 text-rose-500" />
+                    <span>ဖျက်ရန် (Delete)</span>
+                  </button>
                   <button
                     onClick={() => {
                       const tradeToEdit = selectedTrade;
@@ -9182,6 +9358,22 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                   <button
                     type="button"
                     onClick={() => {
+                      const noteToDelete = selectedLearningNote;
+                      setSelectedLearningNote(null);
+                      promptDeleteLearningNote(noteToDelete);
+                    }}
+                    className={`inline-flex items-center space-x-1 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer border ${
+                      isDarkMode 
+                        ? 'bg-zinc-800 border-zinc-700 text-rose-400 hover:bg-rose-500/10 hover:border-rose-500/30' 
+                        : 'bg-white border-slate-200 text-rose-600 hover:bg-rose-50'
+                    }`}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>ဖျက်ရန် (Delete)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
                       const noteToEdit = selectedLearningNote;
                       setSelectedLearningNote(null);
                       setEditingLearningNote(noteToEdit);
@@ -9748,9 +9940,9 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                 <button
                   type="button"
                   onClick={() => {
-                    const id = selectedWatchlistItem.id;
+                    const item = selectedWatchlistItem;
                     setSelectedWatchlistItem(null);
-                    handleDeleteWatchlistItem(id);
+                    promptDeleteWatchlistItem(item);
                   }}
                   className="inline-flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
                 >
@@ -9840,6 +10032,117 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                 <span className="text-[10px] sm:text-xs text-zinc-300 font-bold tracking-wider">
                   အပြည့်ချဲ့၍ ကြည့်ရှုနေသည် (Fullscreen View)
                 </span>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* GLOBAL CONFIRMATION DIALOG MODAL (Delete / Sign Out Confirmation) */}
+        {confirmDialog && confirmDialog.isOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
+            {/* Backdrop Overlay */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                if (!isConfirmLoading) setConfirmDialog(null);
+              }}
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
+            />
+
+            {/* Modal Dialog Card */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 250 }}
+              className={`relative w-full max-w-md p-6 rounded-2xl shadow-2xl border flex flex-col z-10 select-none ${
+                isDarkMode 
+                  ? 'bg-zinc-900 border-zinc-800 text-zinc-100' 
+                  : 'bg-white border-slate-200 text-slate-900'
+              }`}
+            >
+              {/* Header Icon & Title */}
+              <div className="flex items-start space-x-4 mb-4">
+                <div className={`p-3 rounded-2xl shrink-0 flex items-center justify-center ${
+                  confirmDialog.type === 'danger' || confirmDialog.icon === 'delete' || confirmDialog.icon === 'reset'
+                    ? isDarkMode ? 'bg-rose-500/15 text-rose-400 border border-rose-500/30' : 'bg-rose-50 text-rose-600 border border-rose-100'
+                    : confirmDialog.icon === 'logout'
+                    ? isDarkMode ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30' : 'bg-amber-50 text-amber-600 border border-amber-100'
+                    : isDarkMode ? 'bg-zinc-800 text-zinc-200 border border-zinc-700' : 'bg-slate-100 text-slate-800 border border-slate-200'
+                }`}>
+                  {confirmDialog.icon === 'logout' ? (
+                    <LogOut className="h-6 w-6" />
+                  ) : confirmDialog.icon === 'reset' ? (
+                    <RefreshCw className="h-6 w-6" />
+                  ) : (
+                    <Trash2 className="h-6 w-6" />
+                  )}
+                </div>
+
+                <div className="flex-1">
+                  <h3 className="text-base sm:text-lg font-black tracking-tight leading-snug">
+                    {confirmDialog.title}
+                  </h3>
+                  <p className={`text-xs sm:text-sm mt-1 leading-relaxed ${
+                    isDarkMode ? 'text-zinc-400' : 'text-slate-600'
+                  }`}>
+                    {confirmDialog.message}
+                  </p>
+                </div>
+              </div>
+
+              {/* Detail Tag (If provided) */}
+              {confirmDialog.detail && (
+                <div className={`p-3 rounded-xl text-xs font-mono mb-5 border break-words ${
+                  isDarkMode 
+                    ? 'bg-zinc-950/60 border-zinc-800/80 text-zinc-300' 
+                    : 'bg-slate-50 border-slate-200/80 text-slate-700'
+                }`}>
+                  {confirmDialog.detail}
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end space-x-3 pt-2">
+                <button
+                  type="button"
+                  disabled={isConfirmLoading}
+                  onClick={() => setConfirmDialog(null)}
+                  className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                    isDarkMode
+                      ? 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700 text-zinc-300 hover:text-white'
+                      : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700 hover:text-slate-900'
+                  }`}
+                >
+                  {confirmDialog.cancelText || 'မလုပ်တော့ပါ'}
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isConfirmLoading}
+                  onClick={async () => {
+                    setIsConfirmLoading(true);
+                    try {
+                      await confirmDialog.onConfirm();
+                    } catch (e) {
+                      console.error('Confirmation action error:', e);
+                    } finally {
+                      setIsConfirmLoading(false);
+                    }
+                  }}
+                  className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center space-x-2 shadow-sm ${
+                    confirmDialog.type === 'danger' || confirmDialog.icon === 'delete' || confirmDialog.icon === 'reset'
+                      ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-950/30'
+                      : confirmDialog.icon === 'logout'
+                      ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-amber-950/30'
+                      : 'bg-slate-900 hover:bg-slate-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 text-white dark:text-zinc-950'
+                  } ${isConfirmLoading ? 'opacity-80 cursor-not-allowed' : ''}`}
+                >
+                  {isConfirmLoading && <RefreshCw className="h-3.5 w-3.5 animate-spin" />}
+                  <span>{confirmDialog.confirmText || 'အတည်ပြုမည်'}</span>
+                </button>
               </div>
             </motion.div>
           </div>
