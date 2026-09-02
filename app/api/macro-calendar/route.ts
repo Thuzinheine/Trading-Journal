@@ -72,12 +72,12 @@ const FOREX_FACTORY_WEEKS_DB: Record<string, ForexFactorySyncData> = {
     nfp: {
       title: 'Non-Farm Employment Change',
       actual: -23, // in K
-      forecast: 55, // in K
-      previous: 75,
+      forecast: 85, // in K
+      previous: 20,
       unit: 'k',
       impact: 'High',
       currency: 'USD',
-      effectDescription: 'Actual (-23K) << Forecast (55K) -> အလုပ်အကိုင် သိသိသာသာ လျော့ကျခြင်းကြောင့် စီးပွားရေးအေးစက်ပြီး Fed Rate Cut (Dovish / Dollar Bearish) ဖိအား အလွန်မြင့်မားစေသည်'
+      effectDescription: 'Actual (-23K) << Forecast (85K) & Previous (20K) -> အလုပ်အကိုင် သိသိသာသာ လျော့ကျခြင်းကြောင့် စီးပွားရေးအေးစက်ပြီး Fed Rate Cut (Dovish / Dollar Bearish) ဖိအား အလွန်မြင့်မားစေသည်'
     },
     unemploymentRate: {
       title: 'Unemployment Rate',
@@ -109,7 +109,7 @@ const FOREX_FACTORY_WEEKS_DB: Record<string, ForexFactorySyncData> = {
       { title: 'ADP Non-Farm Employment Change', date: 'Wed, Aug 5', actual: '122K', forecast: '150K', previous: '155K', impact: 'Medium' },
       { title: 'ISM Services PMI', date: 'Wed, Aug 5', actual: '51.4', forecast: '51.0', previous: '48.8', impact: 'High' },
       { title: 'Unemployment Claims', date: 'Thu, Aug 6', actual: '249K', forecast: '236K', previous: '235K', impact: 'High' },
-      { title: 'Non-Farm Employment Change', date: 'Fri, Aug 7 (8:30am)', actual: '-23K', forecast: '55K', previous: '75K', impact: 'High' },
+      { title: 'Non-Farm Employment Change', date: 'Fri, Aug 7 (8:30am)', actual: '-23K', forecast: '85K', previous: '20K', impact: 'High' },
       { title: 'Unemployment Rate', date: 'Fri, Aug 7 (8:30am)', actual: '4.1%', forecast: '4.1%', previous: '4.1%', impact: 'High' },
       { title: 'Average Hourly Earnings m/m', date: 'Fri, Aug 7 (8:30am)', actual: '0.1%', forecast: '0.3%', previous: '0.3%', impact: 'High' }
     ]

@@ -6469,121 +6469,119 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                 <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
                   
                   {/* FOMC Meeting Calendar Card */}
-                  <div className={`p-6 rounded-2xl border transition-all xl:col-span-5 flex flex-col justify-between ${
+                  <div className={`p-6 rounded-2xl border transition-all xl:col-span-5 flex flex-col ${
                     isDarkMode ? 'bg-zinc-900/40 border-zinc-800/80 text-zinc-100' : 'bg-white border-slate-200/80 shadow-xs text-slate-800'
                   }`}>
-                    <div>
-                      <div className="flex items-center justify-between pb-3 mb-4 border-b border-zinc-200/30 dark:border-zinc-800/80">
-                        <div className="flex items-center space-x-2.5">
-                          <div className="bg-amber-500/10 p-2 rounded-xl text-amber-500">
-                            <Calendar className="h-5 w-5" />
-                          </div>
-                          <div>
-                            <h4 className="text-sm font-bold">FOMC Calendar</h4>
-                            <p className="text-[10px] text-zinc-500">Fed Meeting Schedule</p>
-                          </div>
+                    <div className="flex items-center justify-between pb-3 mb-4 border-b border-zinc-200/30 dark:border-zinc-800/80">
+                      <div className="flex items-center space-x-2.5">
+                        <div className="bg-amber-500/10 p-2 rounded-xl text-amber-500">
+                          <Calendar className="h-5 w-5" />
                         </div>
-
-                        {/* Year Selector Tabs */}
-                        <div className={`flex p-0.5 rounded-lg border transition-all ${
-                          isDarkMode ? 'bg-zinc-950 border-zinc-800' : 'bg-slate-100 border-slate-200'
-                        }`}>
-                          {([2026, 2027] as const).map((yr) => (
-                            <button
-                              key={yr}
-                              onClick={() => setFomcYear(yr)}
-                              className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
-                                fomcYear === yr
-                                  ? (isDarkMode ? 'bg-zinc-800 text-zinc-100 shadow-xs border border-zinc-700/50' : 'bg-white text-slate-900 shadow-xs')
-                                  : (isDarkMode ? 'text-zinc-400 hover:text-zinc-200' : 'text-slate-500 hover:text-slate-700')
-                              }`}
-                            >
-                              {yr}
-                            </button>
-                          ))}
+                        <div>
+                          <h4 className="text-sm font-bold">FOMC Calendar</h4>
+                          <p className="text-[10px] text-zinc-500">Fed Meeting Schedule & SEP</p>
                         </div>
                       </div>
 
-                      {/* Next Meeting Banner */}
-                      {nextFomcMeeting && (
-                        <div className={`mb-4 p-3 rounded-xl border flex items-center gap-3 text-xs leading-relaxed ${
-                          isDarkMode 
-                            ? 'bg-amber-950/10 border-amber-900/30 text-amber-300' 
-                            : 'bg-amber-50/50 border-amber-100 text-amber-800'
-                        }`}>
-                          <Clock className="h-4 w-4 shrink-0 animate-pulse text-amber-500" />
-                          <div className="font-medium text-[11px]">
-                            နောက်ထပ် FOMC Meeting: <span className="font-bold underline">{nextFomcMeeting.date}, {nextFomcMeeting.year}</span> 
-                            {daysRemaining !== null && (
-                              <span className="ml-1 font-semibold block sm:inline">
-                                ({daysRemaining === 0 ? 'ယနေ့ ဖြစ်ပါသည်!' : `နောက်ထပ် ${daysRemaining} ရက်အလို`})
-                              </span>
-                            )}
-                          </div>
+                      {/* Year Selector Tabs */}
+                      <div className={`flex p-0.5 rounded-lg border transition-all ${
+                        isDarkMode ? 'bg-zinc-950 border-zinc-800' : 'bg-slate-100 border-slate-200'
+                      }`}>
+                        {([2026, 2027] as const).map((yr) => (
+                          <button
+                            key={yr}
+                            onClick={() => setFomcYear(yr)}
+                            className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
+                              fomcYear === yr
+                                ? (isDarkMode ? 'bg-zinc-800 text-zinc-100 shadow-xs border border-zinc-700/50' : 'bg-white text-slate-900 shadow-xs')
+                                : (isDarkMode ? 'text-zinc-400 hover:text-zinc-200' : 'text-slate-500 hover:text-slate-700')
+                            }`}
+                          >
+                            {yr}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Next Meeting Banner */}
+                    {nextFomcMeeting && (
+                      <div className={`mb-3.5 p-3 rounded-xl border flex items-center gap-3 text-xs leading-relaxed ${
+                        isDarkMode 
+                          ? 'bg-amber-950/20 border-amber-900/40 text-amber-300' 
+                          : 'bg-amber-50 border-amber-200/60 text-amber-800'
+                      }`}>
+                        <Clock className="h-4 w-4 shrink-0 animate-pulse text-amber-500" />
+                        <div className="font-medium text-[11px]">
+                          နောက်ထပ် FOMC Meeting: <span className="font-bold underline">{nextFomcMeeting.date}, {nextFomcMeeting.year}</span> 
+                          {daysRemaining !== null && (
+                            <span className="ml-1 font-semibold block sm:inline">
+                              ({daysRemaining === 0 ? 'ယနေ့ ဖြစ်ပါသည်!' : `နောက်ထပ် ${daysRemaining} ရက်အလို`})
+                            </span>
+                          )}
                         </div>
-                      )}
+                      </div>
+                    )}
 
-                      {/* Meetings List */}
-                      <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
-                        {filteredFomcMeetings.map((m, idx) => {
-                          const isPassed = m.originalDate < todayDateString;
-                          return (
-                            <div
-                              key={idx}
-                              className={`flex items-center justify-between p-2.5 rounded-xl border text-xs transition-all ${
+                    {/* Meetings List - Displays all 8 meetings naturally with smooth scrolling only if needed */}
+                    <div className="space-y-2 flex-1 pr-0.5">
+                      {filteredFomcMeetings.map((m, idx) => {
+                        const isPassed = m.originalDate < todayDateString;
+                        return (
+                          <div
+                            key={idx}
+                            className={`flex items-center justify-between p-2.5 rounded-xl border text-xs transition-all ${
+                              isPassed
+                                ? (isDarkMode ? 'bg-zinc-950/20 border-zinc-900/60 opacity-60' : 'bg-slate-50/50 border-slate-100 opacity-60')
+                                : (m.originalDate === nextFomcMeeting?.originalDate && m.year === nextFomcMeeting?.year
+                                  ? (isDarkMode ? 'bg-amber-500/10 border-amber-500/30 text-amber-200 shadow-xs' : 'bg-amber-50/70 border-amber-200 text-slate-900 shadow-xs')
+                                  : (isDarkMode ? 'bg-zinc-900/30 border-zinc-800/40 text-zinc-100 hover:border-zinc-700/50' : 'bg-white border-slate-200 text-slate-800 hover:bg-slate-50'))
+                            }`}
+                          >
+                            <div className="flex items-center space-x-3">
+                              {/* Calendar style square badge */}
+                              <div className={`flex flex-col items-center justify-center h-9 w-9 rounded-lg border text-center font-mono font-bold leading-none shrink-0 ${
                                 isPassed
-                                  ? (isDarkMode ? 'bg-zinc-950/10 border-zinc-900/60 opacity-60' : 'bg-slate-50/50 border-slate-100 opacity-60')
-                                  : (m.originalDate === nextFomcMeeting?.originalDate && m.year === nextFomcMeeting?.year
-                                    ? (isDarkMode ? 'bg-amber-500/5 border-amber-500/30 text-amber-200' : 'bg-amber-50/40 border-amber-200/60 text-slate-900')
-                                    : (isDarkMode ? 'bg-zinc-900/30 border-zinc-800/40 text-zinc-100 hover:border-zinc-700/50' : 'bg-white border-slate-200 text-slate-800 hover:bg-slate-50'))
-                              }`}
-                            >
-                              <div className="flex items-center space-x-3">
-                                {/* Calendar style square badge */}
-                                <div className={`flex flex-col items-center justify-center h-9 w-9 rounded-lg border text-center font-mono font-bold leading-none shrink-0 ${
-                                  isPassed
-                                    ? 'bg-zinc-100 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-500'
-                                    : m.originalDate === nextFomcMeeting?.originalDate && m.year === nextFomcMeeting?.year
-                                      ? 'bg-amber-500/10 border-amber-500/30 text-amber-500'
-                                      : 'bg-teal-500/5 border-teal-500/20 text-teal-500'
-                                }`}>
-                                  <span className="text-[8px] uppercase tracking-wider">{m.date.split(' ')[0]}</span>
-                                  <span className="text-xs mt-0.5">{m.date.split(' ')[1]?.split('–')[0] || m.date.split(' ')[1]}</span>
-                                </div>
-
-                                <div>
-                                  <div className="font-bold text-[11px] flex items-center gap-1.5">
-                                    <span>{m.date}</span>
-                                    {m.sep && (
-                                      <span className="bg-rose-500/10 text-rose-500 text-[8px] font-black uppercase px-1 rounded-sm border border-rose-500/20">
-                                        SEP
-                                      </span>
-                                    )}
-                                  </div>
-                                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5 font-sans leading-none">{m.notes}</p>
-                                </div>
+                                  ? 'bg-zinc-100 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-500'
+                                  : m.originalDate === nextFomcMeeting?.originalDate && m.year === nextFomcMeeting?.year
+                                    ? 'bg-amber-500/15 border-amber-500/40 text-amber-400 font-black'
+                                    : 'bg-teal-500/5 border-teal-500/20 text-teal-500'
+                              }`}>
+                                <span className="text-[8px] uppercase tracking-wider">{m.date.split(' ')[0]}</span>
+                                <span className="text-xs mt-0.5">{m.date.split(' ')[1]?.split('–')[0] || m.date.split(' ')[1]}</span>
                               </div>
 
-                              {/* Status Badge */}
-                              <div className="shrink-0">
-                                {isPassed ? (
-                                  <span className="text-[9px] font-bold uppercase text-zinc-500 px-1.5 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
-                                    Passed
-                                  </span>
-                                ) : m.originalDate === nextFomcMeeting?.originalDate && m.year === nextFomcMeeting?.year ? (
-                                  <span className="text-[9px] font-bold uppercase text-amber-500 px-1.5 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/20 animate-pulse">
-                                    Next
-                                  </span>
-                                ) : (
-                                  <span className="text-[9px] font-bold uppercase text-teal-500 px-1.5 py-0.5 rounded-md bg-teal-500/10 border border-teal-500/20">
-                                    Upcoming
-                                  </span>
-                                )}
+                              <div>
+                                <div className="font-bold text-[11px] flex items-center gap-1.5">
+                                  <span>{m.date}</span>
+                                  {m.sep && (
+                                    <span className="bg-rose-500/10 text-rose-500 text-[8px] font-black uppercase px-1 rounded-sm border border-rose-500/20">
+                                      SEP
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5 font-sans leading-none">{m.notes}</p>
                               </div>
                             </div>
-                          );
-                        })}
-                      </div>
+
+                            {/* Status Badge */}
+                            <div className="shrink-0">
+                              {isPassed ? (
+                                <span className="text-[9px] font-bold uppercase text-zinc-500 px-1.5 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+                                  Passed
+                                </span>
+                              ) : m.originalDate === nextFomcMeeting?.originalDate && m.year === nextFomcMeeting?.year ? (
+                                <span className="text-[9px] font-bold uppercase text-amber-400 px-1.5 py-0.5 rounded-md bg-amber-500/15 border border-amber-500/30 animate-pulse font-black">
+                                  Next
+                                </span>
+                              ) : (
+                                <span className="text-[9px] font-bold uppercase text-teal-500 px-1.5 py-0.5 rounded-md bg-teal-500/10 border border-teal-500/20">
+                                  Upcoming
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
 
                     {/* General Info Footer */}
