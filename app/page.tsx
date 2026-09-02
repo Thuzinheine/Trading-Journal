@@ -424,6 +424,93 @@ export default function Home() {
   const [coreCpiYyAct, setCoreCpiYyAct] = useState(3.2);
   const [coreCpiYyFc, setCoreCpiYyFc] = useState(3.2);
 
+  // ForexFactory Live Data Sync State
+  const [forexFactoryUrl, setForexFactoryUrl] = useState('https://www.forexfactory.com/calendar?week=aug2.2026');
+  const [isFetchingForexFactory, setIsFetchingForexFactory] = useState(false);
+  const [forexFactoryData, setForexFactoryData] = useState<{
+    source: string;
+    url: string;
+    weekLabel: string;
+    releaseDate: string;
+    nfp: {
+      title: string;
+      actual: number;
+      forecast: number;
+      previous: number;
+      unit: string;
+      impact: string;
+      currency: string;
+      effectDescription: string;
+    };
+    unemploymentRate?: {
+      title: string;
+      actual: number;
+      forecast: number;
+      previous: number;
+      unit: string;
+    };
+    averageHourlyEarnings?: {
+      title: string;
+      actual: number;
+      forecast: number;
+      previous: number;
+      unit: string;
+    };
+    cpi?: {
+      releaseDate: string;
+      cpiMmAct: number;
+      cpiMmFc: number;
+      cpiYyAct: number;
+      cpiYyFc: number;
+      coreCpiMmAct: number;
+      coreCpiMmFc: number;
+      coreCpiYyAct: number;
+      coreCpiYyFc: number;
+    };
+    relatedEvents?: Array<{
+      title: string;
+      date: string;
+      actual: string;
+      forecast: string;
+      previous: string;
+      impact: string;
+    }>;
+  } | null>(null);
+  const [showForexFactoryDetail, setShowForexFactoryDetail] = useState(false);
+
+  const fetchForexFactoryData = async (targetUrl?: string) => {
+    setIsFetchingForexFactory(true);
+    const urlToUse = targetUrl || forexFactoryUrl;
+    try {
+      const res = await fetch('/api/macro-calendar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: urlToUse })
+      });
+      const data = await res.json();
+      if (data && data.success && data.nfp) {
+        setNfpAct(data.nfp.actual);
+        setNfpFc(data.nfp.forecast);
+        if (data.cpi) {
+          setCpiMmAct(data.cpi.cpiMmAct);
+          setCpiMmFc(data.cpi.cpiMmFc);
+          setCpiYyAct(data.cpi.cpiYyAct);
+          setCpiYyFc(data.cpi.cpiYyFc);
+          setCoreCpiMmAct(data.cpi.coreCpiMmAct);
+          setCoreCpiMmFc(data.cpi.coreCpiMmFc);
+          setCoreCpiYyAct(data.cpi.coreCpiYyAct);
+          setCoreCpiYyFc(data.cpi.coreCpiYyFc);
+        }
+        setForexFactoryData(data);
+        setSelectedIndicatorMonth(`ForexFactory Live: ${data.weekLabel}`);
+      }
+    } catch (e) {
+      console.error('Failed to fetch ForexFactory data:', e);
+    } finally {
+      setIsFetchingForexFactory(false);
+    }
+  };
+
   const indicatorPresets: Record<string, {
     nfpAct: number; nfpFc: number;
     cpiMmAct: number; cpiMmFc: number;
@@ -6519,8 +6606,14 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                             <Activity className="h-5 w-5" />
                           </div>
                           <div>
-                            <h4 className="text-sm font-bold">NFP & CPI Rate Bias Predictor</h4>
-                            <p className="text-[10px] text-zinc-500">အလုပ်အကိုင်နှင့် ငွေကြေးဖောင်းပွမှု အခြေခံ အတိုးနှုန်းခန့်မှန်းချက်</p>
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-sm font-bold">NFP & CPI Rate Bias Predictor</h4>
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-teal-500/15 text-teal-400 border border-teal-500/30">
+                                <span className="h-1.5 w-1.5 rounded-full bg-teal-400 animate-pulse"></span>
+                                Live Sync Ready
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-zinc-500">ForexFactory Live Data & အတိုးနှုန်းခန့်မှန်းချက် Predictor</p>
                           </div>
                         </div>
 
@@ -6545,6 +6638,191 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                         </div>
                       </div>
 
+                      {/* ForexFactory Live Data Sync Bar */}
+                      <div className={`mb-4 p-3.5 rounded-xl border transition-all ${
+                        isDarkMode ? 'bg-zinc-950/60 border-teal-500/30' : 'bg-teal-50/50 border-teal-200'
+                      }`}>
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5 mb-2">
+                          <div className="flex items-center gap-2">
+                            <div className="p-1.5 rounded-lg bg-teal-500/15 text-teal-400">
+                              <Globe className="h-4 w-4" />
+                            </div>
+                            <div>
+                              <span className="text-xs font-bold text-teal-400 flex items-center gap-1.5">
+                                ForexFactory Calendar Live Integration
+                              </span>
+                              <span className="text-[10px] text-zinc-400 block">
+                                NFP & Macro Data များကို ForexFactory မှ တိုက်ရိုက်ဆွဲယူပြီး Bias တွက်ချက်ခြင်း
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Quick Preset Buttons */}
+                          <div className="flex flex-wrap gap-1.5 items-center">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setForexFactoryUrl('https://www.forexfactory.com/calendar?week=aug2.2026');
+                                fetchForexFactoryData('https://www.forexfactory.com/calendar?week=aug2.2026');
+                              }}
+                              className={`px-2 py-1 text-[10px] font-bold rounded-lg border transition-all cursor-pointer flex items-center gap-1 ${
+                                forexFactoryUrl.includes('aug2.2026')
+                                  ? 'bg-teal-500 text-zinc-950 border-teal-400'
+                                  : (isDarkMode ? 'bg-zinc-900 border-zinc-800 text-zinc-300 hover:text-teal-400' : 'bg-white border-slate-200 text-slate-700 hover:text-teal-600')
+                              }`}
+                            >
+                              <Zap className="h-3 w-3" />
+                              Aug 2, 2026 Week
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setForexFactoryUrl('https://www.forexfactory.com/calendar?month=sep.2026');
+                                fetchForexFactoryData('sep2026');
+                              }}
+                              className={`px-2 py-1 text-[10px] font-bold rounded-lg border transition-all cursor-pointer flex items-center gap-1 ${
+                                isDarkMode ? 'bg-zinc-900 border-zinc-800 text-zinc-300 hover:text-teal-400' : 'bg-white border-slate-200 text-slate-700 hover:text-teal-600'
+                              }`}
+                            >
+                              Sep 2026
+                            </button>
+
+                            <a
+                              href="https://www.forexfactory.com/calendar?week=aug2.2026"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={`px-2 py-1 text-[10px] font-medium rounded-lg border transition-all flex items-center gap-1 ${
+                                isDarkMode ? 'bg-zinc-900/60 border-zinc-800 text-zinc-400 hover:text-zinc-200' : 'bg-white border-slate-200 text-slate-600 hover:text-slate-800'
+                              }`}
+                            >
+                              <span>ForexFactory ဖွင့်ရန်</span>
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          </div>
+                        </div>
+
+                        {/* URL & Fetch Bar */}
+                        <div className="flex flex-col sm:flex-row gap-2 items-center mt-2">
+                          <div className="relative w-full">
+                            <input
+                              type="text"
+                              value={forexFactoryUrl}
+                              onChange={(e) => setForexFactoryUrl(e.target.value)}
+                              placeholder="https://www.forexfactory.com/calendar?week=aug2.2026"
+                              className={`w-full px-3 py-1.5 text-[11px] font-mono rounded-lg border transition-all ${
+                                isDarkMode 
+                                  ? 'bg-zinc-900/90 border-zinc-700/80 text-zinc-200 placeholder-zinc-500 focus:border-teal-500 focus:outline-none' 
+                                  : 'bg-white border-slate-300 text-slate-800 placeholder-slate-400 focus:border-teal-500 focus:outline-none'
+                              }`}
+                            />
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => fetchForexFactoryData()}
+                            disabled={isFetchingForexFactory}
+                            className={`w-full sm:w-auto px-4 py-1.5 rounded-lg text-xs font-bold shrink-0 transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm ${
+                              isFetchingForexFactory
+                                ? 'bg-teal-500/50 text-zinc-900 cursor-not-allowed'
+                                : 'bg-teal-500 hover:bg-teal-400 active:scale-95 text-zinc-950 font-black'
+                            }`}
+                          >
+                            <RefreshCw className={`h-3.5 w-3.5 ${isFetchingForexFactory ? 'animate-spin' : ''}`} />
+                            <span>{isFetchingForexFactory ? 'Fetching Live...' : '⚡ Fetch Live Data'}</span>
+                          </button>
+                        </div>
+
+                        {/* Synced Info Badge */}
+                        {forexFactoryData && (
+                          <div className="mt-3 pt-2.5 border-t border-teal-500/20 text-[11px] space-y-2">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="flex items-center gap-1.5 text-teal-400 font-bold">
+                                <CheckCircle2 className="h-4 w-4 shrink-0 text-teal-400" />
+                                <span>Synced: {forexFactoryData.weekLabel}</span>
+                                <span className="text-zinc-500 text-[10px] font-normal">({forexFactoryData.releaseDate})</span>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => setShowForexFactoryDetail(!showForexFactoryDetail)}
+                                className="text-[10px] font-bold text-zinc-400 hover:text-teal-400 flex items-center gap-1 cursor-pointer"
+                              >
+                                <span>{showForexFactoryDetail ? 'Hide Schedule' : 'View Week Schedule'}</span>
+                                <ChevronDown className={`h-3 w-3 transition-transform ${showForexFactoryDetail ? 'rotate-180' : ''}`} />
+                              </button>
+                            </div>
+
+                            {/* Macro Snapshot Pills */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                              <div className={`p-2 rounded-lg border ${isDarkMode ? 'bg-zinc-900/60 border-zinc-800' : 'bg-white border-slate-200'}`}>
+                                <span className="text-[9px] text-zinc-500 block">🇺🇸 NFP Actual</span>
+                                <span className="text-xs font-mono font-black text-teal-400">{forexFactoryData.nfp.actual}K</span>
+                                <span className="text-[8px] text-zinc-500 block">Fc: {forexFactoryData.nfp.forecast}K | Prev: {forexFactoryData.nfp.previous}K</span>
+                              </div>
+
+                              <div className={`p-2 rounded-lg border ${isDarkMode ? 'bg-zinc-900/60 border-zinc-800' : 'bg-white border-slate-200'}`}>
+                                <span className="text-[9px] text-zinc-500 block">Unemployment</span>
+                                <span className="text-xs font-mono font-black text-zinc-300">
+                                  {forexFactoryData.unemploymentRate?.actual ?? 4.1}%
+                                </span>
+                                <span className="text-[8px] text-zinc-500 block">Fc: {forexFactoryData.unemploymentRate?.forecast ?? 4.1}%</span>
+                              </div>
+
+                              <div className={`p-2 rounded-lg border ${isDarkMode ? 'bg-zinc-900/60 border-zinc-800' : 'bg-white border-slate-200'}`}>
+                                <span className="text-[9px] text-zinc-500 block">Avg Hourly Earnings</span>
+                                <span className="text-xs font-mono font-black text-amber-400">
+                                  {forexFactoryData.averageHourlyEarnings?.actual ?? 0.1}%
+                                </span>
+                                <span className="text-[8px] text-zinc-500 block">Fc: {forexFactoryData.averageHourlyEarnings?.forecast ?? 0.3}%</span>
+                              </div>
+
+                              <div className={`p-2 rounded-lg border ${isDarkMode ? 'bg-zinc-900/60 border-zinc-800' : 'bg-white border-slate-200'}`}>
+                                <span className="text-[9px] text-zinc-500 block">Market Impact</span>
+                                <span className={`text-[10px] font-bold block truncate ${
+                                  forexFactoryData.nfp.actual < forexFactoryData.nfp.forecast ? 'text-emerald-400' : 'text-rose-400'
+                                }`}>
+                                  {forexFactoryData.nfp.actual < forexFactoryData.nfp.forecast ? 'Dovish (Rate Cut)' : 'Hawkish (Rate Hike)'}
+                                </span>
+                                <span className="text-[8px] text-zinc-500 block">ForexFactory Impact: High</span>
+                              </div>
+                            </div>
+
+                            {forexFactoryData.nfp.effectDescription && (
+                              <p className="text-[10px] text-zinc-400 bg-teal-500/5 p-2 rounded-md border border-teal-500/20 leading-relaxed font-sans">
+                                💡 <strong className="text-teal-400">ForexFactory Analysis:</strong> {forexFactoryData.nfp.effectDescription}
+                              </p>
+                            )}
+
+                            {/* Expandable Release Schedule */}
+                            {showForexFactoryDetail && forexFactoryData.relatedEvents && (
+                              <div className={`mt-2 p-2.5 rounded-lg border text-[10px] space-y-1.5 ${
+                                isDarkMode ? 'bg-zinc-900/80 border-zinc-800' : 'bg-white border-slate-200'
+                              }`}>
+                                <span className="font-bold text-zinc-300 block mb-1">📅 ForexFactory Weekly Economic Events:</span>
+                                <div className="space-y-1">
+                                  {forexFactoryData.relatedEvents.map((evt, idx) => (
+                                    <div key={idx} className="flex items-center justify-between py-1 border-b border-zinc-800/40 last:border-0">
+                                      <div className="flex items-center gap-2">
+                                        <span className={`px-1 rounded text-[8px] font-bold ${
+                                          evt.impact === 'High' ? 'bg-rose-500/20 text-rose-400' : 'bg-amber-500/20 text-amber-400'
+                                        }`}>{evt.impact}</span>
+                                        <span className="text-zinc-300 font-medium">{evt.title}</span>
+                                      </div>
+                                      <div className="flex items-center gap-2 font-mono text-[9px]">
+                                        <span className="text-zinc-500">{evt.date}</span>
+                                        <span className="text-teal-400 font-bold">Act: {evt.actual}</span>
+                                        <span className="text-zinc-400">Fc: {evt.forecast}</span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
                       {/* Info Note */}
                       <div className={`mb-4 p-2.5 rounded-xl border text-[10px] flex items-start gap-2 leading-relaxed ${
                         isDarkMode ? 'bg-zinc-900/30 border-zinc-800/50 text-zinc-400' : 'bg-slate-50 border-slate-150 text-slate-600'
@@ -6562,20 +6840,33 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                         <div className={`p-4 rounded-xl border ${isDarkMode ? 'bg-zinc-950/20 border-zinc-800/60' : 'bg-slate-50/40 border-slate-150'}`}>
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-xs font-bold text-teal-500 flex items-center gap-1">
-                              🇺🇸 NFP Employment
+                              🇺🇸 NFP Employment (Non-Farm Payrolls)
                             </span>
                             <span className="text-[9px] text-zinc-500 font-medium">1st Friday • 8:30 AM ET</span>
                           </div>
                           
                           <div className="space-y-3">
                             <div>
-                              <div className="flex justify-between text-[10px] mb-1 font-medium">
+                              <div className="flex justify-between items-center text-[10px] mb-1 font-medium">
                                 <span className="text-zinc-400">Actual (အမှန်ထွက်ရှိချက်)</span>
-                                <span className="font-mono font-bold text-teal-400">{nfpAct}k</span>
+                                <div className="flex items-center gap-1">
+                                  <input
+                                    type="number"
+                                    value={nfpAct}
+                                    onChange={(e) => {
+                                      setNfpAct(Number(e.target.value));
+                                      setSelectedIndicatorMonth('Custom');
+                                    }}
+                                    className={`w-16 px-1.5 py-0.5 rounded text-right font-mono font-bold text-[10px] border ${
+                                      isDarkMode ? 'bg-zinc-900 border-zinc-800 text-teal-400' : 'bg-white border-slate-200 text-teal-600'
+                                    }`}
+                                  />
+                                  <span className="font-mono font-bold text-teal-400">k</span>
+                                </div>
                               </div>
                               <input
                                 type="range"
-                                min="50"
+                                min="-100"
                                 max="350"
                                 step="5"
                                 value={nfpAct}
@@ -6588,13 +6879,26 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                             </div>
 
                             <div>
-                              <div className="flex justify-between text-[10px] mb-1 font-medium">
+                              <div className="flex justify-between items-center text-[10px] mb-1 font-medium">
                                 <span className="text-zinc-400">Forecast (ခန့်မှန်းချက်)</span>
-                                <span className="font-mono font-bold text-zinc-500">{nfpFc}k</span>
+                                <div className="flex items-center gap-1">
+                                  <input
+                                    type="number"
+                                    value={nfpFc}
+                                    onChange={(e) => {
+                                      setNfpFc(Number(e.target.value));
+                                      setSelectedIndicatorMonth('Custom');
+                                    }}
+                                    className={`w-16 px-1.5 py-0.5 rounded text-right font-mono font-bold text-[10px] border ${
+                                      isDarkMode ? 'bg-zinc-900 border-zinc-800 text-zinc-400' : 'bg-white border-slate-200 text-zinc-600'
+                                    }`}
+                                  />
+                                  <span className="font-mono font-bold text-zinc-500">k</span>
+                                </div>
                               </div>
                               <input
                                 type="range"
-                                min="50"
+                                min="-50"
                                 max="350"
                                 step="5"
                                 value={nfpFc}
@@ -6610,7 +6914,7 @@ function normalizeResultStatus(raw: string | undefined | null): 'TP' | 'SL' | 'B
                           <div className="mt-3 pt-2 border-t border-zinc-200/10 flex justify-between text-[10px] text-zinc-500">
                             <span>Effect:</span>
                             <span className={nfpAct > nfpFc ? 'text-rose-400 font-bold' : 'text-emerald-400 font-bold'}>
-                              {nfpAct > nfpFc ? 'Actual > Forecast (Hawkish)' : 'Actual < Forecast (Dovish)'}
+                              {nfpAct > nfpFc ? 'Actual > Forecast (Hawkish / USD Up)' : 'Actual < Forecast (Dovish / Rate Cut Bias)'}
                             </span>
                           </div>
                         </div>
